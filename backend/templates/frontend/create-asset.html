@@ -1,0 +1,340 @@
+{% extends "frontend/base.html" %}
+
+{% block title %}Add Asset - IT Management Platform{% endblock %}
+
+{% block page_title %}Add New Asset{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Add New Asset</h1>
+        <p class="text-gray-600">Register a new hardware or software asset in the system</p>
+    </div>
+
+    <!-- Form -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        {% if form.non_field_errors %}
+        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert" aria-live="polite">
+            <div class="text-red-800">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <h4 class="font-medium">Form Error</h4>
+                </div>
+                {% for error in form.non_field_errors %}
+                    <p class="text-sm">{{ error }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="POST" class="space-y-8">
+            {% csrf_token %}
+
+            <!-- Basic Information Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Basic Information</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Asset Name -->
+                    <div class="md:col-span-2">
+                        <label for="id_name" class="block text-sm font-medium text-gray-700 mb-2">
+                            Asset Name <span class="text-red-500">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="id_name" 
+                            name="name"
+                            value="{{ form.name.value|default:'' }}"
+                            placeholder="Enter asset name"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                        {% if form.name.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Asset Type -->
+                    <div>
+                        <label for="id_asset_type" class="block text-sm font-medium text-gray-700 mb-2">
+                            Asset Type <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="id_asset_type" 
+                            name="asset_type"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                            <option value="">Select asset type</option>
+                            <option value="HARDWARE" {% if form.asset_type.value == 'HARDWARE' %}selected{% endif %}>Hardware</option>
+                            <option value="SOFTWARE" {% if form.asset_type.value == 'SOFTWARE' %}selected{% endif %}>Software</option>
+                        </select>
+                        {% if form.asset_type.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.asset_type.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Category -->
+                    <div>
+                        <label for="id_category" class="block text-sm font-medium text-gray-700 mb-2">
+                            Category <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="id_category" 
+                            name="category"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                            <option value="">Select a category</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if form.category.value|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ category.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        {% if form.category.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.category.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Description</h2>
+                
+                <div>
+                    <label for="id_description" class="block text-sm font-medium text-gray-700 mb-2">
+                        Description
+                    </label>
+                    <textarea 
+                        id="id_description" 
+                        name="description"
+                        rows="4"
+                        placeholder="Provide a detailed description of the asset..."
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                    >{{ form.description.value|default:'' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Identification Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Identification</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Serial Number -->
+                    <div>
+                        <label for="id_serial_number" class="block text-sm font-medium text-gray-700 mb-2">
+                            Serial Number
+                        </label>
+                        <input 
+                            type="text" 
+                            id="id_serial_number" 
+                            name="serial_number"
+                            value="{{ form.serial_number.value|default:'' }}"
+                            placeholder="Enter serial number"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                        {% if form.serial_number.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.serial_number.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Model -->
+                    <div>
+                        <label for="id_model" class="block text-sm font-medium text-gray-700 mb-2">
+                            Model
+                        </label>
+                        <input 
+                            type="text" 
+                            id="id_model" 
+                            name="model"
+                            value="{{ form.model.value|default:'' }}"
+                            placeholder="Enter model"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- Manufacturer -->
+                    <div>
+                        <label for="id_manufacturer" class="block text-sm font-medium text-gray-700 mb-2">
+                            Manufacturer
+                        </label>
+                        <input 
+                            type="text" 
+                            id="id_manufacturer" 
+                            name="manufacturer"
+                            value="{{ form.manufacturer.value|default:'' }}"
+                            placeholder="Enter manufacturer"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- Version -->
+                    <div>
+                        <label for="id_version" class="block text-sm font-medium text-gray-700 mb-2">
+                            Version
+                        </label>
+                        <input 
+                            type="text" 
+                            id="id_version" 
+                            name="version"
+                            value="{{ form.version.value|default:'' }}"
+                            placeholder="Enter version"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lifecycle Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Lifecycle & Status</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Status -->
+                    <div>
+                        <label for="id_status" class="block text-sm font-medium text-gray-700 mb-2">
+                            Status <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="id_status" 
+                            name="status"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                            <option value="">Select status</option>
+                            <option value="ACTIVE" {% if form.status.value == 'ACTIVE' %}selected{% endif %}>Active</option>
+                            <option value="INACTIVE" {% if form.status.value == 'INACTIVE' %}selected{% endif %}>Inactive</option>
+                            <option value="IN_REPAIR" {% if form.status.value == 'IN_REPAIR' %}selected{% endif %}>In Repair</option>
+                            <option value="RETIRED" {% if form.status.value == 'RETIRED' %}selected{% endif %}>Retired</option>
+                            <option value="DISPOSED" {% if form.status.value == 'DISPOSED' %}selected{% endif %}>Disposed</option>
+                            <option value="MISSING" {% if form.status.value == 'MISSING' %}selected{% endif %}>Missing</option>
+                        </select>
+                        {% if form.status.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.status.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Purchase Date -->
+                    <div>
+                        <label for="id_purchase_date" class="block text-sm font-medium text-gray-700 mb-2">
+                            Purchase Date
+                        </label>
+                        <input 
+                            type="date" 
+                            id="id_purchase_date" 
+                            name="purchase_date"
+                            value="{{ form.purchase_date.value|default:'' }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- Purchase Cost -->
+                    <div>
+                        <label for="id_purchase_cost" class="block text-sm font-medium text-gray-700 mb-2">
+                            Purchase Cost
+                        </label>
+                        <input 
+                            type="number" 
+                            id="id_purchase_cost" 
+                            name="purchase_cost"
+                            value="{{ form.purchase_cost.value|default:'' }}"
+                            placeholder="Enter purchase cost"
+                            step="0.01"
+                            min="0"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- Warranty Expiry -->
+                    <div>
+                        <label for="id_warranty_expiry" class="block text-sm font-medium text-gray-700 mb-2">
+                            Warranty Expiry
+                        </label>
+                        <input 
+                            type="date" 
+                            id="id_warranty_expiry" 
+                            name="warranty_expiry"
+                            value="{{ form.warranty_expiry.value|default:'' }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- End of Life -->
+                    <div>
+                        <label for="id_end_of_life" class="block text-sm font-medium text-gray-700 mb-2">
+                            End of Life
+                        </label>
+                        <input 
+                            type="date" 
+                            id="id_end_of_life" 
+                            name="end_of_life"
+                            value="{{ form.end_of_life.value|default:'' }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignment Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Assignment & Location</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Assigned To -->
+                    <div>
+                        <label for="id_assigned_to" class="block text-sm font-medium text-gray-700 mb-2">
+                            Assigned To
+                        </label>
+                        <select 
+                            id="id_assigned_to" 
+                            name="assigned_to"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                            <option value="">Unassigned</option>
+                            {% for user in available_users %}
+                                <option value="{{ user.id }}" {% if form.assigned_to.value|stringformat:"s" == user.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ user.username }} ({{ user.get_role_display }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Location -->
+                    <div>
+                        <label for="id_location" class="block text-sm font-medium text-gray-700 mb-2">
+                            Location
+                        </label>
+                        <input 
+                            type="text" 
+                            id="id_location" 
+                            name="location"
+                            value="{{ form.location.value|default:'' }}"
+                            placeholder="Enter asset location"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between pt-8">
+                <a href="{% url 'frontend:assets' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Cancel
+                </a>
+                
+                <button 
+                    type="submit" 
+                    class="inline-flex items-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition"
+                >
+                    <i class="fas fa-check mr-2"></i>
+                    Add Asset
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

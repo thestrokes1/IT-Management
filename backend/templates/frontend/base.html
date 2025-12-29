@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}IT Management Platform{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Additional Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+        .main-content {
+            transition: margin-left 0.3s ease-in-out;
+        }
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        
+        /* Toast Notifications */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .toast {
+            margin-bottom: 10px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease-in-out;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .toast.success {
+            background-color: #10b981;
+            color: white;
+        }
+        .toast.error {
+            background-color: #ef4444;
+            color: white;
+        }
+        .toast.info {
+            background-color: #3b82f6;
+            color: white;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+        .toast.hide {
+            animation: slideOut 0.3s ease-in-out forwards;
+        }
+        
+        /* Confirmation Modal */
+        #confirmModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+        #confirmModal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.3s ease-in-out;
+        }
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1f2937;
+        }
+        .modal-body {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .modal-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .modal-btn-cancel {
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .modal-btn-cancel:hover {
+            background-color: #d1d5db;
+        }
+        .modal-btn-confirm {
+            background-color: #ef4444;
+            color: white;
+        }
+        .modal-btn-confirm:hover {
+            background-color: #dc2626;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Confirmation Modal -->
+    <div id="confirmModal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalTitle">Confirm Action</div>
+            <div class="modal-body" id="modalMessage">Are you sure?</div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="modal-btn modal-btn-confirm" id="confirmBtn" onclick="executeConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform lg:translate-x-0 lg:static lg:inset-0">
+            <div class="flex items-center justify-center h-16 px-4 bg-primary-600">
+                <div class="flex items-center">
+                    <i class="fas fa-laptop-code text-white text-xl mr-2"></i>
+                    <h1 class="text-white text-lg font-bold">IT Management</h1>
+                </div>
+                <button id="sidebar-toggle" class="lg:hidden ml-auto text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <nav class="mt-8">
+                <div class="px-4">
+                    <a href="{% url 'frontend:dashboard' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg {% if request.resolver_match.url_name == 'dashboard' %}bg-primary-100 text-primary-700{% endif %}">
+                        <i class="fas fa-tachometer-alt mr-3"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    
+                    <a href="{% url 'frontend:assets' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'assets' %}bg-primary-100 text-primary-700{% endif %}">
+                        <i class="fas fa-desktop mr-3"></i>
+                        <span>Assets</span>
+                        {% if dashboard_stats.total_assets > 0 %}
+                        <span class="ml-auto bg-primary-500 text-white text-xs px-2 py-1 rounded-full">{{ dashboard_stats.total_assets }}</span>
+                        {% endif %}
+                    </a>
+                    
+                    <a href="{% url 'frontend:projects' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'projects' %}bg-primary-100 text-primary-700{% endif %}">
+                        <i class="fas fa-project-diagram mr-3"></i>
+                        <span>Projects</span>
+                        {% if dashboard_stats.active_projects > 0 %}
+                        <span class="ml-auto bg-green-500 text-white text-xs px-2 py-1 rounded-full">{{ dashboard_stats.active_projects }}</span>
+                        {% endif %}
+                    </a>
+                    
+                    <a href="{% url 'frontend:tickets' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'tickets' %}bg-primary-100 text-primary-700{% endif %}">
+                        <i class="fas fa-ticket-alt mr-3"></i>
+                        <span>Tickets</span>
+                        {% if dashboard_stats.open_tickets > 0 %}
+                        <span class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full notification-badge">{{ dashboard_stats.open_tickets }}</span>
+                        {% endif %}
+                    </a>
+                    
+                    <a href="{% url 'frontend:users' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'users' %}bg-primary-100 text-primary-700{% endif %}">
+                        <i class="fas fa-users mr-3"></i>
+                        <span>Users</span>
+                        {% if dashboard_stats.active_users > 0 %}
+                        <span class="ml-auto bg-blue-500 text-white text-xs px-2 py-1 rounded-full">{{ dashboard_stats.active_users }}</span>
+                        {% endif %}
+                    </a>
+                    
+                    <a href="{% url 'frontend:logs' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'logs' %}bg-primary-100 text-primary-700{% endif %}">
+                        <i class="fas fa-list-alt mr-3"></i>
+                        <span>Logs</span>
+                    </a>
+                    
+                    <a href="{% url 'frontend:reports' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'reports' %}bg-primary-100 text-primary-700{% endif %}">
+                        <i class="fas fa-chart-bar mr-3"></i>
+                        <span>Reports</span>
+                    </a>
+                </div>
+                
+                {% if user.is_authenticated %}
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                    <div class="px-4">
+                        <div class="flex items-center px-4 py-2 text-gray-700">
+                            <i class="fas fa-user-circle mr-3"></i>
+                            <div>
+                                <div class="text-sm font-medium">{{ user.username }}</div>
+                                <div class="text-xs text-gray-500">{{ user.get_role_display }}</div>
+                            </div>
+                        </div>
+                        
+                        <a href="{% url 'frontend:profile' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'profile' %}bg-primary-100 text-primary-700{% endif %}">
+                            <i class="fas fa-user mr-3"></i>
+                            <span>Profile</span>
+                        </a>
+                        
+                        <a href="{% url 'frontend:logout' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-700 rounded-lg mt-1">
+                            <i class="fas fa-sign-out-alt mr-3"></i>
+                            <span>Logout</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </nav>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden main-content lg:ml-64">
+            <!-- Top Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="flex items-center justify-between h-16 px-4">
+                    <div class="flex items-center">
+                        <button id="mobile-sidebar-toggle" class="lg:hidden text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-bars text-xl"></i>
+                        </button>
+                        <h2 class="ml-4 lg:ml-0 text-xl font-semibold text-gray-800">
+                            {% block page_title %}Dashboard{% endblock %}
+                        </h2>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <!-- Search -->
+                        <div class="hidden md:block relative">
+                            <input type="text" id="global-search" placeholder="Search..." 
+                                   class="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                            <div id="search-results" class="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 hidden z-50"></div>
+                        </div>
+                        
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <button id="notifications-toggle" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-bell text-xl"></i>
+                                <span id="notification-count" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
+                            </button>
+                            <div id="notifications-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                <div class="p-4 border-b border-gray-200">
+                                    <h3 class="text-lg font-semibold">Notifications</h3>
+                                </div>
+                                <div class="max-h-64 overflow-y-auto">
+                                    <div class="p-4 border-b border-gray-100 hover:bg-gray-50">
+                                        <div class="text-sm font-medium">New ticket assigned</div>
+                                        <div class="text-xs text-gray-500 mt-1">2 minutes ago</div>
+                                    </div>
+                                    <div class="p-4 border-b border-gray-100 hover:bg-gray-50">
+                                        <div class="text-sm font-medium">Project milestone reached</div>
+                                        <div class="text-xs text-gray-500 mt-1">1 hour ago</div>
+                                    </div>
+                                </div>
+                                <div class="p-4 border-t border-gray-200">
+                                    <a href="#" class="text-sm text-primary-600 hover:text-primary-700">View all notifications</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User Menu -->
+                        {% if user.is_authenticated %}
+                        <div class="relative">
+                            <button id="user-menu-toggle" class="flex items-center text-gray-700 hover:text-gray-900">
+                                <img class="h-8 w-8 rounded-full bg-gray-300" 
+                                     src="https://ui-avatars.com/api/?name={{ user.username }}&background=3b82f6&color=fff" 
+                                     alt="{{ user.username }}">
+                            </button>
+                            <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                <div class="p-2">
+                                    <a href="{% url 'frontend:profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">Profile</a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">Settings</a>
+                                    <hr class="my-2">
+                                    <a href="{% url 'frontend:logout' %}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded">Logout</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
+                <div class="container mx-auto px-4 py-6">
+                    <!-- Breadcrumb -->
+                    {% block breadcrumb %}
+                    <nav class="flex mb-6" aria-label="Breadcrumb">
+                        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                            <li class="inline-flex items-center">
+                                <a href="{% url 'frontend:dashboard' %}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-primary-600">
+                                    <i class="fas fa-home mr-2"></i>
+                                    Dashboard
+                                </a>
+                            </li>
+                        </ol>
+                    </nav>
+                    {% endblock %}
+                    
+                    <!-- Page Content -->
+                    {% block content %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                        <!-- Stats Cards -->
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-users text-2xl text-blue-500"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Active Users</p>
+                                    <p class="text-2xl font-semibold text-gray-900">{{ dashboard_stats.active_users|default:0 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-desktop text-2xl text-green-500"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Total Assets</p>
+                                    <p class="text-2xl font-semibold text-gray-900">{{ dashboard_stats.total_assets|default:0 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-project-diagram text-2xl text-yellow-500"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Active Projects</p>
+                                    <p class="text-2xl font-semibold text-gray-900">{{ dashboard_stats.active_projects|default:0 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-ticket-alt text-2xl text-red-500"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Open Tickets</p>
+                                    <p class="text-2xl font-semibold text-gray-900">{{ dashboard_stats.open_tickets|default:0 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="bg-white rounded-lg shadow mb-6">
+                        <div class="p-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <button onclick="showCreateTicketModal()" class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors">
+                                    <div class="text-center">
+                                        <i class="fas fa-plus text-2xl text-gray-400 mb-2"></i>
+                                        <p class="text-sm font-medium text-gray-600">Create Ticket</p>
+                                    </div>
+                                </button>
+                                
+                                <button onclick="showCreateProjectModal()" class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors">
+                                    <div class="text-center">
+                                        <i class="fas fa-project-diagram text-2xl text-gray-400 mb-2"></i>
+                                        <p class="text-sm font-medium text-gray-600">New Project</p>
+                                    </div>
+                                </button>
+                                
+                                <button onclick="showCreateAssetModal()" class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors">
+                                    <div class="text-center">
+                                        <i class="fas fa-desktop text-2xl text-gray-400 mb-2"></i>
+                                        <p class="text-sm font-medium text-gray-600">Add Asset</p>
+                                    </div>
+                                </button>
+                                
+                                <button onclick="showReportsModal()" class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors">
+                                    <div class="text-center">
+                                        <i class="fas fa-chart-bar text-2xl text-gray-400 mb-2"></i>
+                                        <p class="text-sm font-medium text-gray-600">Generate Report</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Activity -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="p-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
+                            <div class="space-y-4">
+                                {% for log in recent_logs %}
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex-shrink-0">
+                                        <div class="h-8 w-8 bg-primary-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-user text-white text-xs"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-gray-900">{{ log.title }}</p>
+                                        <p class="text-sm text-gray-500">{{ log.description }}</p>
+                                        <p class="text-xs text-gray-400">{{ log.timestamp|timesince }} ago</p>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="text-center text-gray-500 py-8">
+                                    <i class="fas fa-info-circle text-2xl mb-2"></i>
+                                    <p>No recent activity</p>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+    
+    <!-- Overlay for mobile sidebar -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-40 hidden lg:hidden"></div>
+    
+    <!-- Modals -->
+    <div id="modal-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 hidden">
+        <!-- Create Ticket Modal -->
+        <div id="create-ticket-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+                <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                    <form id="create-ticket-form">
+                        <div>
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Create New Ticket</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Title</label>
+                                    <input type="text" name="title" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                                    <textarea name="description" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                            <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm">
+                                Create Ticket
+                            </button>
+                            <button type="button" onclick="hideModal('create-ticket-modal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script>
+        // Mobile sidebar toggle
+        document.getElementById('mobile-sidebar-toggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.remove('lg:translate-x-0');
+            document.getElementById('sidebar').classList.add('-translate-x-full');
+            document.getElementById('sidebar-overlay').classList.remove('hidden');
+        });
+        
+        // Close mobile sidebar
+        document.getElementById('sidebar-toggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.add('lg:translate-x-0');
+            document.getElementById('sidebar').classList.remove('-translate-x-full');
+            document.getElementById('sidebar-overlay').classList.add('hidden');
+        });
+        
+        // Close sidebar overlay
+        document.getElementById('sidebar-overlay').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.add('lg:translate-x-0');
+            document.getElementById('sidebar').classList.remove('-translate-x-full');
+            this.classList.add('hidden');
+        });
+        
+        // Notifications dropdown
+        document.getElementById('notifications-toggle').addEventListener('click', function() {
+            document.getElementById('notifications-dropdown').classList.toggle('hidden');
+        });
+        
+        // User menu dropdown
+        document.getElementById('user-menu-toggle').addEventListener('click', function() {
+            document.getElementById('user-menu-dropdown').classList.toggle('hidden');
+        });
+        
+        // Global search
+        document.getElementById('global-search').addEventListener('input', function() {
+            const query = this.value;
+            if (query.length > 2) {
+                // Implement search functionality
+                fetch(`/api/search/?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const resultsContainer = document.getElementById('search-results');
+                        if (data.count > 0) {
+                            let html = '<div class="p-2">';
+                            if (data.results.users) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1">Users</div>';
+                                data.results.users.forEach(user => {
+                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${user.username}</div>`;
+                                });
+                            }
+                            if (data.results.tickets) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1 mt-2">Tickets</div>';
+                                data.results.tickets.forEach(ticket => {
+                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${ticket.title}</div>`;
+                                });
+                            }
+                            html += '</div>';
+                            resultsContainer.innerHTML = html;
+                            resultsContainer.classList.remove('hidden');
+                        } else {
+                            resultsContainer.classList.add('hidden');
+                        }
+                    });
+            } else {
+                document.getElementById('search-results').classList.add('hidden');
+            }
+        });
+        
+        // Modal functions
+        function showModal(modalId) {
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+        
+        function hideModal(modalId) {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            document.getElementById(modalId).classList.add('hidden');
+        }
+        
+        function showCreateTicketModal() {
+            showModal('create-ticket-modal');
+        }
+        
+        // Form submissions
+        document.getElementById('create-ticket-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            formData.append('action', 'create_ticket');
+            
+            fetch('/api/quick-actions/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    hideModal('create-ticket-modal');
+                    this.reset();
+                    location.reload(); // Refresh to show new ticket
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        });
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('#notifications-toggle')) {
+                document.getElementById('notifications-dropdown').classList.add('hidden');
+            }
+            if (!event.target.closest('#user-menu-toggle')) {
+                document.getElementById('user-menu-dropdown').classList.add('hidden');
+            }
+        });
+        
+        // Auto-refresh dashboard stats every 30 seconds
+        setInterval(function() {
+            fetch('/frontend/api/dashboard/')
+                .then(response => response.json())
+                .then(data => {
+                    // Update stats display
+                    console.log('Dashboard stats updated:', data.stats);
+                });
+        }, 30000);
+        
+        // Enhanced Toast notification system
+        function showToast(message, type = 'info', duration = 5000) {
+            const container = document.getElementById('toast-container');
+            const toastId = 'toast-' + Date.now();
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `toast ${type} transform translate-x-full opacity-0 transition-all duration-300 ease-in-out mb-2`;
+            
+            const backgroundClass = getToastBackground(type);
+            const textColorClass = getToastTextColor(type);
+            const icon = getToastIcon(type);
+            
+            toast.innerHTML = `
+                <div class="flex items-center p-4 rounded-lg shadow-lg max-w-sm w-full ${backgroundClass}">
+                    <div class="flex-shrink-0">
+                        ${icon}
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <p class="text-sm font-medium ${textColorClass}">${message}</p>
+                    </div>
+                    <button class="ml-auto pl-3 ${textColorClass} hover:opacity-75" onclick="hideToast('${toastId}')">
+                        <span class="sr-only">Close</span>
+                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            }, 100);
+            
+            if (duration > 0) {
+                setTimeout(() => {
+                    hideToast(toastId);
+                }, duration);
+            }
+        }
+
+        function hideToast(toastId) {
+            const toast = document.getElementById(toastId);
+            if (toast) {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }
+        }
+
+        function getToastIcon(type) {
+            const icons = {
+                success: '<i class="fas fa-check-circle text-green-500"></i>',
+                error: '<i class="fas fa-exclamation-circle text-red-500"></i>',
+                warning: '<i class="fas fa-exclamation-triangle text-yellow-500"></i>',
+                info: '<i class="fas fa-info-circle text-blue-500"></i>'
+            };
+            return icons[type] || icons.info;
+        }
+
+        function getToastBackground(type) {
+            const backgrounds = {
+                success: 'bg-green-50 border border-green-200',
+                error: 'bg-red-50 border border-red-200',
+                warning: 'bg-yellow-50 border border-yellow-200',
+                info: 'bg-blue-50 border border-blue-200'
+            };
+            return backgrounds[type] || backgrounds.info;
+        }
+
+        function getToastTextColor(type) {
+            const colors = {
+                success: 'text-green-800',
+                error: 'text-red-800',
+                warning: 'text-yellow-800',
+                info: 'text-blue-800'
+            };
+            return colors[type] || colors.info;
+        }
+
+        // Standardized error handling function
+        function handleApiError(error, context = '') {
+            console.error('API Error' + (context ? ` in ${context}` : ''), error);
+            
+            let message = 'An unexpected error occurred';
+            let type = 'error';
+            
+            if (error.response) {
+                // Server responded with error status
+                if (error.response.status === 400) {
+                    message = error.response.data?.message || 'Invalid request. Please check your input.';
+                    type = 'warning';
+                } else if (error.response.status === 401) {
+                    message = 'You are not authorized to perform this action.';
+                } else if (error.response.status === 403) {
+                    message = 'Access denied. You do not have permission to perform this action.';
+                } else if (error.response.status === 404) {
+                    message = 'The requested resource was not found.';
+                } else if (error.response.status >= 500) {
+                    message = 'Server error. Please try again later.';
+                } else {
+                    message = error.response.data?.message || `Error ${error.response.status}: ${error.response.statusText}`;
+                }
+            } else if (error.request) {
+                // Network error
+                message = 'Network error. Please check your internet connection and try again.';
+            } else {
+                // Other error
+                message = error.message || 'An unexpected error occurred.';
+            }
+            
+            showToast(message, type);
+            return message;
+        }
+
+        // Standardized form validation helper
+        function validateForm(formElement) {
+            const requiredFields = formElement.querySelectorAll('[required]');
+            let isValid = true;
+            const errors = [];
+            
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    isValid = false;
+                    errors.push(`${field.labels[0]?.textContent || field.name} is required`);
+                    field.classList.add('border-red-300', 'focus:border-red-500');
+                } else {
+                    field.classList.remove('border-red-300', 'focus:border-red-500');
+                }
+            });
+            
+            if (!isValid) {
+                showToast(`Please fix the following errors: ${errors.join(', ')}`, 'warning');
+            }
+            
+            return isValid;
+        }
+        
+        // Confirmation Modal System
+        let confirmCallback = null;
+        
+        function showConfirmation(title, message, callback) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = message;
+            confirmCallback = callback;
+            document.getElementById('confirmModal').classList.add('show');
+        }
+        
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('show');
+            confirmCallback = null;
+        }
+        
+        function executeConfirm() {
+            if (confirmCallback) {
+                confirmCallback();
+            }
+            closeConfirmModal();
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('confirmModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmModal();
+            }
+        });
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeConfirmModal();
+            }
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

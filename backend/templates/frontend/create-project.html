@@ -1,0 +1,318 @@
+{% extends "frontend/base.html" %}
+
+{% block title %}Create Project - IT Management Platform{% endblock %}
+
+{% block page_title %}Create New Project{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Create New Project</h1>
+        <p class="text-gray-600">Set up a new project and assign team members</p>
+    </div>
+
+    <!-- Form -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        {% if form.non_field_errors %}
+        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert" aria-live="polite">
+            <div class="text-red-800">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <h4 class="font-medium">Form Error</h4>
+                </div>
+                {% for error in form.non_field_errors %}
+                    <p class="text-sm">{{ error }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="POST" class="space-y-8">
+            {% csrf_token %}
+
+            <!-- Basic Information Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Basic Information</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Project Name -->
+                    <div class="md:col-span-2">
+                        <label for="id_name" class="block text-sm font-medium text-gray-700 mb-2">
+                            Project Name <span class="text-red-500">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="id_name" 
+                            name="name"
+                            value="{{ form.name.value|default:'' }}"
+                            placeholder="Enter project name"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                        {% if form.name.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Category -->
+                    <div>
+                        <label for="id_category" class="block text-sm font-medium text-gray-700 mb-2">
+                            Category <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="id_category" 
+                            name="category"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                            <option value="">Select a category</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if form.category.value|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ category.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        {% if form.category.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.category.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Priority -->
+                    <div>
+                        <label for="id_priority" class="block text-sm font-medium text-gray-700 mb-2">
+                            Priority <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="id_priority" 
+                            name="priority"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                            <option value="">Select priority</option>
+                            <option value="LOW" {% if form.priority.value == 'LOW' %}selected{% endif %}>Low</option>
+                            <option value="MEDIUM" {% if form.priority.value == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                            <option value="HIGH" {% if form.priority.value == 'HIGH' %}selected{% endif %}>High</option>
+                            <option value="URGENT" {% if form.priority.value == 'URGENT' %}selected{% endif %}>Urgent</option>
+                        </select>
+                        {% if form.priority.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.priority.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Project Description</h2>
+                
+                <div class="space-y-6">
+                    <!-- Description -->
+                    <div>
+                        <label for="id_description" class="block text-sm font-medium text-gray-700 mb-2">
+                            Description <span class="text-red-500">*</span>
+                        </label>
+                        <textarea 
+                            id="id_description" 
+                            name="description"
+                            rows="4"
+                            placeholder="Provide a detailed description of the project..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >{{ form.description.value|default:'' }}</textarea>
+                        {% if form.description.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.description.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Objectives -->
+                    <div>
+                        <label for="id_objectives" class="block text-sm font-medium text-gray-700 mb-2">
+                            Objectives
+                        </label>
+                        <textarea 
+                            id="id_objectives" 
+                            name="objectives"
+                            rows="3"
+                            placeholder="Define the project objectives..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >{{ form.objectives.value|default:'' }}</textarea>
+                    </div>
+
+                    <!-- Requirements -->
+                    <div>
+                        <label for="id_requirements" class="block text-sm font-medium text-gray-700 mb-2">
+                            Requirements
+                        </label>
+                        <textarea 
+                            id="id_requirements" 
+                            name="requirements"
+                            rows="3"
+                            placeholder="List the project requirements..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >{{ form.requirements.value|default:'' }}</textarea>
+                    </div>
+
+                    <!-- Deliverables -->
+                    <div>
+                        <label for="id_deliverables" class="block text-sm font-medium text-gray-700 mb-2">
+                            Deliverables
+                        </label>
+                        <textarea 
+                            id="id_deliverables" 
+                            name="deliverables"
+                            rows="3"
+                            placeholder="Define the project deliverables..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >{{ form.deliverables.value|default:'' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline & Budget Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Timeline & Budget</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Start Date -->
+                    <div>
+                        <label for="id_start_date" class="block text-sm font-medium text-gray-700 mb-2">
+                            Start Date
+                        </label>
+                        <input 
+                            type="date" 
+                            id="id_start_date" 
+                            name="start_date"
+                            value="{{ form.start_date.value|default:'' }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- End Date -->
+                    <div>
+                        <label for="id_end_date" class="block text-sm font-medium text-gray-700 mb-2">
+                            End Date
+                        </label>
+                        <input 
+                            type="date" 
+                            id="id_end_date" 
+                            name="end_date"
+                            value="{{ form.end_date.value|default:'' }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- Deadline -->
+                    <div>
+                        <label for="id_deadline" class="block text-sm font-medium text-gray-700 mb-2">
+                            Deadline
+                        </label>
+                        <input 
+                            type="date" 
+                            id="id_deadline" 
+                            name="deadline"
+                            value="{{ form.deadline.value|default:'' }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- Budget -->
+                    <div>
+                        <label for="id_budget" class="block text-sm font-medium text-gray-700 mb-2">
+                            Budget
+                        </label>
+                        <input 
+                            type="number" 
+                            id="id_budget" 
+                            name="budget"
+                            value="{{ form.budget.value|default:'' }}"
+                            placeholder="Enter budget amount"
+                            step="0.01"
+                            min="0"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Manager & Risk Section -->
+            <div class="border-b border-gray-200 pb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Project Management</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Project Manager -->
+                    <div>
+                        <label for="id_project_manager" class="block text-sm font-medium text-gray-700 mb-2">
+                            Project Manager <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="id_project_manager" 
+                            name="project_manager"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            required
+                        >
+                            <option value="">Select a project manager</option>
+                            {% for user in available_users %}
+                                <option value="{{ user.id }}" {% if form.project_manager.value|stringformat:"s" == user.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ user.username }} ({{ user.get_role_display }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                        {% if form.project_manager.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.project_manager.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Risk Level -->
+                    <div>
+                        <label for="id_risk_level" class="block text-sm font-medium text-gray-700 mb-2">
+                            Risk Level
+                        </label>
+                        <select 
+                            id="id_risk_level" 
+                            name="risk_level"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >
+                            <option value="">Select risk level</option>
+                            <option value="LOW" {% if form.risk_level.value == 'LOW' %}selected{% endif %}>Low</option>
+                            <option value="MEDIUM" {% if form.risk_level.value == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                            <option value="HIGH" {% if form.risk_level.value == 'HIGH' %}selected{% endif %}>High</option>
+                            <option value="URGENT" {% if form.risk_level.value == 'URGENT' %}selected{% endif %}>Urgent</option>
+                        </select>
+                    </div>
+
+                    <!-- Risk Description -->
+                    <div class="md:col-span-2">
+                        <label for="id_risk_description" class="block text-sm font-medium text-gray-700 mb-2">
+                            Risk Description
+                        </label>
+                        <textarea 
+                            id="id_risk_description" 
+                            name="risk_description"
+                            rows="3"
+                            placeholder="Describe potential risks associated with this project..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        >{{ form.risk_description.value|default:'' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between pt-8">
+                <a href="{% url 'frontend:projects' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Cancel
+                </a>
+                
+                <button 
+                    type="submit" 
+                    class="inline-flex items-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition"
+                >
+                    <i class="fas fa-check mr-2"></i>
+                    Create Project
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

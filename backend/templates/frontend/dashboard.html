@@ -1,0 +1,443 @@
+{% extends "frontend/base.html" %}
+
+{% block title %}Dashboard - IT Management Platform{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Dashboard Header -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4 sm:gap-0">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p class="text-xs sm:text-sm text-gray-600 mt-1">Welcome back, {{ user.username }}! Here's what's happening with your IT infrastructure.</p>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+        <button onclick="refreshDashboard()" class="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+            <i class="fas fa-sync-alt mr-2"></i>
+            Refresh
+        </button>
+        <button onclick="exportDashboard()" class="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition">
+            <i class="fas fa-download mr-2"></i>
+            Export
+        </button>
+    </div>
+</div>
+
+<!-- Stats Overview -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6">
+    <!-- Users Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div class="p-4 sm:p-6">
+            <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex-shrink-0">
+                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-users text-blue-600 text-lg sm:text-xl"></i>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm font-medium text-gray-500">Active Users</p>
+                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ user_count|default:0 }}</p>
+                    <p class="text-xs sm:text-sm text-green-600">
+                        <i class="fas fa-arrow-up mr-1"></i>
+                        +5.2% from last month
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assets Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div class="p-4 sm:p-6">
+            <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex-shrink-0">
+                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-desktop text-green-600 text-lg sm:text-xl"></i>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm font-medium text-gray-500">Active Assets</p>
+                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ asset_count|default:0 }}</p>
+                    <p class="text-xs sm:text-sm text-blue-600">
+                        <i class="fas fa-arrow-right mr-1"></i>
+                        12 new this week
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div class="p-4 sm:p-6">
+            <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex-shrink-0">
+                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-project-diagram text-yellow-600 text-lg sm:text-xl"></i>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm font-medium text-gray-500">Active Projects</p>
+                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ project_count|default:0 }}</p>
+                    <p class="text-xs sm:text-sm text-yellow-600">
+                        <i class="fas fa-clock mr-1"></i>
+                        3 due this week
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tickets Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div class="p-4 sm:p-6">
+            <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex-shrink-0">
+                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-ticket-alt text-red-600 text-lg sm:text-xl"></i>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm font-medium text-gray-500">Open Tickets</p>
+                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ ticket_count|default:0 }}</p>
+                    <p class="text-xs sm:text-sm text-red-600">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        2 high priority
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+    <!-- Recent Activity -->
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 sm:p-6 border-b border-gray-200">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+                    <h3 class="text-base sm:text-lg font-medium text-gray-900">Recent Activity (Last 10)</h3>
+                    <a href="{% url 'frontend:logs' %}" class="text-xs sm:text-sm text-primary-600 hover:text-primary-700 font-medium">View all →</a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-6">
+                <div class="space-y-4">
+                    {% for log in recent_logs %}
+                    <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                        <div class="flex-shrink-0">
+                            {% if log.level == 'ERROR' %}
+                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-red-600 text-xs"></i>
+                                </div>
+                            {% elif log.level == 'WARNING' %}
+                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-exclamation text-yellow-600 text-xs"></i>
+                                </div>
+                            {% elif log.level == 'SUCCESS' %}
+                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-check-circle text-green-600 text-xs"></i>
+                                </div>
+                            {% else %}
+                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-info-circle text-blue-600 text-xs"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs sm:text-sm font-medium text-gray-900">{{ log.title }}</p>
+                            <p class="text-xs sm:text-sm text-gray-600">{{ log.description }}</p>
+                            <div class="flex items-center gap-1 sm:gap-2 mt-1 text-xs text-gray-500">
+                                <span>{{ log.timestamp|timesince }} ago</span>
+                                {% if log.user %}
+                                <span>•</span>
+                                <span>by {{ log.user.username }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                {% if log.level == 'ERROR' %}bg-red-100 text-red-800
+                                {% elif log.level == 'WARNING' %}bg-yellow-100 text-yellow-800
+                                {% elif log.level == 'SUCCESS' %}bg-green-100 text-green-800
+                                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ log.level }}
+                            </span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-info-circle text-lg sm:text-2xl mb-2"></i>
+                        <p class="text-xs sm:text-sm">No recent activity</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions & Alerts -->
+    <div class="space-y-4 sm:space-y-6">
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 sm:p-6 border-b border-gray-200">
+                <h3 class="text-base sm:text-lg font-medium text-gray-900">Quick Actions</h3>
+            </div>
+            <div class="p-4 sm:p-6">
+                <div class="space-y-2 sm:space-y-3">
+                    <a href="{% url 'frontend:create_ticket' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
+                        <div class="text-center">
+                            <i class="fas fa-ticket-alt text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
+                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-primary-700">Create Ticket</p>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'frontend:create_project' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
+                        <div class="text-center">
+                            <i class="fas fa-project-diagram text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
+                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-primary-700">New Project</p>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'frontend:create_asset' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
+                        <div class="text-center">
+                            <i class="fas fa-desktop text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
+                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-primary-700">Add Asset</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Alerts -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 sm:p-6 border-b border-gray-200">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+                    <h3 class="text-base sm:text-lg font-medium text-gray-900">System Alerts</h3>
+                    <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        {{ security_events|default:0 }} Active
+                    </span>
+                </div>
+            </div>
+            <div class="p-4 sm:p-6">
+                <div class="space-y-2 sm:space-y-3">
+                    {% if security_events > 0 %}
+                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-red-50 rounded-lg border border-red-200">
+                        <i class="fas fa-shield-alt text-red-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs sm:text-sm font-medium text-red-800">Security Events</p>
+                            <p class="text-xs text-red-600">{{ security_events }} active security events require attention</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if system_errors > 0 %}
+                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <i class="fas fa-exclamation-triangle text-yellow-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs sm:text-sm font-medium text-yellow-800">System Errors</p>
+                            <p class="text-xs text-yellow-600">{{ system_errors }} system errors detected</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
+                        <i class="fas fa-check-circle text-green-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs sm:text-sm font-medium text-green-800">System Status</p>
+                            <p class="text-xs text-green-600">All systems operational</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Asset Status Chart -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Asset Status Overview</h3>
+        </div>
+        <div class="p-6">
+            <div class="h-64 flex items-center justify-center">
+                <div class="text-center">
+                    <i class="fas fa-chart-pie text-4xl text-gray-400 mb-4"></i>
+                    <p class="text-gray-500">Asset status chart will be displayed here</p>
+                    <p class="text-sm text-gray-400">Chart.js integration needed</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Timeline -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Project Timeline</h3>
+        </div>
+        <div class="p-6">
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-blue-900">IT Infrastructure Upgrade</p>
+                        <p class="text-xs text-blue-600">Due: Dec 30, 2025</p>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        75%
+                    </span>
+                </div>
+                
+                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-green-900">Security Audit</p>
+                        <p class="text-xs text-green-600">Due: Jan 15, 2026</p>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        45%
+                    </span>
+                </div>
+                
+                <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-yellow-900">User Training Program</p>
+                        <p class="text-xs text-yellow-600">Due: Feb 1, 2026</p>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        20%
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Tickets -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-medium text-gray-900">Recent Tickets</h3>
+            <a href="{% url 'frontend:tickets' %}" class="text-sm text-primary-600 hover:text-primary-700">View all</a>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <!-- Sample ticket data - would be replaced with real data -->
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">Network connectivity issues</div>
+                        <div class="text-sm text-gray-500">Unable to connect to VPN</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            In Progress
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            High
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        2 hours ago
+                    </td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">Software installation request</div>
+                        <div class="text-sm text-gray-500">Need Adobe Creative Suite installed</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Open
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Low
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        5 hours ago
+                    </td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">Hardware upgrade request</div>
+                        <div class="text-sm text-gray-500">Need additional RAM for workstation</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            New
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Medium
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        1 day ago
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshDashboard() {
+    fetch('/api/dashboard/')
+        .then(response => response.json())
+        .then(data => {
+            // Update dashboard with new data
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Error refreshing dashboard:', error);
+        });
+}
+
+function exportDashboard() {
+    // Implementation for dashboard export
+    alert('Dashboard export feature will be implemented');
+}
+
+// Auto-refresh dashboard every 60 seconds
+setInterval(function() {
+    fetch('/api/dashboard/')
+        .then(response => response.json())
+        .then(data => {
+            // Update dashboard stats without full page reload
+            console.log('Auto-refresh dashboard data:', data);
+        })
+        .catch(error => {
+            console.error('Auto-refresh error:', error);
+        });
+}, 60000);
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    // Set active nav item
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+        if (link.getAttribute('href').includes('dashboard')) {
+            link.classList.add('bg-primary-100', 'text-primary-700');
+        }
+    });
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,590 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Activity Logs - IT Management Platform{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+<style>
+    .filter-container {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        min-width: 100%;
+    }
+    .filter-item {
+        min-width: 0;
+    }
+    .search-highlight {
+        background-color: #fef08a;
+        padding: 0 2px;
+        border-radius: 2px;
+    }
+    .results-counter {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-bottom: 1rem;
+    }
+    .reset-button {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        transition: all 0.3s ease;
+    }
+    .reset-button:hover {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+    .reset-button:active {
+        transform: translateY(0);
+    }
+    .date-range-container {
+        position: relative;
+    }
+    .time-inputs {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .time-inputs label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin: 0;
+    }
+    .time-input {
+        flex: 1;
+        min-width: 80px;
+    }
+    /* Basic Date Input Styling */
+    .date-range-input {
+        background: white;
+        border: 1px solid #d1d5db;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+    .date-range-input:focus {
+        border-color: #3b82f6;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    /* Toast container styling */
+    #toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        max-width: 400px;
+    }
+    @media (max-width: 640px) {
+        .filter-grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        .time-inputs {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.25rem;
+        }
+        .time-input {
+            min-width: auto;
+        }
+        #toast-container {
+            left: 20px;
+            right: 20px;
+            max-width: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 sm:py-8">
+    <div class="mb-6 sm:mb-8">
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Activity & Security Logs</h1>
+        <p class="text-gray-600">View and search system activity and security events</p>
+    </div>
+
+    <!-- Results Counter -->
+    <div id="resultsCounter" class="results-counter hidden">
+        Showing <span id="visibleCount">0</span> of <span id="totalCount">0</span> entries
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 filter-container">
+        <div class="filter-grid">
+            <div class="filter-item">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                <input type="text" id="searchLogs" placeholder="Search logs..." 
+                       class="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
+            </div>
+            
+            <div class="filter-item">
+                <label class="block text-sm font-medium text-gray-700 mb-2">User</label>
+                <select id="userFilter" class="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
+                    <option value="">All Users</option>
+                    {% for user in all_users %}
+                        <option value="{{ user.username }}">{{ user.username }} ({{ user.get_role_display }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-item">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Log Type</label>
+                <select id="typeFilter" class="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
+                    <option value="">All Types</option>
+                    <option value="ACTIVITY">Activity</option>
+                    <option value="SECURITY">Security</option>
+                    <option value="SYSTEM">System</option>
+                </select>
+            </div>
+            
+            <div class="filter-item date-range-container">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                <input type="text" id="dateRange" placeholder="Select date range" 
+                       class="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
+            </div>
+            
+            <div class="filter-item">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Hour Range</label>
+                <div class="time-inputs">
+                    <input type="time" id="hourFrom" class="time-input px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors" placeholder="From">
+                    <span class="text-gray-400 text-sm">to</span>
+                    <input type="time" id="hourTo" class="time-input px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors" placeholder="To">
+                </div>
+            </div>
+            
+            <div class="filter-item">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Actions</label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button id="resetFilters" class="reset-button w-full px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                        <i class="fas fa-redo mr-2"></i>Reset Filters
+                    </button>
+                    <button id="exportBtn" class="w-full px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                        <i class="fas fa-download mr-2"></i>Export
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Logs Tab -->
+    <div class="mb-8">
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Recent Activity</h2>
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs sm:text-sm">
+                    <thead class="bg-gray-100 border-b-2 border-gray-300">
+                        <tr>
+                            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">Timestamp</th>
+                            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">User</th>
+                            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900 hidden sm:table-cell">Action</th>
+                            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900 hidden md:table-cell">Category</th>
+                            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900 hidden lg:table-cell">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% if recent_logs %}
+                            {% for log in recent_logs %}
+                            <tr class="hover:bg-gray-50 transition log-row" data-type="ACTIVITY">
+                                <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 text-xs sm:text-sm">{{ log.timestamp|date:"Y-m-d H:i" }}</td>
+                                <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-900 text-xs sm:text-sm font-medium">{{ log.user.username }}</td>
+                                <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 hidden sm:table-cell text-xs sm:text-sm">{{ log.title }}</td>
+                                <td class="px-3 sm:px-6 py-2 sm:py-4 hidden md:table-cell">
+                                    <span class="px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        {{ log.category.name }}
+                                    </span>
+                                </td>
+                                <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 hidden lg:table-cell text-xs sm:text-sm">{{ log.description|truncatewords:10 }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="px-3 sm:px-6 py-8 text-center text-gray-500 text-xs sm:text-sm">No activity logs found.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Events Tab -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold text-gray-900 mb-4">Security Events</h2>
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100 border-b-2 border-gray-300">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Detected At</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Event Type</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Severity</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Details</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% if security_events %}
+                            {% for event in security_events %}
+                            <tr class="hover:bg-gray-50 transition log-row" data-type="SECURITY">
+                                <td class="px-6 py-4 text-sm text-gray-600">{{ event.detected_at|date:"Y-m-d H:i" }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900">{{ event.event_type }}</td>
+                                <td class="px-6 py-4 text-sm">
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium {% if event.severity == 'CRITICAL' %}bg-red-100 text-red-800{% elif event.severity == 'HIGH' %}bg-orange-100 text-orange-800{% elif event.severity == 'MEDIUM' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                        {{ event.severity|upper }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-600">{{ event.details|truncatewords:10 }}</td>
+                                <td class="px-6 py-4 text-sm">
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium {% if event.status == 'OPEN' %}bg-red-100 text-red-800{% elif event.status == 'INVESTIGATING' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
+                                        {{ event.status|upper }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-gray-500">No security events found.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Access -->
+    <div class="bg-blue-50 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">API Access</h3>
+        <p class="text-gray-600 mb-4">Access logs via REST API:</p>
+        <code class="bg-gray-100 p-3 rounded text-sm text-gray-800 block mb-2">GET /api/logs/</code>
+        <code class="bg-gray-100 p-3 rounded text-sm text-gray-800">GET /api/security/events/</code>
+    </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM Elements
+    const searchInput = document.getElementById('searchLogs');
+    const userFilter = document.getElementById('userFilter');
+    const typeFilter = document.getElementById('typeFilter');
+    const dateRangeInput = document.getElementById('dateRange');
+    const hourFromInput = document.getElementById('hourFrom');
+    const hourToInput = document.getElementById('hourTo');
+    const resetButton = document.getElementById('resetFilters');
+    const exportBtn = document.getElementById('exportBtn');
+    const logRows = document.querySelectorAll('.log-row');
+    const resultsCounter = document.getElementById('resultsCounter');
+    const visibleCount = document.getElementById('visibleCount');
+    const totalCount = document.getElementById('totalCount');
+
+    // Initialize total count
+    totalCount.textContent = logRows.length;
+
+    // Initialize Flatpickr date range picker with improved configuration
+    const datePicker = flatpickr(dateRangeInput, {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        onChange: function(selectedDates, dateStr, instance) {
+            filterLogs();
+        },
+        altInput: true,
+        altFormat: 'F j, Y',
+        // Remove date restrictions to allow historical selection
+        // minDate: 'today',
+        // maxDate: 'today',
+        maxDate: new Date().fp_incr(365), // Allow future dates up to 1 year
+        onOpen: function(selectedDates, dateStr, instance) {
+            // Show loading indicator
+            document.body.style.cursor = 'progress';
+        },
+        onClose: function(selectedDates, dateStr, instance) {
+            document.body.style.cursor = 'default';
+        }
+    });
+
+    // Debounced search function for better performance
+    let searchTimeout;
+    function debounceSearch(func, delay) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(func, delay);
+    }
+
+    // Enhanced filter function with search highlighting and results counting
+    function filterLogs() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const selectedUser = userFilter.value.toLowerCase();
+        const selectedType = typeFilter.value;
+        const dateRange = dateRangeInput.value;
+        const hourFrom = hourFromInput.value;
+        const hourTo = hourToInput.value;
+
+        let dateStart = null;
+        let dateEnd = null;
+        
+        if (dateRange) {
+            const dates = dateRange.split(' to ');
+            if (dates.length === 2) {
+                dateStart = new Date(dates[0]);
+                dateEnd = new Date(dates[1]);
+                dateEnd.setHours(23, 59, 59, 999);
+            }
+        }
+
+        let visibleRows = 0;
+
+        logRows.forEach(row => {
+            const rowType = row.dataset.type;
+            const text = row.textContent.toLowerCase();
+            const timestampText = row.querySelector('td').textContent.trim();
+            const userCell = row.querySelectorAll('td')[1]?.textContent.trim().toLowerCase() || '';
+            
+            // Parse timestamp from the row (format: YYYY-MM-DD HH:MM or similar)
+            const parts = timestampText.split(' ');
+            const dateStr = parts[0];
+            const timeStr = parts[1] ? parts[1] : '00:00';
+            
+            let matchesSearch = !searchTerm || text.includes(searchTerm);
+            let matchesUser = !selectedUser || userCell.includes(selectedUser);
+            let matchesType = !selectedType || rowType.includes(selectedType);
+            let matchesDate = true;
+            let matchesHour = true;
+
+            // Check date range
+            if (dateStart && dateEnd) {
+                const rowDate = new Date(dateStr);
+                matchesDate = rowDate >= dateStart && rowDate <= dateEnd;
+            }
+
+            // Check hour range with better validation
+            if (hourFrom || hourTo) {
+                const rowHour = timeStr.split(':')[0] + ':' + timeStr.split(':')[1];
+                if (hourFrom && rowHour < hourFrom) matchesHour = false;
+                if (hourTo && rowHour > hourTo) matchesHour = false;
+            }
+
+            const shouldShow = matchesSearch && matchesUser && matchesType && matchesDate && matchesHour;
+            row.style.display = shouldShow ? '' : 'none';
+            
+            if (shouldShow) {
+                visibleRows++;
+            }
+
+            // Add search highlighting if there's a search term
+            if (searchTerm && matchesSearch) {
+                highlightSearchTerm(row, searchTerm);
+            } else {
+                removeSearchHighlight(row);
+            }
+        });
+
+        // Update results counter
+        updateResultsCounter(visibleRows, logRows.length);
+    }
+
+    // Search highlighting function
+    function highlightSearchTerm(row, searchTerm) {
+        const cells = row.querySelectorAll('td');
+        cells.forEach(cell => {
+            const originalText = cell.textContent;
+            const highlightedText = originalText.replace(
+                new RegExp(`(${searchTerm})`, 'gi'),
+                '<span class="search-highlight">$1</span>'
+            );
+            if (highlightedText !== originalText) {
+                cell.innerHTML = highlightedText;
+            }
+        });
+    }
+
+    function removeSearchHighlight(row) {
+        const highlightedSpans = row.querySelectorAll('.search-highlight');
+        highlightedSpans.forEach(span => {
+            span.outerHTML = span.textContent;
+        });
+    }
+
+    // Update results counter
+    function updateResultsCounter(visible, total) {
+        if (visible === total) {
+            resultsCounter.classList.add('hidden');
+        } else {
+            visibleCount.textContent = visible;
+            totalCount.textContent = total;
+            resultsCounter.classList.remove('hidden');
+        }
+    }
+
+    // Enhanced reset filters function
+    function resetFilters() {
+        // Add loading state
+        resetButton.disabled = true;
+        resetButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Resetting...';
+        
+        // Reset form elements
+        searchInput.value = '';
+        userFilter.value = '';
+        typeFilter.value = '';
+        dateRangeInput.value = '';
+        hourFromInput.value = '';
+        hourToInput.value = '';
+        
+        // Clear date picker
+        datePicker.clear();
+        
+        // Apply filters with slight delay for better UX
+        setTimeout(() => {
+            filterLogs();
+            
+            // Remove loading state
+            resetButton.disabled = false;
+            resetButton.innerHTML = '<i class="fas fa-redo mr-2"></i>Reset Filters';
+            
+            // Show success feedback
+            showToast('Filters reset successfully', 'success');
+        }, 300);
+    }
+
+    // Export functionality
+    function exportLogs() {
+        const visibleRows = Array.from(logRows).filter(row => row.style.display !== 'none');
+        
+        if (visibleRows.length === 0) {
+            showToast('No logs to export', 'warning');
+            return;
+        }
+
+        // Create CSV content
+        const csvContent = generateCSV(visibleRows);
+        
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `logs_export_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showToast(`Exported ${visibleRows.length} log entries`, 'success');
+    }
+
+    // Generate CSV content
+    function generateCSV(rows) {
+        const headers = ['Timestamp', 'User', 'Type', 'Details'];
+        const csvRows = [headers.join(',')];
+        
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            const rowData = Array.from(cells).map(cell => {
+                return `"${cell.textContent.trim().replace(/"/g, '""')}"`;
+            });
+            csvRows.push(rowData.join(','));
+        });
+        
+        return csvRows.join('\n');
+    }
+
+    // Toast notification system
+    function showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type} transform translate-x-full opacity-0 transition-all duration-300 ease-in-out mb-2`;
+        
+        const iconMap = {
+            success: '<i class="fas fa-check-circle text-green-500"></i>',
+            error: '<i class="fas fa-exclamation-circle text-red-500"></i>',
+            warning: '<i class="fas fa-exclamation-triangle text-yellow-500"></i>',
+            info: '<i class="fas fa-info-circle text-blue-500"></i>'
+        };
+        
+        toast.innerHTML = `
+            <div class="flex items-center p-4 rounded-lg shadow-lg max-w-sm w-full bg-white border border-gray-200">
+                <div class="flex-shrink-0 mr-3">
+                    ${iconMap[type]}
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-900">${message}</p>
+                </div>
+                <button class="ml-auto pl-3 text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+        `;
+        
+        toastContainer.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full', 'opacity-0');
+        }, 100);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            toast.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
+    }
+
+    // Event listeners
+    searchInput.addEventListener('input', () => {
+        debounceSearch(filterLogs, 300);
+    });
+    
+    userFilter.addEventListener('change', filterLogs);
+    typeFilter.addEventListener('change', filterLogs);
+    hourFromInput.addEventListener('change', filterLogs);
+    hourToInput.addEventListener('change', filterLogs);
+    
+    resetButton.addEventListener('click', resetFilters);
+    exportBtn.addEventListener('click', exportLogs);
+
+    // Initialize with all logs visible
+    filterLogs();
+
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + R for reset
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            resetFilters();
+        }
+        
+        // Ctrl/Cmd + E for export
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            exportLogs();
+        }
+        
+        // Escape to clear search
+        if (e.key === 'Escape' && document.activeElement === searchInput) {
+            searchInput.value = '';
+            filterLogs();
+        }
+    });
+
+    // Add loading states for better UX
+    function addLoadingState(element, loadingText) {
+        element.disabled = true;
+        element.innerHTML = loadingText;
+    }
+
+    function removeLoadingState(element, originalText) {
+        element.disabled = false;
+        element.innerHTML = originalText;
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Assets Management - IT Management Platform{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">Assets Management</h1>
+        <p class="text-gray-600">Manage and track all IT assets in your organization</p>
+    </div>
+
+    <!-- Add Asset Button -->
+    <div class="mb-6">
+        <a href="{% url 'frontend:create_asset' %}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+            + Add New Asset
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Search Assets</label>
+                <input type="text" id="searchAssets" placeholder="Search by name or tag..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select id="categoryFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category.category__name }}">{{ category.category__name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select id="statusFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">All Status</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="MAINTENANCE">Maintenance</option>
+                    <option value="RETIRED">Retired</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assets Table -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-100 border-b-2 border-gray-300">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Asset Name</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Asset Tag</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Category</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Assigned To</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% if assets %}
+                        {% for asset in assets %}
+                        <tr class="hover:bg-gray-50 transition asset-row" data-id="{{ asset.id }}">
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ asset.name }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ asset.asset_tag }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ asset.category.name }}</td>
+                            <td class="px-6 py-4 text-sm">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium {% if asset.status == 'ACTIVE' %}bg-green-100 text-green-800{% elif asset.status == 'INACTIVE' %}bg-gray-100 text-gray-800{% elif asset.status == 'MAINTENANCE' %}bg-yellow-100 text-yellow-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ asset.status }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600">
+                                {% if asset.assigned_to %}
+                                    {{ asset.assigned_to.username }}
+                                {% else %}
+                                    <span class="text-gray-400">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
+                                <a href="javascript:editAsset({{ asset.id }}, '{{ asset.name|escapejs }}', '{{ asset.tag|escapejs }}')" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
+                                {% else %}
+                                <a href="#" onclick="return false;" class="text-gray-400 cursor-not-allowed mr-4" title="Admin only">Edit</a>
+                                {% endif %}
+                                <a href="javascript:deleteAsset({{ asset.id }}, '{{ asset.name|escapejs }}')" class="text-red-600 hover:text-red-900">Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                                No assets found. <a href="{% url 'frontend:create_asset' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- API Access -->
+    <div class="mt-8 bg-blue-50 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">API Access</h3>
+        <p class="text-gray-600 mb-4">Access assets via REST API:</p>
+        <code class="bg-gray-100 p-3 rounded text-sm text-gray-800">GET /api/assets/</code>
+    </div>
+</div>
+
+<script>
+function editAsset(assetId, assetName, assetTag) {
+    const newName = prompt('Edit asset name:', assetName);
+    if (newName === null) return; // User cancelled
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+    
+    fetch(`/api/assets/${assetId}/`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            name: newName,
+            tag: assetTag
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        return response.text().then(text => {
+            throw new Error(text || `HTTP ${response.status}`);
+        });
+    })
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to update asset'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error updating asset: ' + error, 'error');
+    });
+}
+
+function deleteAsset(assetId, assetName) {
+    showConfirmation(
+        'Delete Asset',
+        `Are you sure you want to delete "${assetName}"? This action cannot be undone.`,
+        function() {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                             document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+            
+            fetch(`/api/assets/${assetId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => {
+                if (response.status === 204) {
+                    return { success: true };
+                }
+                if (response.ok) {
+                    return response.json();
+                }
+                return response.text().then(text => {
+                    throw new Error(text || `HTTP ${response.status}`);
+                });
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast('Asset deleted successfully', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('Error: ' + (data.error || 'Failed to delete asset'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error deleting asset: ' + error, 'error');
+            });
+        }
+    );
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality
+    const searchInput = document.getElementById('searchAssets');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const assetRows = document.querySelectorAll('.asset-row');
+
+    function filterAssets() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedCategory = categoryFilter.value;
+        const selectedStatus = statusFilter.value;
+
+        assetRows.forEach(row => {
+            const name = row.cells[0].textContent.toLowerCase();
+            const tag = row.cells[1].textContent.toLowerCase();
+            const category = row.cells[2].textContent;
+            const status = row.cells[3].textContent.trim();
+
+            const matchesSearch = name.includes(searchTerm) || tag.includes(searchTerm);
+            const matchesCategory = !selectedCategory || category.includes(selectedCategory);
+            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
+
+            row.style.display = matchesSearch && matchesCategory && matchesStatus ? '' : 'none';
+        });
+    }
+
+    searchInput.addEventListener('keyup', filterAssets);
+    categoryFilter.addEventListener('change', filterAssets);
+    statusFilter.addEventListener('change', filterAssets);
+});
+</script>
+{% endblock %}
