@@ -158,7 +158,7 @@ class TicketsView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         try:
-            tickets = Ticket.objects.select_related('created_by', 'assigned_to', 'category').order_by('-created_at')[:50]
+            tickets = Ticket.objects.select_related('created_by', 'assigned_to', 'category', 'ticket_type').order_by('-created_at')[:50]
             status_choices = Ticket.STATUS_CHOICES
             priority_choices = Ticket.PRIORITY_CHOICES
         except:
@@ -444,14 +444,17 @@ class CreateTicketView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         try:
-            from apps.tickets.models import TicketCategory
+            from apps.tickets.models import TicketCategory, TicketType
             categories = TicketCategory.objects.filter(is_active=True)
+            ticket_types = TicketType.objects.filter(is_active=True)
             available_users = User.objects.filter(is_active=True)
         except:
             categories = []
+            ticket_types = []
             available_users = []
         context.update({
             'categories': categories,
+            'ticket_types': ticket_types,
             'available_users': available_users,
             'form': {}
         })
@@ -460,11 +463,14 @@ class CreateTicketView(LoginRequiredMixin, TemplateView):
     def post(self, request, *args, **kwargs):
         """Handle ticket creation."""
         try:
-            from apps.tickets.models import Ticket, TicketCategory
+            from apps.tickets.models import Ticket, TicketCategory, TicketType
+            from django.utils import timezone
+            from datetime import datetime
             
             title = request.POST.get('title', '')
             description = request.POST.get('description', '')
             category_id = request.POST.get('category', '')
+            ticket_type_id = request.POST.get('ticket_type', '')
             priority = request.POST.get('priority', 'MEDIUM')
             impact = request.POST.get('impact', 'MEDIUM')
             urgency = request.POST.get('urgency', 'MEDIUM')
@@ -490,17 +496,31 @@ class CreateTicketView(LoginRequiredMixin, TemplateView):
             
             # Create ticket
             category = TicketCategory.objects.get(id=category_id)
+            ticket_type = TicketType.objects.get(id=ticket_type_id) if ticket_type_id else None
             assigned_to = User.objects.get(id=assigned_to_id) if assigned_to_id else None
+            
+            # Parse due_date and convert to sla_due_at
+            sla_due_at = None
+            if due_date:
+                try:
+                    due_date_obj = datetime.strptime(due_date, '%Y-%m-%d').date()
+                    sla_due_at = timezone.make_aware(
+                        timezone.datetime.combine(due_date_obj, timezone.datetime.min.time())
+                    )
+                except ValueError:
+                    pass  # Invalid date format, leave as None
             
             ticket = Ticket.objects.create(
                 title=title,
                 description=description,
                 category=category,
+                ticket_type=ticket_type,
                 priority=priority,
                 impact=impact,
                 urgency=urgency,
                 assigned_to=assigned_to,
-                due_date=due_date if due_date else None,
+                sla_due_at=sla_due_at,
+                requester=request.user,
                 created_by=request.user,
                 status='NEW'
             )

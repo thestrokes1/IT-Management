@@ -87,7 +87,7 @@
                                     {{ ticket.priority|upper }}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ ticket.created_by.username }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</td>
                             <td class="px-6 py-4 text-sm">
                                 {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
                                 <a href="javascript:editTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}', '{{ ticket.description|escapejs }}')" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
