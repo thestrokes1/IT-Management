@@ -120,11 +120,32 @@ class User(AbstractUser):
         if not self.email and self.username:
             self.email = f"{self.username}@company.com"
         
+        # Auto-generate employee_id if not provided
+        if not self.employee_id:
+            import random
+            import string
+            # Generate a unique employee ID
+            random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            if self.username:
+                self.employee_id = f"EMP-{self.username.upper()[:4]}-{random_suffix}"
+            else:
+                self.employee_id = f"EMP-{random_suffix}"
+            
+            # Ensure uniqueness
+            counter = 1
+            original_employee_id = self.employee_id
+            while User.objects.filter(employee_id=self.employee_id).exclude(pk=self.pk).exists():
+                self.employee_id = f"{original_employee_id}-{counter}"
+                counter += 1
+        
         # Update password_changed_at when password changes
         if self.pk:
-            old_user = User.objects.get(pk=self.pk)
-            if old_user.password != self.password:
-                self.password_changed_at = timezone.now()
+            try:
+                old_user = User.objects.get(pk=self.pk)
+                if old_user.password != self.password:
+                    self.password_changed_at = timezone.now()
+            except User.DoesNotExist:
+                pass
         
         super().save(*args, **kwargs)
     

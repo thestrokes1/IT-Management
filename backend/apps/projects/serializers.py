@@ -8,7 +8,7 @@ from django.utils import timezone
 from datetime import datetime
 
 from apps.projects.models import (
-    ProjectCategory, Project, ProjectMember, Task, TaskComment,
+    ProjectCategory, TaskCategory, Project, ProjectMember, Task, TaskComment,
     TaskAttachment, ProjectTemplate, ProjectAuditLog, ProjectReport
 )
 from apps.users.models import User
@@ -21,6 +21,17 @@ class ProjectCategorySerializer(serializers.ModelSerializer):
         model = ProjectCategory
         fields = ['id', 'name', 'description', 'color', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+class TaskCategorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for task categories.
+    """
+    task_count = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        model = TaskCategory
+        fields = ['id', 'name', 'description', 'color', 'is_active', 'task_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'task_count', 'created_at', 'updated_at']
 
 class ProjectMemberSerializer(serializers.ModelSerializer):
     """
@@ -184,6 +195,7 @@ class TaskListSerializer(serializers.ModelSerializer):
     Serializer for task list view.
     """
     project_name = serializers.CharField(source='project.name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
     assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
@@ -193,10 +205,10 @@ class TaskListSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             'id', 'task_id', 'title', 'description', 'project_name',
-            'type', 'priority', 'status', 'assigned_to_username',
-            'created_by_username', 'start_date', 'due_date',
-            'estimated_hours', 'completion_percentage', 'is_overdue',
-            'is_subtask', 'created_at'
+            'category', 'category_name', 'type', 'priority', 'status',
+            'assigned_to_username', 'created_by_username', 'start_date',
+            'due_date', 'estimated_hours', 'completion_percentage',
+            'is_overdue', 'is_subtask', 'created_at'
         ]
         read_only_fields = ['id', 'task_id', 'created_at']
 
@@ -205,6 +217,7 @@ class TaskDetailSerializer(serializers.ModelSerializer):
     Serializer for task detail view.
     """
     project = ProjectListSerializer(read_only=True)
+    category = TaskCategorySerializer(read_only=True)
     assigned_to = serializers.StringRelatedField(read_only=True)
     created_by = serializers.StringRelatedField(read_only=True)
     parent_task = serializers.StringRelatedField(read_only=True)
@@ -217,7 +230,7 @@ class TaskDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            'id', 'task_id', 'title', 'description', 'project',
+            'id', 'task_id', 'title', 'description', 'project', 'category',
             'type', 'priority', 'status', 'assigned_to', 'created_by',
             'start_date', 'due_date', 'completed_date',
             'estimated_hours', 'actual_hours', 'parent_task',

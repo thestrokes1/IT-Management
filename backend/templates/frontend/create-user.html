@@ -178,16 +178,18 @@
                             required
                         >
                             <option value="">Select a role</option>
-                            <option value="ADMIN" {% if form.role.value == 'ADMIN' %}selected{% endif %}>Administrator</option>
+                            <option value="SUPERADMIN" {% if form.role.value == 'SUPERADMIN' %}selected{% endif %}>Super Administrator</option>
+                            <option value="IT_ADMIN" {% if form.role.value == 'IT_ADMIN' %}selected{% endif %}>IT Administrator</option>
                             <option value="MANAGER" {% if form.role.value == 'MANAGER' %}selected{% endif %}>Manager</option>
                             <option value="TECHNICIAN" {% if form.role.value == 'TECHNICIAN' %}selected{% endif %}>Technician</option>
-                            <option value="USER" {% if form.role.value == 'USER' %}selected{% endif %}>User</option>
+                            <option value="VIEWER" {% if form.role.value == 'VIEWER' %}selected{% endif %}>Viewer</option>
                         </select>
                         <p class="text-xs text-gray-500 mt-2">
-                            <strong>Admin:</strong> Full system access | 
+                            <strong>Super Admin:</strong> Full system access | 
+                            <strong>IT Admin:</strong> Manage users & system | 
                             <strong>Manager:</strong> Can manage tickets & projects | 
                             <strong>Technician:</strong> Can create & resolve tickets | 
-                            <strong>User:</strong> Can create tickets
+                            <strong>Viewer:</strong> View-only access
                         </p>
                         {% if form.role.errors %}
                         <p class="text-red-500 text-sm mt-1">{{ form.role.errors.0 }}</p>
@@ -201,15 +203,12 @@
                             id="id_is_active" 
                             name="is_active"
                             class="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-primary-500"
-                            {% if form.is_active.value != False %}checked{% endif %}
+                            checked
                         >
                         <label for="id_is_active" class="text-sm font-medium text-gray-700">
                             Active User
                         </label>
                         <p class="text-xs text-gray-500">User can log in and access the system</p>
-                        {% if form.is_active.errors %}
-                        <p class="text-red-500 text-sm">{{ form.is_active.errors.0 }}</p>
-                        {% endif %}
                     </div>
                 </div>
             </div>

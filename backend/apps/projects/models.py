@@ -32,6 +32,26 @@ class ProjectCategory(models.Model):
     def __str__(self):
         return self.name
 
+class TaskCategory(models.Model):
+    """
+    Categories for organizing tasks.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=7, default='#3B82F6')  # Hex color code
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'task_categories'
+        verbose_name = 'Task Category'
+        verbose_name_plural = 'Task Categories'
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+
 class Project(models.Model):
     """
     Project model for IT project management.
@@ -230,6 +250,12 @@ class Task(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField()
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks')
+    
+    # Category
+    category = models.ForeignKey(
+        TaskCategory, on_delete=models.SET_NULL, null=True, blank=True, 
+        related_name='tasks'
+    )
     
     # Task management
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='TASK')
