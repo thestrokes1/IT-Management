@@ -933,15 +933,18 @@ class EditUserView(LoginRequiredMixin, TemplateView):
 
 
 @login_required(login_url='frontend:login')
-@require_http_methods(["POST"])
+@require_http_methods(["DELETE", "POST"])
 def delete_user(request, user_id):
     """Delete a user account."""
-    if request.method not in ['DELETE', 'POST']:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    # Check if user is authenticated - return 401 for AJAX requests
+    if not request.user.is_authenticated:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+            return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
+        return redirect('frontend:login')
     
     # Check permissions - allow ADMIN or SUPERADMIN
     if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPERADMIN']:
-        return JsonResponse({'error': 'You do not have permission to delete users.'}, status=403)
+        return JsonResponse({'error': 'You do not have permission to delete users. Only ADMIN or SUPERADMIN roles can delete users.'}, status=403)
     
     try:
         from django.contrib.auth import get_user_model
@@ -954,7 +957,11 @@ def delete_user(request, user_id):
         username = user.username
         user.delete()
         
-        return JsonResponse({'success': True, 'message': f'User {username} deleted successfully.'})
+        # Return 204 No Content for DELETE requests, or JSON for POST
+        if request.method == 'DELETE':
+            return HttpResponse(status=204)
+        else:
+            return JsonResponse({'success': True, 'message': f'User {username} deleted successfully.'})
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found.'}, status=404)
     except Exception as e:
