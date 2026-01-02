@@ -81,7 +81,7 @@
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
                                     {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
-                                    <a href="javascript:editProject({{ project.id }}, '{{ project.name|escapejs }}', '{{ project.description|escapejs }}')" class="text-blue-600 hover:text-blue-900">Edit</a>
+                                    <a href="{% url 'frontend:edit_project' project.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
                                     {% else %}
                                     <a href="#" onclick="return false;" class="text-gray-400 cursor-not-allowed" title="Admin only">Edit</a>
                                     {% endif %}
@@ -111,46 +111,6 @@
 </div>
 
 <script>
-function editProject(projectId, projectName, projectDesc) {
-    const newName = prompt('Edit project name:', projectName);
-    if (newName === null) return; // User cancelled
-    
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
-    
-    fetch(`/api/projects/${projectId}/`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            name: newName,
-            description: projectDesc
-        })
-    })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
-        }
-        return response.text().then(text => {
-            throw new Error(text || `HTTP ${response.status}`);
-        });
-    })
-    .then(data => {
-        if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showToast('Error: ' + (data.error || 'Failed to update project'), 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('Error updating project: ' + error, 'error');
-    });
-}
-
 function deleteProject(projectId, projectName) {
     showConfirmation(
         'Delete Project',

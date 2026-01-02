@@ -81,7 +81,7 @@
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
                                     {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
-                                    <button onclick="editAsset({{ asset.id }}, '{{ asset.name|escapejs }}', '{{ asset.tag|escapejs }}')" class="text-blue-600 hover:text-blue-900 bg-none border-none cursor-pointer">Edit</button>
+                                    <a href="{% url 'frontend:edit_asset' asset.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
                                     {% else %}
                                     <span class="text-gray-400 cursor-not-allowed" title="Admin only">Edit</span>
                                     {% endif %}
@@ -111,46 +111,6 @@
 </div>
 
 <script>
-function editAsset(assetId, assetName, assetTag) {
-    const newName = prompt('Edit asset name:', assetName);
-    if (newName === null) return; // User cancelled
-    
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
-    
-    fetch(`/api/assets/${assetId}/`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            name: newName,
-            tag: assetTag
-        })
-    })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
-        }
-        return response.text().then(text => {
-            throw new Error(text || `HTTP ${response.status}`);
-        });
-    })
-    .then(data => {
-        if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showToast('Error: ' + (data.error || 'Failed to update asset'), 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('Error updating asset: ' + error, 'error');
-    });
-}
-
 function deleteAsset(assetId, assetName) {
     showConfirmation(
         'Delete Asset',
@@ -163,7 +123,7 @@ function deleteAsset(assetId, assetName) {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
+                    'X-CSRFToken': csrfToken || '{{ csrf_token }}'
                 }
             })
             .then(response => {
@@ -180,7 +140,22 @@ function deleteAsset(assetId, assetName) {
             .then(data => {
                 if (data.success) {
                     showToast('Asset deleted successfully', 'success');
-                    setTimeout(() => location.reload(), 1500);
+                    // Remove the row immediately for better UX
+                    const row = document.querySelector(`.asset-row[data-id="${assetId}"]`);
+                    if (row) {
+                        row.style.transition = 'opacity 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(() => {
+                            row.remove();
+                            // Check if there are no more assets
+                            const remainingRows = document.querySelectorAll('.asset-row');
+                            if (remainingRows.length === 0) {
+                                location.reload();
+                            }
+                        }, 300);
+                    } else {
+                        setTimeout(() => location.reload(), 1500);
+                    }
                 } else {
                     showToast('Error: ' + (data.error || 'Failed to delete asset'), 'error');
                 }
@@ -225,3 +200,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

@@ -34,10 +34,13 @@ urlpatterns = [
     # Module URLs
     path('assets/', views.AssetsView.as_view(), name='assets'),
     path('assets/create/', views.CreateAssetView.as_view(), name='create_asset'),
+    path('assets/<int:asset_id>/edit/', views.EditAssetView.as_view(), name='edit_asset'),
     path('projects/', views.ProjectsView.as_view(), name='projects'),
     path('projects/create/', views.CreateProjectView.as_view(), name='create_project'),
+    path('projects/<int:project_id>/edit/', views.EditProjectView.as_view(), name='edit_project'),
     path('tickets/', views.TicketsView.as_view(), name='tickets'),
     path('tickets/create/', views.CreateTicketView.as_view(), name='create_ticket'),
+    path('tickets/<int:ticket_id>/edit/', views.EditTicketView.as_view(), name='edit_ticket'),
     path('users/', views.UsersView.as_view(), name='users'),
     path('users/create/', views.CreateUserView.as_view(), name='create_user'),
     path('users/<int:user_id>/edit/', views.EditUserView.as_view(), name='edit_user'),

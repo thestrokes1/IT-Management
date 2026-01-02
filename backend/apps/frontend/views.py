@@ -722,6 +722,357 @@ class CreateAssetView(LoginRequiredMixin, TemplateView):
             return render(request, self.template_name, context)
 
 
+class EditAssetView(LoginRequiredMixin, TemplateView):
+    """
+    Edit asset web interface.
+    """
+    template_name = 'frontend/edit-asset.html'
+    login_url = 'frontend:login'
+    
+    def dispatch(self, request, asset_id, *args, **kwargs):
+        """Check if user can manage assets."""
+        if not hasattr(request.user, 'can_manage_assets') or not request.user.can_manage_assets:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'You do not have permission to edit assets.'}, status=403)
+            messages.error(request, 'You do not have permission to edit assets.')
+            return redirect('frontend:assets')
+        self.asset_id = asset_id
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            asset = Asset.objects.select_related('category', 'assigned_to').get(id=self.asset_id)
+            from apps.assets.models import AssetCategory
+            categories = AssetCategory.objects.filter(is_active=True)
+            available_users = User.objects.filter(is_active=True)
+            context.update({
+                'asset': asset,
+                'categories': categories,
+                'available_users': available_users,
+                'form': {}
+            })
+        except Asset.DoesNotExist:
+            messages.error(self.request, 'Asset not found.')
+            return redirect('frontend:assets')
+        except Exception as e:
+            messages.error(self.request, f'Error loading asset: {str(e)}')
+            return redirect('frontend:assets')
+        return context
+    
+    def post(self, request, *args, **kwargs):
+        """Handle asset edit."""
+        try:
+            asset = Asset.objects.select_related('category', 'assigned_to').get(id=self.asset_id)
+            
+            name = request.POST.get('name', '')
+            asset_tag = request.POST.get('asset_tag', '')
+            asset_type = request.POST.get('asset_type', '')
+            category_id = request.POST.get('category', '')
+            description = request.POST.get('description', '')
+            serial_number = request.POST.get('serial_number', '')
+            model = request.POST.get('model', '')
+            manufacturer = request.POST.get('manufacturer', '')
+            version = request.POST.get('version', '')
+            status = request.POST.get('status', 'ACTIVE')
+            assigned_to_id = request.POST.get('assigned_to', '')
+            location = request.POST.get('location', '')
+            purchase_date = request.POST.get('purchase_date', '')
+            purchase_cost = request.POST.get('purchase_cost', '')
+            warranty_expiry = request.POST.get('warranty_expiry', '')
+            
+            # Validation
+            errors = {}
+            if not name:
+                errors['name'] = 'Asset name is required'
+            if not asset_tag:
+                errors['asset_tag'] = 'Asset tag is required'
+            if not asset_type:
+                errors['asset_type'] = 'Asset type is required'
+            if not category_id:
+                errors['category'] = 'Category is required'
+            if not status:
+                errors['status'] = 'Status is required'
+            
+            if errors:
+                context = self.get_context_data()
+                context['errors'] = errors
+                context['form'] = request.POST
+                return render(request, self.template_name, context)
+            
+            # Update asset
+            from apps.assets.models import AssetCategory
+            category = AssetCategory.objects.get(id=category_id)
+            assigned_to = User.objects.get(id=assigned_to_id) if assigned_to_id else None
+            
+            asset.name = name
+            asset.asset_tag = asset_tag
+            asset.asset_type = asset_type
+            asset.category = category
+            asset.description = description
+            asset.serial_number = serial_number if serial_number else None
+            asset.model = model
+            asset.manufacturer = manufacturer
+            asset.version = version
+            asset.status = status
+            asset.assigned_to = assigned_to
+            asset.location = location
+            asset.purchase_date = purchase_date if purchase_date else None
+            asset.purchase_cost = purchase_cost if purchase_cost else None
+            asset.warranty_expiry = warranty_expiry if warranty_expiry else None
+            asset.save()
+            
+            messages.success(request, f'Asset "{asset.name}" updated successfully!')
+            return redirect('frontend:assets')
+        
+        except Asset.DoesNotExist:
+            messages.error(request, 'Asset not found.')
+            return redirect('frontend:assets')
+        except Exception as e:
+            messages.error(request, f'Error updating asset: {str(e)}')
+            context = self.get_context_data()
+            context['form'] = request.POST
+            return render(request, self.template_name, context)
+
+
+class EditProjectView(LoginRequiredMixin, TemplateView):
+    """
+    Edit project web interface.
+    """
+    template_name = 'frontend/edit-project.html'
+    login_url = 'frontend:login'
+    
+    def dispatch(self, request, project_id, *args, **kwargs):
+        """Check if user can manage projects."""
+        if not hasattr(request.user, 'can_manage_projects') or not request.user.can_manage_projects:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'You do not have permission to edit projects.'}, status=403)
+            messages.error(request, 'You do not have permission to edit projects.')
+            return redirect('frontend:projects')
+        self.project_id = project_id
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            project = Project.objects.select_related('category', 'project_manager', 'created_by', 'updated_by').get(id=self.project_id)
+            from apps.projects.models import ProjectCategory
+            categories = ProjectCategory.objects.filter(is_active=True)
+            available_users = User.objects.filter(is_active=True)
+            context.update({
+                'project': project,
+                'categories': categories,
+                'available_users': available_users,
+                'form': {}
+            })
+        except Project.DoesNotExist:
+            messages.error(self.request, 'Project not found.')
+            return redirect('frontend:projects')
+        except Exception as e:
+            messages.error(self.request, f'Error loading project: {str(e)}')
+            return redirect('frontend:projects')
+        return context
+    
+    def post(self, request, *args, **kwargs):
+        """Handle project edit."""
+        try:
+            project = Project.objects.select_related('category', 'project_manager').get(id=self.project_id)
+            
+            name = request.POST.get('name', '')
+            description = request.POST.get('description', '')
+            category_id = request.POST.get('category', '')
+            status = request.POST.get('status', 'PLANNING')
+            priority = request.POST.get('priority', 'MEDIUM')
+            project_manager_id = request.POST.get('project_manager', '')
+            objectives = request.POST.get('objectives', '')
+            requirements = request.POST.get('requirements', '')
+            deliverables = request.POST.get('deliverables', '')
+            start_date = request.POST.get('start_date', '')
+            end_date = request.POST.get('end_date', '')
+            deadline = request.POST.get('deadline', '')
+            budget = request.POST.get('budget', '')
+            risk_level = request.POST.get('risk_level', 'MEDIUM')
+            risk_description = request.POST.get('risk_description', '')
+            
+            # Validation
+            errors = {}
+            if not name:
+                errors['name'] = 'Project name is required'
+            if not description:
+                errors['description'] = 'Description is required'
+            if not category_id:
+                errors['category'] = 'Category is required'
+            if not project_manager_id:
+                errors['project_manager'] = 'Project manager is required'
+            
+            if errors:
+                context = self.get_context_data()
+                context['errors'] = errors
+                context['form'] = request.POST
+                return render(request, self.template_name, context)
+            
+            # Update project
+            from apps.projects.models import ProjectCategory
+            category = ProjectCategory.objects.get(id=category_id)
+            project_manager = User.objects.get(id=project_manager_id)
+            
+            project.name = name
+            project.description = description
+            project.category = category
+            project.status = status
+            project.priority = priority
+            project.project_manager = project_manager
+            project.objectives = objectives
+            project.requirements = requirements
+            project.deliverables = deliverables
+            project.start_date = start_date if start_date else None
+            project.end_date = end_date if end_date else None
+            project.deadline = deadline if deadline else None
+            project.budget = budget if budget else None
+            project.risk_level = risk_level
+            project.risk_description = risk_description
+            project.updated_by = request.user
+            project.save()
+            
+            messages.success(request, f'Project "{project.name}" updated successfully!')
+            return redirect('frontend:projects')
+        
+        except Project.DoesNotExist:
+            messages.error(request, 'Project not found.')
+            return redirect('frontend:projects')
+        except Exception as e:
+            messages.error(request, f'Error updating project: {str(e)}')
+            context = self.get_context_data()
+            context['form'] = request.POST
+            return render(request, self.template_name, context)
+
+
+class EditTicketView(LoginRequiredMixin, TemplateView):
+    """
+    Edit ticket web interface.
+    """
+    template_name = 'frontend/edit-ticket.html'
+    login_url = 'frontend:login'
+    
+    def dispatch(self, request, ticket_id, *args, **kwargs):
+        """Check if user can manage tickets."""
+        if not hasattr(request.user, 'can_manage_tickets') or not request.user.can_manage_tickets:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'You do not have permission to edit tickets.'}, status=403)
+            messages.error(request, 'You do not have permission to edit tickets.')
+            return redirect('frontend:tickets')
+        self.ticket_id = ticket_id
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            ticket = Ticket.objects.select_related('category', 'ticket_type', 'assigned_to', 'created_by').get(id=self.ticket_id)
+            from apps.tickets.models import TicketCategory, TicketType
+            categories = TicketCategory.objects.filter(is_active=True)
+            ticket_types = TicketType.objects.filter(is_active=True)
+            available_users = User.objects.filter(is_active=True)
+            context.update({
+                'ticket': ticket,
+                'categories': categories,
+                'ticket_types': ticket_types,
+                'available_users': available_users,
+                'form': {}
+            })
+        except Ticket.DoesNotExist:
+            messages.error(self.request, 'Ticket not found.')
+            return redirect('frontend:tickets')
+        except Exception as e:
+            messages.error(self.request, f'Error loading ticket: {str(e)}')
+            return redirect('frontend:tickets')
+        return context
+    
+    def post(self, request, *args, **kwargs):
+        """Handle ticket edit."""
+        try:
+            ticket = Ticket.objects.select_related('category', 'ticket_type', 'assigned_to').get(id=self.ticket_id)
+            
+            title = request.POST.get('title', '')
+            description = request.POST.get('description', '')
+            category_id = request.POST.get('category', '')
+            ticket_type_id = request.POST.get('ticket_type', '')
+            status = request.POST.get('status', 'NEW')
+            priority = request.POST.get('priority', 'MEDIUM')
+            impact = request.POST.get('impact', 'MEDIUM')
+            urgency = request.POST.get('urgency', 'MEDIUM')
+            assigned_to_id = request.POST.get('assigned_to', '')
+            assigned_team = request.POST.get('assigned_team', '')
+            location = request.POST.get('location', '')
+            contact_phone = request.POST.get('contact_phone', '')
+            contact_email = request.POST.get('contact_email', '')
+            sla_due_at_str = request.POST.get('sla_due_at', '')
+            resolution_summary = request.POST.get('resolution_summary', '')
+            
+            # Validation
+            errors = {}
+            if not title:
+                errors['title'] = 'Title is required'
+            if not description:
+                errors['description'] = 'Description is required'
+            if not category_id:
+                errors['category'] = 'Category is required'
+            if not priority:
+                errors['priority'] = 'Priority is required'
+            
+            if errors:
+                context = self.get_context_data()
+                context['errors'] = errors
+                context['form'] = request.POST
+                return render(request, self.template_name, context)
+            
+            # Update ticket
+            from apps.tickets.models import TicketCategory, TicketType
+            category = TicketCategory.objects.get(id=category_id)
+            ticket_type = TicketType.objects.get(id=ticket_type_id) if ticket_type_id else None
+            assigned_to = User.objects.get(id=assigned_to_id) if assigned_to_id else None
+            
+            # Parse sla_due_at
+            sla_due_at = None
+            if sla_due_at_str:
+                try:
+                    from datetime import datetime
+                    sla_due_at = timezone.make_aware(
+                        datetime.fromisoformat(sla_due_at_str.replace('Z', '+00:00'))
+                    )
+                except (ValueError, TypeError):
+                    pass  # Invalid datetime format, leave as None
+            
+            ticket.title = title
+            ticket.description = description
+            ticket.category = category
+            ticket.ticket_type = ticket_type
+            ticket.status = status
+            ticket.priority = priority
+            ticket.impact = impact
+            ticket.urgency = urgency
+            ticket.assigned_to = assigned_to
+            ticket.assigned_team = assigned_team
+            ticket.location = location
+            ticket.contact_phone = contact_phone
+            ticket.contact_email = contact_email
+            ticket.sla_due_at = sla_due_at
+            ticket.resolution_summary = resolution_summary
+            ticket.updated_by = request.user
+            ticket.save()
+            
+            messages.success(request, f'Ticket #{ticket.id} updated successfully!')
+            return redirect('frontend:tickets')
+        
+        except Ticket.DoesNotExist:
+            messages.error(request, 'Ticket not found.')
+            return redirect('frontend:tickets')
+        except Exception as e:
+            messages.error(request, f'Error updating ticket: {str(e)}')
+            context = self.get_context_data()
+            context['form'] = request.POST
+            return render(request, self.template_name, context)
+
+
 class Error404View(TemplateView):
     """
     Custom 404 error page.
