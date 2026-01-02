@@ -178,10 +178,11 @@ class Project(models.Model):
         """Update project completion percentage based on tasks."""
         total_tasks = self.total_tasks
         if total_tasks == 0:
-            self.completion_percentage = 0
+            new_percentage = 0
         else:
-            self.completion_percentage = int((self.completed_tasks / total_tasks) * 100)
-        self.save()
+            new_percentage = int((self.completed_tasks / total_tasks) * 100)
+        # Use update() to avoid triggering signals and causing recursion
+        Project.objects.filter(pk=self.pk).update(completion_percentage=new_percentage)
 
 class ProjectMember(models.Model):
     """

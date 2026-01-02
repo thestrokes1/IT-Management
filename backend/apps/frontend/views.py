@@ -13,7 +13,7 @@ from django.views.generic import TemplateView
 from django.contrib.auth import authenticate, login, logout
 from django.conf import settings
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime, date
 import json
 
 try:
@@ -599,6 +599,28 @@ class CreateProjectView(LoginRequiredMixin, TemplateView):
             category = ProjectCategory.objects.get(id=category_id)
             project_manager = User.objects.get(id=project_manager_id)
             
+            # Convert date strings to date objects
+            start_date_obj = None
+            if start_date:
+                try:
+                    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    start_date_obj = None
+            
+            end_date_obj = None
+            if end_date:
+                try:
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    end_date_obj = None
+            
+            deadline_obj = None
+            if deadline:
+                try:
+                    deadline_obj = datetime.strptime(deadline, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    deadline_obj = None
+            
             project = Project.objects.create(
                 name=name,
                 description=description,
@@ -608,9 +630,9 @@ class CreateProjectView(LoginRequiredMixin, TemplateView):
                 objectives=objectives,
                 requirements=requirements,
                 deliverables=deliverables,
-                start_date=start_date if start_date else None,
-                end_date=end_date if end_date else None,
-                deadline=deadline if deadline else None,
+                start_date=start_date_obj,
+                end_date=end_date_obj,
+                deadline=deadline_obj,
                 budget=budget if budget else None,
                 risk_level=risk_level,
                 risk_description=risk_description,
@@ -916,6 +938,28 @@ class EditProjectView(LoginRequiredMixin, TemplateView):
             category = ProjectCategory.objects.get(id=category_id)
             project_manager = User.objects.get(id=project_manager_id)
             
+            # Convert date strings to datetime.date objects
+            start_date_obj = None
+            if start_date:
+                try:
+                    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    start_date_obj = None
+            
+            end_date_obj = None
+            if end_date:
+                try:
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    end_date_obj = None
+            
+            deadline_obj = None
+            if deadline:
+                try:
+                    deadline_obj = datetime.strptime(deadline, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    deadline_obj = None
+            
             project.name = name
             project.description = description
             project.category = category
@@ -925,9 +969,9 @@ class EditProjectView(LoginRequiredMixin, TemplateView):
             project.objectives = objectives
             project.requirements = requirements
             project.deliverables = deliverables
-            project.start_date = start_date if start_date else None
-            project.end_date = end_date if end_date else None
-            project.deadline = deadline if deadline else None
+            project.start_date = start_date_obj
+            project.end_date = end_date_obj
+            project.deadline = deadline_obj
             project.budget = budget if budget else None
             project.risk_level = risk_level
             project.risk_description = risk_description

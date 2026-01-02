@@ -5,7 +5,7 @@ Handles serialization and validation for project and task operations.
 
 from rest_framework import serializers
 from django.utils import timezone
-from datetime import datetime
+from datetime import datetime, date
 
 from apps.projects.models import (
     ProjectCategory, TaskCategory, Project, ProjectMember, Task, TaskComment,
@@ -118,12 +118,50 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             'team_member_ids'
         ]
     
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'end_date', 'deadline']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
+    
     def validate(self, attrs):
-        # Validate dates
+        # Ensure dates are date objects for comparison
         start_date = attrs.get('start_date')
         end_date = attrs.get('end_date')
         deadline = attrs.get('deadline')
         
+        # Convert string dates to date objects if needed
+        if isinstance(start_date, str):
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                attrs['start_date'] = start_date
+            except (ValueError, TypeError):
+                start_date = None
+                attrs['start_date'] = None
+        
+        if isinstance(end_date, str):
+            try:
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                attrs['end_date'] = end_date
+            except (ValueError, TypeError):
+                end_date = None
+                attrs['end_date'] = None
+        
+        if isinstance(deadline, str):
+            try:
+                deadline = datetime.strptime(deadline, '%Y-%m-%d').date()
+                attrs['deadline'] = deadline
+            except (ValueError, TypeError):
+                deadline = None
+                attrs['deadline'] = None
+        
+        # Validate dates
         if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError("End date cannot be before start date.")
         
@@ -165,6 +203,58 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
             'requirements', 'deliverables', 'risk_level', 'risk_description',
             'team_member_ids'
         ]
+    
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'end_date', 'deadline']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
+    
+    def validate(self, attrs):
+        # Ensure dates are date objects for comparison
+        start_date = attrs.get('start_date')
+        end_date = attrs.get('end_date')
+        deadline = attrs.get('deadline')
+        
+        # Convert string dates to date objects if needed
+        if isinstance(start_date, str):
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                attrs['start_date'] = start_date
+            except (ValueError, TypeError):
+                start_date = None
+                attrs['start_date'] = None
+        
+        if isinstance(end_date, str):
+            try:
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                attrs['end_date'] = end_date
+            except (ValueError, TypeError):
+                end_date = None
+                attrs['end_date'] = None
+        
+        if isinstance(deadline, str):
+            try:
+                deadline = datetime.strptime(deadline, '%Y-%m-%d').date()
+                attrs['deadline'] = deadline
+            except (ValueError, TypeError):
+                deadline = None
+                attrs['deadline'] = None
+        
+        # Validate dates
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError("End date cannot be before start date.")
+        
+        if deadline and start_date and deadline < start_date:
+            raise serializers.ValidationError("Deadline cannot be before start date.")
+        
+        return attrs
     
     def update(self, instance, validated_data):
         team_member_ids = validated_data.pop('team_member_ids', None)
@@ -261,6 +351,18 @@ class TaskCreateSerializer(serializers.ModelSerializer):
             'completion_percentage', 'tags', 'dependency_ids'
         ]
     
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'due_date']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
+    
     def create(self, validated_data):
         dependency_ids = validated_data.pop('dependency_ids', [])
         validated_data['created_by'] = self.context['request'].user
@@ -295,6 +397,18 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
             'actual_hours', 'parent_task', 'completion_percentage', 'tags',
             'dependency_ids'
         ]
+    
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'due_date']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
     
     def update(self, instance, validated_data):
         dependency_ids = validated_data.pop('dependency_ids', None)
@@ -447,3 +561,4 @@ class TaskSearchSerializer(serializers.Serializer):
     overdue = serializers.BooleanField(required=False)
     due_date_from = serializers.DateField(required=False)
     due_date_to = serializers.DateField(required=False)
+
