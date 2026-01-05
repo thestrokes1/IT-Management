@@ -2,7 +2,7 @@
 URL configuration for IT Management Platform.
 Main URL configuration that includes API documentation and app URLs.
 """
-
+from django.contrib.auth import views as auth_views
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -37,6 +37,31 @@ urlpatterns = [
     path('', include('apps.tickets.web_urls')),  # Web URLs for tickets
     path('', include('apps.projects.web_urls')),  # Web URLs for projects
     path('', include('apps.logs.web_urls')),  # Web URLs for logs
+    
+        # Auth password reset
+    path(
+        'password-reset/',
+        auth_views.PasswordResetView.as_view(),
+        name='password_reset'
+    ),
+    path(
+        'password-reset/done/',
+        auth_views.PasswordResetDoneView.as_view(),
+        name='password_reset_done'
+    ),
+    path(
+        'reset/<uidb64>/<token>/',
+        auth_views.PasswordResetConfirmView.as_view(),
+        name='password_reset_confirm'
+    ),
+    path(
+        'reset/done/',
+        auth_views.PasswordResetCompleteView.as_view(),
+        name='password_reset_complete'
+    ),
+
+    path('accounts/', include('django.contrib.auth.urls')),
+
 ]
 
 # Serve media files in development
