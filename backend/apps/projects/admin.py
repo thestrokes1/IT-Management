@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 
 from .models import (
-    ProjectCategory, Project, ProjectMember, Task, TaskComment,
+    ProjectCategory, TaskCategory, Project, ProjectMember, Task, TaskComment,
     TaskAttachment, ProjectTemplate, ProjectAuditLog, ProjectReport
 )
 
@@ -41,6 +41,34 @@ class ProjectReportInline(admin.TabularInline):
 @admin.register(ProjectCategory)
 class ProjectCategoryAdmin(admin.ModelAdmin):
     """Admin interface for ProjectCategory model."""
+    list_display = ['name', 'color_display', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def color_display(self, obj):
+        return format_html(
+            '<span style="color: {};">●</span> {}',
+            obj.color, obj.color
+        )
+    color_display.short_description = 'Color'
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'description', 'color')
+        }),
+        ('Settings', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+@admin.register(TaskCategory)
+class TaskCategoryAdmin(admin.ModelAdmin):
+    """Admin interface for TaskCategory model."""
     list_display = ['name', 'color_display', 'is_active', 'created_at']
     list_filter = ['is_active', 'created_at']
     search_fields = ['name', 'description']
@@ -137,15 +165,15 @@ class ProjectMemberAdmin(admin.ModelAdmin):
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
     """Admin interface for Task model."""
-    list_display = ['title', 'project', 'type', 'priority', 'status', 'assigned_to', 'due_date', 'completion_percentage']
-    list_filter = ['type', 'priority', 'status', 'project', 'assigned_to', 'due_date']
-    search_fields = ['title', 'description', 'project__name', 'assigned_to__username']
+    list_display = ['title', 'project', 'category', 'type', 'priority', 'status', 'assigned_to', 'due_date', 'completion_percentage']
+    list_filter = ['category', 'type', 'priority', 'status', 'project', 'assigned_to', 'due_date']
+    search_fields = ['title', 'description', 'project__name', 'assigned_to__username', 'category__name']
     readonly_fields = ['task_id', 'created_at', 'updated_at', 'completion_percentage']
     date_hierarchy = 'due_date'
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('task_id', 'title', 'description', 'project')
+            'fields': ('task_id', 'title', 'description', 'project', 'category')
         }),
         ('Task Management', {
             'fields': ('type', 'priority', 'status')

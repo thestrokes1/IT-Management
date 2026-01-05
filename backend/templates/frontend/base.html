@@ -524,43 +524,7 @@
     <!-- Overlay for mobile sidebar -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-40 hidden lg:hidden"></div>
     
-    <!-- Modals -->
-    <div id="modal-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 hidden">
-        <!-- Create Ticket Modal -->
-        <div id="create-ticket-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-                </div>
-                <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                    <form id="create-ticket-form">
-                        <div>
-                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Create New Ticket</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Title</label>
-                                    <input type="text" name="title" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Description</label>
-                                    <textarea name="description" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"></textarea>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-                            <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm">
-                                Create Ticket
-                            </button>
-                            <button type="button" onclick="hideModal('create-ticket-modal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    
+
     <!-- JavaScript -->
     <script>
         // Mobile sidebar toggle
@@ -631,40 +595,47 @@
         
         // Modal functions
         function showModal(modalId) {
-            document.getElementById('modal-overlay').classList.remove('hidden');
-            document.getElementById(modalId).classList.remove('hidden');
+            const overlay = document.getElementById('modal-overlay');
+            const modal = document.getElementById(modalId);
+            if (overlay) overlay.classList.remove('hidden');
+            if (modal) modal.classList.remove('hidden');
         }
         
         function hideModal(modalId) {
-            document.getElementById('modal-overlay').classList.add('hidden');
-            document.getElementById(modalId).classList.add('hidden');
+            const overlay = document.getElementById('modal-overlay');
+            const modal = document.getElementById(modalId);
+            if (overlay) overlay.classList.add('hidden');
+            if (modal) modal.classList.add('hidden');
         }
         
         function showCreateTicketModal() {
             showModal('create-ticket-modal');
         }
         
-        // Form submissions
-        document.getElementById('create-ticket-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            formData.append('action', 'create_ticket');
-            
-            fetch('/api/quick-actions/', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    hideModal('create-ticket-modal');
-                    this.reset();
-                    location.reload(); // Refresh to show new ticket
-                } else {
-                    alert('Error: ' + data.error);
-                }
+        // Form submissions - with null check
+        const createTicketForm = document.getElementById('create-ticket-form');
+        if (createTicketForm) {
+            createTicketForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.append('action', 'create_ticket');
+                
+                fetch('/api/quick-actions/', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        hideModal('create-ticket-modal');
+                        this.reset();
+                        location.reload(); // Refresh to show new ticket
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
             });
-        });
+        }
         
         // Close dropdowns when clicking outside
         document.addEventListener('click', function(event) {
@@ -678,7 +649,7 @@
         
         // Auto-refresh dashboard stats every 30 seconds
         setInterval(function() {
-            fetch('/frontend/api/dashboard/')
+            fetch('/dashboard/api/')
                 .then(response => response.json())
                 .then(data => {
                     // Update stats display
@@ -825,7 +796,7 @@
         }
         
         // Confirmation Modal System
-        let confirmCallback = null;
+        var confirmCallback = null;
         
         function showConfirmation(title, message, callback) {
             document.getElementById('modalTitle').innerText = title;
@@ -836,11 +807,13 @@
         
         function closeConfirmModal() {
             document.getElementById('confirmModal').classList.remove('show');
-            confirmCallback = null;
+            setTimeout(function() {
+                confirmCallback = null;
+            }, 100); // Small delay to prevent timing issues
         }
         
         function executeConfirm() {
-            if (confirmCallback) {
+            if (typeof confirmCallback === 'function') {
                 confirmCallback();
             }
             closeConfirmModal();

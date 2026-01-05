@@ -5,10 +5,10 @@ Handles serialization and validation for project and task operations.
 
 from rest_framework import serializers
 from django.utils import timezone
-from datetime import datetime
+from datetime import datetime, date
 
 from apps.projects.models import (
-    ProjectCategory, Project, ProjectMember, Task, TaskComment,
+    ProjectCategory, TaskCategory, Project, ProjectMember, Task, TaskComment,
     TaskAttachment, ProjectTemplate, ProjectAuditLog, ProjectReport
 )
 from apps.users.models import User
@@ -21,6 +21,17 @@ class ProjectCategorySerializer(serializers.ModelSerializer):
         model = ProjectCategory
         fields = ['id', 'name', 'description', 'color', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+class TaskCategorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for task categories.
+    """
+    task_count = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        model = TaskCategory
+        fields = ['id', 'name', 'description', 'color', 'is_active', 'task_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'task_count', 'created_at', 'updated_at']
 
 class ProjectMemberSerializer(serializers.ModelSerializer):
     """
@@ -107,12 +118,50 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             'team_member_ids'
         ]
     
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'end_date', 'deadline']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
+    
     def validate(self, attrs):
-        # Validate dates
+        # Ensure dates are date objects for comparison
         start_date = attrs.get('start_date')
         end_date = attrs.get('end_date')
         deadline = attrs.get('deadline')
         
+        # Convert string dates to date objects if needed
+        if isinstance(start_date, str):
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                attrs['start_date'] = start_date
+            except (ValueError, TypeError):
+                start_date = None
+                attrs['start_date'] = None
+        
+        if isinstance(end_date, str):
+            try:
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                attrs['end_date'] = end_date
+            except (ValueError, TypeError):
+                end_date = None
+                attrs['end_date'] = None
+        
+        if isinstance(deadline, str):
+            try:
+                deadline = datetime.strptime(deadline, '%Y-%m-%d').date()
+                attrs['deadline'] = deadline
+            except (ValueError, TypeError):
+                deadline = None
+                attrs['deadline'] = None
+        
+        # Validate dates
         if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError("End date cannot be before start date.")
         
@@ -155,6 +204,58 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
             'team_member_ids'
         ]
     
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'end_date', 'deadline']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
+    
+    def validate(self, attrs):
+        # Ensure dates are date objects for comparison
+        start_date = attrs.get('start_date')
+        end_date = attrs.get('end_date')
+        deadline = attrs.get('deadline')
+        
+        # Convert string dates to date objects if needed
+        if isinstance(start_date, str):
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                attrs['start_date'] = start_date
+            except (ValueError, TypeError):
+                start_date = None
+                attrs['start_date'] = None
+        
+        if isinstance(end_date, str):
+            try:
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                attrs['end_date'] = end_date
+            except (ValueError, TypeError):
+                end_date = None
+                attrs['end_date'] = None
+        
+        if isinstance(deadline, str):
+            try:
+                deadline = datetime.strptime(deadline, '%Y-%m-%d').date()
+                attrs['deadline'] = deadline
+            except (ValueError, TypeError):
+                deadline = None
+                attrs['deadline'] = None
+        
+        # Validate dates
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError("End date cannot be before start date.")
+        
+        if deadline and start_date and deadline < start_date:
+            raise serializers.ValidationError("Deadline cannot be before start date.")
+        
+        return attrs
+    
     def update(self, instance, validated_data):
         team_member_ids = validated_data.pop('team_member_ids', None)
         
@@ -184,6 +285,7 @@ class TaskListSerializer(serializers.ModelSerializer):
     Serializer for task list view.
     """
     project_name = serializers.CharField(source='project.name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
     assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
@@ -193,10 +295,10 @@ class TaskListSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             'id', 'task_id', 'title', 'description', 'project_name',
-            'type', 'priority', 'status', 'assigned_to_username',
-            'created_by_username', 'start_date', 'due_date',
-            'estimated_hours', 'completion_percentage', 'is_overdue',
-            'is_subtask', 'created_at'
+            'category', 'category_name', 'type', 'priority', 'status',
+            'assigned_to_username', 'created_by_username', 'start_date',
+            'due_date', 'estimated_hours', 'completion_percentage',
+            'is_overdue', 'is_subtask', 'created_at'
         ]
         read_only_fields = ['id', 'task_id', 'created_at']
 
@@ -205,6 +307,7 @@ class TaskDetailSerializer(serializers.ModelSerializer):
     Serializer for task detail view.
     """
     project = ProjectListSerializer(read_only=True)
+    category = TaskCategorySerializer(read_only=True)
     assigned_to = serializers.StringRelatedField(read_only=True)
     created_by = serializers.StringRelatedField(read_only=True)
     parent_task = serializers.StringRelatedField(read_only=True)
@@ -217,7 +320,7 @@ class TaskDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            'id', 'task_id', 'title', 'description', 'project',
+            'id', 'task_id', 'title', 'description', 'project', 'category',
             'type', 'priority', 'status', 'assigned_to', 'created_by',
             'start_date', 'due_date', 'completed_date',
             'estimated_hours', 'actual_hours', 'parent_task',
@@ -247,6 +350,18 @@ class TaskCreateSerializer(serializers.ModelSerializer):
             'start_date', 'due_date', 'estimated_hours', 'parent_task',
             'completion_percentage', 'tags', 'dependency_ids'
         ]
+    
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'due_date']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
     
     def create(self, validated_data):
         dependency_ids = validated_data.pop('dependency_ids', [])
@@ -282,6 +397,18 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
             'actual_hours', 'parent_task', 'completion_percentage', 'tags',
             'dependency_ids'
         ]
+    
+    def to_internal_value(self, data):
+        """Convert string dates to date objects before validation."""
+        # Convert date fields from string to datetime.date
+        date_fields = ['start_date', 'due_date']
+        for field in date_fields:
+            if field in data and isinstance(data[field], str) and data[field]:
+                try:
+                    data[field] = datetime.strptime(data[field], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data[field] = None
+        return super().to_internal_value(data)
     
     def update(self, instance, validated_data):
         dependency_ids = validated_data.pop('dependency_ids', None)
@@ -434,3 +561,4 @@ class TaskSearchSerializer(serializers.Serializer):
     overdue = serializers.BooleanField(required=False)
     due_date_from = serializers.DateField(required=False)
     due_date_to = serializers.DateField(required=False)
+

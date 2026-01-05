@@ -72,6 +72,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.frontend.views.dashboard_stats_context',
+                'apps.frontend.views.frontend_context',
             ],
         },
     },
@@ -218,7 +220,7 @@ LOGGING = {
             'formatter': 'verbose',
         },
         'console': {
-            'level': 'DEBUG',
+            'level': 'WARNING',  # Only show WARNING and above in console
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
@@ -230,13 +232,28 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': True,
+            'level': 'WARNING',  # Reduce Django logging to WARNING
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.db.migrations': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.utils.translation': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
         },
         'it_management_platform': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }

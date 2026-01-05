@@ -3,7 +3,7 @@ Asset signals for IT Management Platform.
 Handles asset creation, updates, assignments, and audit logging.
 """
 
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, pre_delete, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -83,14 +83,17 @@ def create_asset_audit_log(sender, instance, created, **kwargs):
         except Asset.DoesNotExist:
             pass
 
-@receiver(post_delete, sender=Asset)
+@receiver(pre_delete, sender=Asset)
 def create_asset_deletion_log(sender, instance, **kwargs):
     """
     Create audit log when asset is deleted.
+    Use pre_delete to ensure the asset still exists in the database.
     """
+    # Get user from updated_by if available (user performing the deletion)
+    user = instance.updated_by or User.objects.filter(is_superuser=True).first()
     AssetAuditLog.objects.create(
         asset=instance,
-        user=User.objects.filter(is_superuser=True).first(),  # System deletion
+        user=user,
         action='DELETED',
         description=f'Asset deleted: {instance.name}',
         old_values={

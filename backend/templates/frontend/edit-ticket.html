@@ -1,0 +1,226 @@
+
+{% extends 'frontend/base.html' %}
+
+{% block title %}Edit Ticket - IT Management Platform{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 sm:py-8">
+    <div class="mb-6 sm:mb-8">
+        <h1 class="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">Edit Ticket</h1>
+        <p class="text-xs sm:text-base text-gray-600">Update ticket information and settings</p>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="mb-6">
+        <nav class="flex text-xs sm:text-sm" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li>
+                    <a href="{% url 'frontend:dashboard' %}" class="text-gray-500 hover:text-gray-700">Dashboard</a>
+                </li>
+                <li class="flex items-center">
+                    <svg class="flex-shrink-0 h-4 w-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                    </svg>
+                    <a href="{% url 'frontend:tickets' %}" class="ml-2 text-gray-500 hover:text-gray-700">Tickets</a>
+                </li>
+                <li class="flex items-center">
+                    <svg class="flex-shrink-0 h-4 w-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                    </svg>
+                    <span class="ml-2 text-gray-900 font-medium">{{ ticket.title }}</span>
+                </li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-6 p-3 sm:p-4 {% if message.tags == 'success' %}bg-green-50 border border-green-200 text-green-800{% elif message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %} rounded-lg text-xs sm:text-sm">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Edit Ticket Form -->
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <form method="POST" id="editTicketForm" class="space-y-4 sm:space-y-6">
+            {% csrf_token %}
+            
+            <!-- Basic Information -->
+            <div>
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 border-b pb-2">Basic Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    <div class="md:col-span-2">
+                        <label for="title" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Title *</label>
+                        <input type="text" id="title" name="title" value="{{ ticket.title }}" required
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        {% if errors.title %}
+                        <p class="mt-1 text-xs text-red-600">{{ errors.title }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="description" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Description *</label>
+                        <textarea id="description" name="description" rows="4" required
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">{{ ticket.description }}</textarea>
+                        {% if errors.description %}
+                        <p class="mt-1 text-xs text-red-600">{{ errors.description }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="category" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Category *</label>
+                        <select id="category" name="category" required
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Category</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if ticket.category.id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if errors.category %}
+                        <p class="mt-1 text-xs text-red-600">{{ errors.category }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="ticket_type" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Ticket Type</label>
+                        <select id="ticket_type" name="ticket_type"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Type</option>
+                            {% for type in ticket_types %}
+                            <option value="{{ type.id }}" {% if ticket.ticket_type and ticket.ticket_type.id == type.id %}selected{% endif %}>
+                                {{ type.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status & Priority -->
+            <div>
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 border-b pb-2">Status & Priority</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
+                    <div>
+                        <label for="status" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Status *</label>
+                        <select id="status" name="status" required
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="NEW" {% if ticket.status == 'NEW' %}selected{% endif %}>New</option>
+                            <option value="OPEN" {% if ticket.status == 'OPEN' %}selected{% endif %}>Open</option>
+                            <option value="IN_PROGRESS" {% if ticket.status == 'IN_PROGRESS' %}selected{% endif %}>In Progress</option>
+                            <option value="PENDING" {% if ticket.status == 'PENDING' %}selected{% endif %}>Pending</option>
+                            <option value="RESOLVED" {% if ticket.status == 'RESOLVED' %}selected{% endif %}>Resolved</option>
+                            <option value="CLOSED" {% if ticket.status == 'CLOSED' %}selected{% endif %}>Closed</option>
+                            <option value="CANCELLED" {% if ticket.status == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="priority" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Priority *</label>
+                        <select id="priority" name="priority" required
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="LOW" {% if ticket.priority == 'LOW' %}selected{% endif %}>Low</option>
+                            <option value="MEDIUM" {% if ticket.priority == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                            <option value="HIGH" {% if ticket.priority == 'HIGH' %}selected{% endif %}>High</option>
+                            <option value="CRITICAL" {% if ticket.priority == 'CRITICAL' %}selected{% endif %}>Critical</option>
+                            <option value="URGENT" {% if ticket.priority == 'URGENT' %}selected{% endif %}>Urgent</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="impact" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Impact</label>
+                        <select id="impact" name="impact"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="LOW" {% if ticket.impact == 'LOW' %}selected{% endif %}>Low</option>
+                            <option value="MEDIUM" {% if ticket.impact == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                            <option value="HIGH" {% if ticket.impact == 'HIGH' %}selected{% endif %}>High</option>
+                            <option value="CRITICAL" {% if ticket.impact == 'CRITICAL' %}selected{% endif %}>Critical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="urgency" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Urgency</label>
+                        <select id="urgency" name="urgency"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="LOW" {% if ticket.urgency == 'LOW' %}selected{% endif %}>Low</option>
+                            <option value="MEDIUM" {% if ticket.urgency == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                            <option value="HIGH" {% if ticket.urgency == 'HIGH' %}selected{% endif %}>High</option>
+                            <option value="URGENT" {% if ticket.urgency == 'URGENT' %}selected{% endif %}>Urgent</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignment -->
+            <div>
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 border-b pb-2">Assignment</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                        <label for="assigned_to" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                        <select id="assigned_to" name="assigned_to"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Unassigned</option>
+                            {% for user in available_users %}
+                            <option value="{{ user.id }}" {% if ticket.assigned_to and ticket.assigned_to.id == user.id %}selected{% endif %}>
+                                {{ user.username }} ({{ user.first_name }} {{ user.last_name }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="assigned_team" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Assigned Team</label>
+                        <input type="text" id="assigned_team" name="assigned_team" value="{{ ticket.assigned_team }}"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div>
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 border-b pb-2">Contact Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                    <div>
+                        <label for="location" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <input type="text" id="location" name="location" value="{{ ticket.location }}"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="contact_phone" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+                        <input type="text" id="contact_phone" name="contact_phone" value="{{ ticket.contact_phone }}"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="contact_email" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+                        <input type="email" id="contact_email" name="contact_email" value="{{ ticket.contact_email }}"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                </div>
+            </div>
+
+            <!-- SLA & Resolution -->
+            <div>
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 border-b pb-2">SLA & Resolution</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                        <label for="sla_due_at" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">SLA Due Date</label>
+                        <input type="datetime-local" id="sla_due_at" name="sla_due_at" 
+                            value="{% if ticket.sla_due_at %}{{ ticket.sla_due_at|date:'Y-m-d\TH:i' }}{% endif %}"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="resolution_summary" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Resolution Summary</label>
+                        <textarea id="resolution_summary" name="resolution_summary" rows="3"
+                            class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">{{ ticket.resolution_summary }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex flex-col sm:flex-row justify-end gap-3 sm:space-x-4 pt-4 border-t">
+                <a href="{% url 'frontend:tickets' %}" class="inline-flex justify-center px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Cancel
+                </a>
+                <button type="submit" class="inline-flex justify-center px-4 py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

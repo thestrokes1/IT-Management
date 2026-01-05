@@ -131,6 +131,46 @@ class AssetViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
     
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override destroy to properly handle signal disconnection and cascade deletion.
+        """
+        from django.db.models.signals import pre_delete
+        from django.db import transaction
+        
+        instance = self.get_object()
+        
+        # Temporarily disconnect the pre_delete signal to prevent
+        # creating an AssetAuditLog while the asset is being deleted
+        try:
+            from apps.assets.signals import create_asset_deletion_log
+            pre_delete.disconnect(create_asset_deletion_log, sender=Asset)
+            signal_disconnected = True
+        except Exception:
+            signal_disconnected = False
+        
+        try:
+            with transaction.atomic():
+                # Delete related records first
+                AssetMaintenance.objects.filter(asset=instance).delete()
+                AssetAuditLog.objects.filter(asset=instance).delete()
+                AssetAssignment.objects.filter(asset=instance).delete()
+                
+                # Delete the asset (CASCADE handles any remaining references)
+                instance.delete()
+                
+                return Response(
+                    {'message': f'Asset "{instance.name}" deleted successfully.'},
+                    status=status.HTTP_200_OK
+                )
+        finally:
+            # Reconnect the signal if it was disconnected
+            if signal_disconnected:
+                try:
+                    pre_delete.connect(create_asset_deletion_log, sender=Asset)
+                except Exception:
+                    pass
+    
     @action(detail=True, methods=['post'])
     def assign(self, request, pk=None):
         """Assign asset to a user."""

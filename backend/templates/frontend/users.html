@@ -11,7 +11,7 @@
 
     <!-- Add User Button -->
     <div class="mb-6">
-        <a href="{% url 'frontend:create_user' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
+<a href="{% url 'frontend:create-user' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
             + Add New User
         </a>
     </div>
@@ -76,7 +76,7 @@
                             </td>
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
-                                    <a href="{% url 'frontend:edit_user' user.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
+<a href="{% url 'frontend:edit-user' user.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
                                     <button onclick="deleteUser({{ user.id }})" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
                                 </div>
                             </td>
@@ -85,7 +85,7 @@
                     {% else %}
                         <tr>
                             <td colspan="6" class="px-3 sm:px-6 py-8 text-center text-gray-500 text-xs sm:text-sm">
-                                No users found. <a href="{% url 'frontend:create_user' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
+No users found. <a href="{% url 'frontend:create-user' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
                             </td>
                         </tr>
                     {% endif %}
@@ -103,6 +103,59 @@
 </div>
 
 <script>
+function deleteUser(userId) {
+    showConfirmation(
+        'Delete User',
+        'Are you sure you want to delete this user? This action cannot be undone.',
+        function() {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                             document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+            
+            fetch(`/users/${userId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken || '{{ csrf_token }}'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                return response.text().then(text => {
+                    throw new Error(text || `HTTP ${response.status}`);
+                });
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast('User deleted successfully', 'success');
+                    // Remove the row immediately for better UX
+                    const row = document.querySelector(`.user-row[data-id="${userId}"]`);
+                    if (row) {
+                        row.style.transition = 'opacity 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(() => {
+                            row.remove();
+                            // Check if there are no more users
+                            const remainingRows = document.querySelectorAll('.user-row');
+                            if (remainingRows.length === 0) {
+                                location.reload();
+                            }
+                        }, 300);
+                    } else {
+                        setTimeout(() => location.reload(), 1500);
+                    }
+                } else {
+                    showToast('Error: ' + (data.error || 'Failed to delete user'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error deleting user: ' + error, 'error');
+            });
+        }
+    );
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('searchUsers');
     const roleFilter = document.getElementById('roleFilter');
@@ -127,48 +180,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             row.style.display = matchesSearch && matchesRole && matchesStatus ? '' : 'none';
         });
-    }
-
-    function deleteUser(userId) {
-        showConfirmation(
-            'Delete User',
-            'Are you sure you want to delete this user? This action cannot be undone.',
-            function() {
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                                 document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
-                
-                fetch(`/api/users/${userId}/`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken || '{{ csrf_token }}'
-                    }
-                })
-                .then(response => {
-                    if (response.status === 204) {
-                        return { success: true };
-                    }
-                    if (response.ok) {
-                        return response.json();
-                    }
-                    return response.text().then(text => {
-                        throw new Error(text || `HTTP ${response.status}`);
-                    });
-                })
-                .then(data => {
-                    if (data.success) {
-                        showToast('User deleted successfully', 'success');
-                        setTimeout(() => location.reload(), 1500);
-                    } else {
-                        showToast('Error: ' + (data.error || 'Failed to delete user'), 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast('Error deleting user: ' + error, 'error');
-                });
-            }
-        );
     }
 
     searchInput.addEventListener('keyup', filterUsers);

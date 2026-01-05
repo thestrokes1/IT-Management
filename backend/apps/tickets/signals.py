@@ -3,7 +3,7 @@ Ticket signals for IT Management Platform.
 Handles ticket creation, updates, assignments, and audit logging.
 """
 
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -84,18 +84,6 @@ def create_ticket_history(sender, instance, created, **kwargs):
         except Ticket.DoesNotExist:
             pass
 
-@receiver(post_delete, sender=Ticket)
-def create_ticket_deletion_log(sender, instance, **kwargs):
-    """
-    Create history record when ticket is deleted.
-    """
-    TicketHistory.objects.create(
-        ticket=instance,
-        user=User.objects.filter(is_superuser=True).first(),  # System deletion
-        field_name='deleted',
-        old_value=f'Ticket deleted: {instance.title}'
-    )
-    logger.warning(f"Ticket deleted: {instance.title} (ID: {instance.ticket_id})")
 
 @receiver(post_save, sender=TicketComment)
 def create_comment_history(sender, instance, created, **kwargs):
@@ -138,45 +126,6 @@ def create_escalation_history(sender, instance, created, **kwargs):
             new_value=f'Ticket escalated to {instance.escalation_level} by {instance.escalated_by.username}'
         )
         logger.info(f"Ticket {instance.ticket.ticket_id} escalated to {instance.escalation_level} by {instance.escalated_by.username}")
-
-@receiver(post_save, sender=Ticket)
-def update_ticket_timestamps(sender, instance, **kwargs):
-    """
-    Update ticket timestamps and perform automatic status checks.
-    """
-    # Update the updated_at timestamp
-    Ticket.objects.filter(pk=instance.pk).update(updated_at=timezone.now())
-    
-    # Check for SLA breach
-    if instance.sla_due_at and timezone.now() > instance.sla_due_at:
-        if not instance.sla_breached:
-            Ticket.objects.filter(pk=instance.pk).update(sla_breached=True)
-            logger.warning(f"SLA breach detected for ticket {instance.ticket_id}: {instance.title}")
-    
-    # Update SLA calculation if needed
-    if not instance.sla_due_at and instance.ticket_type:
-        instance.update_sla_due()
-
-@receiver(post_save, sender=Ticket)
-def check_sla_breach_notification(sender, instance, **kwargs):
-    """
-    Check for SLA breach notifications.
-    """
-    # This would typically integrate with a notification system
-    # For now, we'll just log it
-    if instance.sla_breached and not instance.sla_breach_notified:
-        logger.warning(f"SLA breach notification needed for ticket {instance.ticket_id}")
-        # Here you would typically send emails, create alerts, etc.
-
-@receiver(post_save, sender=Ticket)
-def auto_assign_ticket(sender, instance, **kwargs):
-    """
-    Auto-assign tickets based on category settings.
-    """
-    if created and instance.category.auto_assign_enabled and instance.category.default_assignee:
-        if not instance.assigned_to:
-            instance.assign_to(instance.category.default_assignee)
-            logger.info(f"Ticket {instance.ticket_id} auto-assigned to {instance.category.default_assignee.username}")
 
 @receiver(post_save, sender=Ticket)
 def check_ticket_workflow(sender, instance, **kwargs):

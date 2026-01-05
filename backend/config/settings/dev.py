@@ -38,7 +38,7 @@ INSTALLED_APPS += [
     # Additional development apps can be added here
 ]
 
-# Development logging - more verbose
+# Development logging - reduced output
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -54,31 +54,46 @@ LOGGING = {
     },
     'handlers': {
         'file': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.FileHandler',
             'filename': BASE_DIR / 'logs/django.log',
             'formatter': 'verbose',
         },
         'console': {
-            'level': 'DEBUG',
+            'level': 'WARNING',  # Only show WARNING and above in console
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
     },
     'root': {
         'handlers': ['console', 'file'],
-        'level': 'DEBUG',
+        'level': 'WARNING',
     },
     'loggers': {
         'django': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.db.migrations': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.utils.translation': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
         },
         'it_management_platform': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }
