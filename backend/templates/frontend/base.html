@@ -58,6 +58,51 @@
         .main-content {
             transition: margin-left 0.3s ease-in-out;
         }
+
+        /* Mobile responsive improvements */
+        @media (max-width: 1023px) {
+            .sidebar {
+                position: fixed;
+                z-index: 50;
+                transform: translateX(-100%);
+            }
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0 !important;
+            }
+        }
+
+        /* Mobile search overlay */
+        .mobile-search-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+        }
+        .mobile-search-overlay.show {
+            display: block;
+        }
+        .mobile-search-modal {
+            position: fixed;
+            top: 64px;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 50;
+        }
+        .mobile-search-modal.show {
+            transform: translateY(0);
+        }
         .notification-badge {
             animation: pulse 2s infinite;
         }
@@ -324,9 +369,14 @@
                     </div>
                     
                     <div class="flex items-center space-x-4">
+                        <!-- Mobile Search Button -->
+                        <button id="mobile-search-toggle" class="md:hidden text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-search text-xl"></i>
+                        </button>
+
                         <!-- Search -->
                         <div class="hidden md:block relative">
-                            <input type="text" id="global-search" placeholder="Search..." 
+                            <input type="text" id="global-search" placeholder="Search..."
                                    class="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                             <div id="search-results" class="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 hidden z-50"></div>
                         </div>
@@ -523,6 +573,15 @@
     
     <!-- Overlay for mobile sidebar -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-40 hidden lg:hidden"></div>
+
+    <!-- Mobile Search Overlay -->
+    <div id="mobile-search-overlay" class="mobile-search-overlay">
+        <div id="mobile-search-modal" class="mobile-search-modal">
+            <input type="text" id="mobile-global-search" placeholder="Search..."
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-base">
+            <div id="mobile-search-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+        </div>
+    </div>
     
 
     <!-- JavaScript -->
@@ -644,6 +703,9 @@
             }
             if (!event.target.closest('#user-menu-toggle')) {
                 document.getElementById('user-menu-dropdown').classList.add('hidden');
+            }
+            if (!event.target.closest('#mobile-search-toggle') && !event.target.closest('#mobile-search-overlay')) {
+                closeMobileSearch();
             }
         });
         
@@ -830,6 +892,75 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeConfirmModal();
+                closeMobileSearch();
+            }
+        });
+
+        // Mobile search functionality
+        document.getElementById('mobile-search-toggle').addEventListener('click', function() {
+            openMobileSearch();
+        });
+
+        function openMobileSearch() {
+            document.getElementById('mobile-search-overlay').classList.add('show');
+            document.getElementById('mobile-search-modal').classList.add('show');
+            document.getElementById('mobile-global-search').focus();
+        }
+
+        function closeMobileSearch() {
+            document.getElementById('mobile-search-overlay').classList.remove('show');
+            document.getElementById('mobile-search-modal').classList.remove('show');
+            document.getElementById('mobile-global-search').value = '';
+            document.getElementById('mobile-search-results').innerHTML = '';
+        }
+
+        // Mobile search input
+        document.getElementById('mobile-global-search').addEventListener('input', function() {
+            const query = this.value;
+            if (query.length > 2) {
+                // Implement search functionality
+                fetch(`/api/search/?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const resultsContainer = document.getElementById('mobile-search-results');
+                        if (data.count > 0) {
+                            let html = '<div class="p-2">';
+                            if (data.results.users) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1">Users</div>';
+                                data.results.users.forEach(user => {
+                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${user.username}</div>`;
+                                });
+                            }
+                            if (data.results.tickets) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1 mt-2">Tickets</div>';
+                                data.results.tickets.forEach(ticket => {
+                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${ticket.title}</div>`;
+                                });
+                            }
+                            if (data.results.assets) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1 mt-2">Assets</div>';
+                                data.results.assets.forEach(asset => {
+                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${asset.name}</div>`;
+                                });
+                            }
+                            if (data.results.projects) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1 mt-2">Projects</div>';
+                                data.results.projects.forEach(project => {
+                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${project.name}</div>`;
+                                });
+                            }
+                            html += '</div>';
+                            resultsContainer.innerHTML = html;
+                        } else {
+                            resultsContainer.innerHTML = '<div class="p-4 text-center text-gray-500">No results found</div>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Search error:', error);
+                        document.getElementById('mobile-search-results').innerHTML = '<div class="p-4 text-center text-red-500">Search failed. Please try again.</div>';
+                    });
+            } else {
+                document.getElementById('mobile-search-results').innerHTML = '';
             }
         });
     </script>
