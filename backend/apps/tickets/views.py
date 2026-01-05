@@ -185,6 +185,53 @@ class TicketViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
     
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override destroy to properly handle cascade deletion with all related records.
+        Uses transaction.atomic() to guarantee consistency.
+        """
+        from django.db import transaction
+        from django.core.files.storage import default_storage
+        
+        instance = self.get_object()
+        
+        try:
+            with transaction.atomic():
+                # Delete attachment files from storage
+                for attachment in instance.attachments.select_related('ticket'):
+                    if attachment.file:
+                        try:
+                            default_storage.delete(attachment.file.name)
+                        except Exception:
+                            pass
+                
+                # Delete all related records via cascade
+                TicketAttachment.objects.filter(ticket=instance).delete()
+                TicketComment.objects.filter(ticket=instance).delete()
+                TicketHistory.objects.filter(ticket=instance).delete()
+                TicketEscalation.objects.filter(ticket=instance).delete()
+                TicketSatisfaction.objects.filter(ticket=instance).delete()
+                TicketReport.objects.filter(ticket=instance).delete()
+                
+                # Clear related_tickets M2M
+                instance.related_tickets.clear()
+                
+                # Update child tickets to remove parent reference
+                Ticket.objects.filter(parent_ticket=instance).update(parent_ticket=None)
+                
+                # Delete the ticket itself
+                instance.delete()
+                
+            return Response(
+                {'message': 'Ticket deleted successfully.'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to delete ticket: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     @action(detail=True, methods=['post'])
     def assign(self, request, pk=None):
         """Assign ticket to a user."""

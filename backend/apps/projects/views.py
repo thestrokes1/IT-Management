@@ -142,6 +142,59 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
     
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override destroy to properly handle cascade deletion and signal disconnection.
+        """
+        from django.db.models.signals import pre_delete
+        from django.db import transaction
+        
+        instance = self.get_object()
+        
+        # Temporarily disconnect the pre_delete signal to prevent
+        # creating a ProjectAuditLog while the project is being deleted
+        try:
+            from apps.projects.signals import create_project_deletion_log
+            pre_delete.disconnect(create_project_deletion_log, sender=Project)
+            signal_disconnected = True
+        except Exception:
+            signal_disconnected = False
+        
+        try:
+            with transaction.atomic():
+                # Delete related TaskComment records (via tasks)
+                TaskComment.objects.filter(task__project=instance).delete()
+                
+                # Delete related TaskAttachment records (via tasks)
+                TaskAttachment.objects.filter(task__project=instance).delete()
+                
+                # Delete related ProjectMember records
+                ProjectMember.objects.filter(project=instance).delete()
+                
+                # Delete related ProjectAuditLog records
+                ProjectAuditLog.objects.filter(project=instance).delete()
+                
+                # Delete related ProjectReport records
+                ProjectReport.objects.filter(project=instance).delete()
+                
+                # Delete tasks (this will also delete subtasks via CASCADE)
+                Task.objects.filter(project=instance).delete()
+                
+                # Delete the project (M2M team_members will be cleared automatically)
+                instance.delete()
+                
+                return Response(
+                    {'message': f'Project "{instance.name}" deleted successfully.'},
+                    status=status.HTTP_200_OK
+                )
+        finally:
+            # Reconnect the signal if it was disconnected
+            if signal_disconnected:
+                try:
+                    pre_delete.connect(create_project_deletion_log, sender=Project)
+                except Exception:
+                    pass
+    
     @action(detail=True, methods=['post'])
     def add_member(self, request, pk=None):
         """Add a member to the project."""

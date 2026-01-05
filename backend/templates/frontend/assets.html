@@ -11,7 +11,7 @@
 
     <!-- Add Asset Button -->
     <div class="mb-6">
-        <a href="{% url 'frontend:create_asset' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
+<a href="{% url 'frontend:create-asset' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
             + Add New Asset
         </a>
     </div>
@@ -81,7 +81,7 @@
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
                                     {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
-                                    <a href="{% url 'frontend:edit_asset' asset.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
+<a href="{% url 'frontend:edit-asset' asset.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
                                     {% else %}
                                     <span class="text-gray-400 cursor-not-allowed" title="Admin only">Edit</span>
                                     {% endif %}
@@ -93,7 +93,7 @@
                     {% else %}
                         <tr>
                             <td colspan="6" class="px-3 sm:px-6 py-8 text-center text-gray-500 text-xs sm:text-sm">
-                                No assets found. <a href="{% url 'frontend:create_asset' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
+No assets found. <a href="{% url 'frontend:create-asset' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
                             </td>
                         </tr>
                     {% endif %}
@@ -111,61 +111,87 @@
 </div>
 
 <script>
+// Debug: Log when page loads
+console.log('Assets page loaded');
+
 function deleteAsset(assetId, assetName) {
-    showConfirmation(
-        'Delete Asset',
-        `Are you sure you want to delete "${assetName}"? This action cannot be undone.`,
-        function() {
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                             document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
-            
-            fetch(`/api/assets/${assetId}/`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken || '{{ csrf_token }}'
-                }
-            })
-            .then(response => {
-                if (response.status === 204) {
-                    return { success: true };
-                }
-                if (response.ok) {
-                    return response.json();
-                }
-                return response.text().then(text => {
-                    throw new Error(text || `HTTP ${response.status}`);
-                });
-            })
-            .then(data => {
-                if (data.success) {
-                    showToast('Asset deleted successfully', 'success');
-                    // Remove the row immediately for better UX
-                    const row = document.querySelector(`.asset-row[data-id="${assetId}"]`);
-                    if (row) {
-                        row.style.transition = 'opacity 0.3s';
-                        row.style.opacity = '0';
-                        setTimeout(() => {
-                            row.remove();
-                            // Check if there are no more assets
-                            const remainingRows = document.querySelectorAll('.asset-row');
-                            if (remainingRows.length === 0) {
-                                location.reload();
-                            }
-                        }, 300);
-                    } else {
-                        setTimeout(() => location.reload(), 1500);
-                    }
-                } else {
-                    showToast('Error: ' + (data.error || 'Failed to delete asset'), 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showToast('Error deleting asset: ' + error, 'error');
-            });
+    console.log('deleteAsset called with:', assetId, assetName);
+    
+    // Check if showConfirmation is available, otherwise use browser confirm
+    const useNativeConfirm = typeof showConfirmation !== 'function';
+    console.log('Using native confirm:', useNativeConfirm);
+    
+    const confirmed = useNativeConfirm 
+        ? confirm(`Are you sure you want to delete "${assetName}"? This action cannot be undone.`)
+        : true;
+    
+    if (useNativeConfirm || typeof showConfirmation !== 'function') {
+        // Use native confirm dialog
+        if (confirmed) {
+            executeDelete(assetId);
         }
-    );
+    } else {
+        // Use custom confirmation modal
+        showConfirmation(
+            'Delete Asset',
+            `Are you sure you want to delete "${assetName}"? This action cannot be undone.`,
+            function() {
+                executeDelete(assetId);
+            }
+        );
+    }
+}
+
+function executeDelete(assetId) {
+    console.log('Delete confirmed for asset:', assetId);
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+    console.log('CSRF Token:', csrfToken ? 'found' : 'not found');
+    
+    fetch(`/assets/api/${assetId}/`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': csrfToken || '{{ csrf_token }}'
+        }
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (response.ok) {
+            return response.json();
+        }
+        return response.text().then(text => {
+            throw new Error(text || `HTTP ${response.status}`);
+        });
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        if (data.success) {
+            showToast('Asset deleted successfully', 'success');
+            // Remove the row immediately for better UX
+            const row = document.querySelector(`.asset-row[data-id="${assetId}"]`);
+            if (row) {
+                row.style.transition = 'opacity 0.3s';
+                row.style.opacity = '0';
+                setTimeout(() => {
+                    row.remove();
+                    // Check if there are no more assets
+                    const remainingRows = document.querySelectorAll('.asset-row');
+                    if (remainingRows.length === 0) {
+                        location.reload();
+                    }
+                }, 300);
+            } else {
+                setTimeout(() => location.reload(), 1500);
+            }
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to delete asset'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error deleting asset: ' + error, 'error');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {

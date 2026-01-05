@@ -109,7 +109,7 @@ class Ticket(models.Model):
     
     # Requester information
     requester = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name='tickets_created'
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tickets_created'
     )
     
     # Ticket management
@@ -306,7 +306,7 @@ class TicketHistory(models.Model):
     """
     Historical changes to tickets for audit trail.
     """
-    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='history')
+    ticket = models.ForeignKey(Ticket, on_delete=models.SET_NULL,null=True,blank=True, related_name='history')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ticket_history')
     field_name = models.CharField(max_length=50)
     old_value = models.TextField(blank=True)

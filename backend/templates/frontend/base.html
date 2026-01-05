@@ -595,40 +595,47 @@
         
         // Modal functions
         function showModal(modalId) {
-            document.getElementById('modal-overlay').classList.remove('hidden');
-            document.getElementById(modalId).classList.remove('hidden');
+            const overlay = document.getElementById('modal-overlay');
+            const modal = document.getElementById(modalId);
+            if (overlay) overlay.classList.remove('hidden');
+            if (modal) modal.classList.remove('hidden');
         }
         
         function hideModal(modalId) {
-            document.getElementById('modal-overlay').classList.add('hidden');
-            document.getElementById(modalId).classList.add('hidden');
+            const overlay = document.getElementById('modal-overlay');
+            const modal = document.getElementById(modalId);
+            if (overlay) overlay.classList.add('hidden');
+            if (modal) modal.classList.add('hidden');
         }
         
         function showCreateTicketModal() {
             showModal('create-ticket-modal');
         }
         
-        // Form submissions
-        document.getElementById('create-ticket-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            formData.append('action', 'create_ticket');
-            
-            fetch('/api/quick-actions/', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    hideModal('create-ticket-modal');
-                    this.reset();
-                    location.reload(); // Refresh to show new ticket
-                } else {
-                    alert('Error: ' + data.error);
-                }
+        // Form submissions - with null check
+        const createTicketForm = document.getElementById('create-ticket-form');
+        if (createTicketForm) {
+            createTicketForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.append('action', 'create_ticket');
+                
+                fetch('/api/quick-actions/', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        hideModal('create-ticket-modal');
+                        this.reset();
+                        location.reload(); // Refresh to show new ticket
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
             });
-        });
+        }
         
         // Close dropdowns when clicking outside
         document.addEventListener('click', function(event) {
@@ -642,7 +649,7 @@
         
         // Auto-refresh dashboard stats every 30 seconds
         setInterval(function() {
-            fetch('/frontend/api/dashboard/')
+            fetch('/dashboard/api/')
                 .then(response => response.json())
                 .then(data => {
                     // Update stats display
@@ -789,7 +796,7 @@
         }
         
         // Confirmation Modal System
-        let confirmCallback = null;
+        var confirmCallback = null;
         
         function showConfirmation(title, message, callback) {
             document.getElementById('modalTitle').innerText = title;
@@ -800,11 +807,13 @@
         
         function closeConfirmModal() {
             document.getElementById('confirmModal').classList.remove('show');
-            confirmCallback = null;
+            setTimeout(function() {
+                confirmCallback = null;
+            }, 100); // Small delay to prevent timing issues
         }
         
         function executeConfirm() {
-            if (confirmCallback) {
+            if (typeof confirmCallback === 'function') {
                 confirmCallback();
             }
             closeConfirmModal();

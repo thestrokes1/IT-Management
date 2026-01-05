@@ -268,7 +268,7 @@ class Task(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tasks'
     )
     created_by = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='created_tasks'
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_tasks'
     )
     
     # Timeline
