@@ -157,7 +157,7 @@ class DeleteProject(IdempotentUseCase):
         """
         from apps.projects.queries import ProjectQuery
         from apps.frontend.services import ProjectService
-        from apps.core.policies import ProjectPolicy
+        from apps.projects.policies import ProjectPolicy
         from apps.core.exceptions import PermissionDeniedError, NotFoundError
         
         # Step 1: Get project for authorization
@@ -247,7 +247,7 @@ class CreateProject(IdempotentUseCase):
         Returns:
             ApplicationResult with project data or error
         """
-        from apps.core.policies import ProjectPolicy
+        from apps.projects.policies import ProjectPolicy
         from apps.frontend.services import ProjectService
         from apps.core.exceptions import PermissionDeniedError
         
@@ -311,7 +311,7 @@ class UpdateProject(IdempotentUseCase):
     ) -> ApplicationResult:
         """Execute project update use case."""
         from apps.projects.queries import ProjectQuery
-        from apps.core.policies import ProjectPolicy
+        from apps.projects.policies import ProjectPolicy
         from apps.frontend.services import ProjectService
         
         # Get project

@@ -17,7 +17,7 @@ from apps.frontend.services import ProjectService
 from apps.projects.queries import ProjectQuery
 from apps.core.exceptions import DomainException, PermissionDeniedError
 from apps.core.exception_mapper import ExceptionMapper, SafeTemplateView
-from apps.core.policies import ProjectPolicy
+from apps.projects.policies import ProjectPolicy
 
 
 class ProjectsView(LoginRequiredMixin, SafeTemplateView):

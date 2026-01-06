@@ -14,7 +14,7 @@ from apps.core.exceptions import (
     PermissionDeniedError,
     DomainException,
 )
-from apps.core.policies import ProjectPolicy
+from apps.projects.policies import ProjectPolicy
 from apps.core.events import (
     EventPublisher,
     ProjectCreated,
