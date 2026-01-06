@@ -36,7 +36,7 @@ urlpatterns = [
     path('', include('apps.assets.web_urls')),  # Web URLs for assets
     path('', include('apps.tickets.web_urls')),  # Web URLs for tickets
     path('', include('apps.projects.web_urls')),  # Web URLs for projects
-    path('', include('apps.logs.web_urls')),  # Web URLs for logs
+    
     
         # Auth password reset
     path(

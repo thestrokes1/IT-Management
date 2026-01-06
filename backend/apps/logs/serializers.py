@@ -217,7 +217,7 @@ class LogRetentionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'last_run', 'created_at', 'updated_at']
 
-class LogStatisticsSerializer(serializers.ModelSerializer):
+class LogStatisticsDashboardSerializer(serializers.Serializer):
     """
     Serializer for log statistics.
     """

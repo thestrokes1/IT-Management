@@ -59,7 +59,8 @@
 
     <!-- Tickets Table -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
+        <!-- Desktop Table View -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="w-full">
                 <thead class="bg-gray-100 border-b-2 border-gray-300">
                     <tr>
@@ -107,6 +108,46 @@
                     {% endif %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="md:hidden">
+            {% if tickets %}
+                {% for ticket in tickets %}
+                <div class="border-b border-gray-200 p-4 ticket-row" data-id="{{ ticket.id }}">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900">#{{ ticket.id }} - {{ ticket.title }}</div>
+                            <div class="text-sm text-gray-600 mt-1">By: {% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</div>
+                        </div>
+                        <div class="flex space-x-2 ml-2">
+                            {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
+                            <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
+                                <i class="fas fa-edit text-sm"></i>
+                            </a>
+                            {% endif %}
+                            <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 p-1">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex space-x-2">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.status == 'NEW' %}bg-blue-100 text-blue-800{% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800{% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800{% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ ticket.status|upper }}
+                            </span>
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ ticket.priority|upper }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="p-8 text-center text-gray-500">
+                    No tickets found. <a href="{% url 'frontend:create-ticket' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
+                </div>
+            {% endif %}
         </div>
     </div>
 
@@ -171,10 +212,36 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedCategory = categoryFilter.value;
 
         ticketRows.forEach(row => {
-            const id = row.cells[0].textContent.toLowerCase();
-            const title = row.cells[1].textContent.toLowerCase();
-            const status = row.cells[2].textContent.trim().toUpperCase();
-            const priority = row.cells[3].textContent.trim().toUpperCase();
+            let id = '', title = '', status = '', priority = '';
+
+            // Handle both table rows and card elements
+            if (row.tagName === 'TR') {
+                // Desktop table row
+                id = row.cells[0].textContent.toLowerCase();
+                title = row.cells[1].textContent.toLowerCase();
+                status = row.cells[2].textContent.trim().toUpperCase();
+                priority = row.cells[3].textContent.trim().toUpperCase();
+            } else {
+                // Mobile card element
+                const titleElement = row.querySelector('.font-medium');
+                if (titleElement) {
+                    const titleText = titleElement.textContent;
+                    const idMatch = titleText.match(/^#(\d+)/);
+                    id = idMatch ? idMatch[1] : '';
+                    title = titleText.replace(/^#\d+\s*-\s*/, '').toLowerCase();
+                }
+
+                // Get status and priority from badges
+                const badges = row.querySelectorAll('span.rounded-full');
+                badges.forEach(badge => {
+                    const text = badge.textContent.trim().toUpperCase();
+                    if (['NEW', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(text)) {
+                        status = text;
+                    } else if (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(text)) {
+                        priority = text;
+                    }
+                });
+            }
 
             const matchesSearch = id.includes(searchTerm) || title.includes(searchTerm);
             const matchesStatus = !selectedStatus || status.includes(selectedStatus);
