@@ -40,4 +40,3 @@ urlpatterns = [
     path('dashboard/', LogDashboardView.as_view(), name='log-dashboard'),
     path('', include(router.urls)),
 ]
-
