@@ -1,7 +1,5 @@
-"""
-Frontend views package.
-Re-exports views from domain-specific modules using relative imports.
-"""
+# Frontend views package.
+# Re-exports views from domain-specific modules using relative imports.
 
 # Auth views
 from .auth import (
@@ -36,7 +34,7 @@ from .projects import (
     ProjectsView,
     CreateProjectView,
     EditProjectView,
-    project_crud,
+    delete_project,
 )
 
 # Asset views
@@ -44,7 +42,7 @@ from .assets import (
     AssetsView,
     CreateAssetView,
     EditAssetView,
-    asset_crud,
+    delete_asset,
 )
 
 # User views
