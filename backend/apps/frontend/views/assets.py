@@ -192,3 +192,102 @@ try:
 except ImportError:
     _has_asset_crud = False
 
+
+@login_required(login_url='frontend:login')
+@require_http_methods(["GET", "PATCH", "DELETE"])
+def asset_crud(request, asset_id):
+    """
+    Handle asset CRUD operations (GET, PATCH, DELETE).
+    Uses AssetQuery for reads and AssetService for writes.
+    """
+    try:
+        # GET - Retrieve asset details
+        if request.method == 'GET':
+            asset = AssetQuery.get_with_details(asset_id)
+            
+            if asset is None:
+                return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
+            
+            # Convert to dict if it's a DTO
+            if hasattr(asset, 'to_dict'):
+                asset_data = asset.to_dict()
+            else:
+                asset_data = asset
+            
+            return JsonResponse({'success': True, 'asset': asset_data})
+        
+        # DELETE - Delete asset
+        elif request.method == 'DELETE':
+            # Check if user is authenticated
+            if not request.user.is_authenticated:
+                return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
+            
+            # Check permissions (same as delete_asset)
+            if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']:
+                return JsonResponse({
+                    'error': 'You do not have permission to delete assets. Only ADMIN or SUPERADMIN roles can delete assets.'
+                }, status=403)
+            
+            # Get asset for confirmation
+            asset = AssetQuery.get_by_id(asset_id)
+            if asset is None:
+                return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
+            
+            # Use Service for delete operation
+            AssetService.delete_asset(asset_id)
+            
+            return JsonResponse({'success': True, 'message': 'Asset deleted successfully.'})
+        
+        # PATCH - Partial update asset
+        elif request.method == 'PATCH':
+            import json
+            
+            # Check if user is authenticated
+            if not request.user.is_authenticated:
+                return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
+            
+            # Check permissions for update
+            if not hasattr(request.user, 'can_manage_assets') or not request.user.can_manage_assets:
+                if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']:
+                    return JsonResponse({
+                        'error': 'You do not have permission to update assets.'
+                    }, status=403)
+            
+            data = json.loads(request.body)
+            
+            # Get asset for authorization check
+            asset = AssetQuery.get_by_id(asset_id)
+            if asset is None:
+                return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
+            
+            # Convert to dict if it's a DTO
+            if hasattr(asset, 'to_dict'):
+                asset_data = asset.to_dict()
+            else:
+                asset_data = asset
+            
+            # Use Service for partial update
+            updated_asset = AssetService.update_asset(
+                request=request,
+                asset_id=asset_id,
+                name=data.get('name', asset_data.get('name', '')).strip(),
+                description=data.get('description', asset_data.get('description', '')).strip(),
+                category_id=data.get('category_id', data.get('category', asset_data.get('category_id'))),
+                serial_number=data.get('serial_number', asset_data.get('serial_number', '')).strip(),
+                asset_tag=data.get('asset_tag', asset_data.get('asset_tag', '')).strip(),
+                status=data.get('status', asset_data.get('status', 'AVAILABLE')),
+                location=data.get('location', asset_data.get('location', '')).strip(),
+                purchase_date=data.get('purchase_date', asset_data.get('purchase_date', '')),
+                purchase_price=data.get('purchase_price', asset_data.get('purchase_price', '')),
+                warranty_expiry=data.get('warranty_expiry', asset_data.get('warranty_expiry', '')),
+                assigned_to_id=data.get('assigned_to_id', data.get('assigned_to', asset_data.get('assigned_to_id')))
+            )
+            
+            return JsonResponse({'success': True, 'message': f'Asset "{updated_asset.name}" updated successfully.'})
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
+
+

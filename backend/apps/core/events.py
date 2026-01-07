@@ -3,7 +3,7 @@
 # Follows the Observer pattern for loose coupling between domain and infrastructure.
 # Supports both synchronous and asynchronous event handlers.
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Callable, Optional, Union

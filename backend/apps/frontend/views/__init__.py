@@ -35,6 +35,7 @@ from .projects import (
     CreateProjectView,
     EditProjectView,
     delete_project,
+    project_crud,
 )
 
 # Asset views
@@ -43,6 +44,7 @@ from .assets import (
     CreateAssetView,
     EditAssetView,
     delete_asset,
+    asset_crud,
 )
 
 # User views

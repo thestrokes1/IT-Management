@@ -4,7 +4,7 @@
 
 from django.db.models import QuerySet
 from typing import List, Dict, Any, Optional
-from .project_dto import (
+from ..dtos.project_dto import (
     ProjectDTO, ProjectDetailDTO, ProjectListDTO,
     ProjectCategoryDTO, ProjectMemberDTO
 )

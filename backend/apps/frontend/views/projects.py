@@ -287,3 +287,57 @@ def delete_project(request, project_id):
         traceback.print_exc()
         return JsonResponse({'error': f'Error deleting project: {str(e)}'}, status=500)
 
+
+@login_required(login_url='frontend:login')
+@require_http_methods(["DELETE", "PATCH"])
+def project_crud(request, project_id):
+    """
+    Handle project CRUD operations (DELETE and PATCH).
+    Uses ProjectService for write operations.
+    Uses ProjectPolicy for authorization.
+    """
+    try:
+        if request.method == 'DELETE':
+            # Check permission using Policy
+            project_dto = ProjectQuery.get_by_id(project_id)
+            if project_dto is None:
+                return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
+            
+            policy = ProjectPolicy()
+            policy.can_delete(request.user, project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto).require('delete', 'project')
+            
+            # Use Service for delete operation
+            ProjectService.delete_project(project_id, user=request.user)
+            
+            return JsonResponse({'success': True, 'message': 'Project deleted successfully.'})
+        
+        elif request.method == 'PATCH':
+            import json
+            data = json.loads(request.body)
+            
+            # Get project for authorization check
+            project_dto = ProjectQuery.get_by_id(project_id)
+            if project_dto is None:
+                return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
+            
+            # Check permission using Policy
+            policy = ProjectPolicy()
+            policy.can_edit(request.user, project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto).require('edit', 'project')
+            
+            # Use Service for partial update
+            project = ProjectService.update_project(
+                request=request,
+                project_id=project_id,
+                **{k: v for k, v in data.items() if k in ['name', 'description', 'status', 'priority', 'start_date', 'end_date', 'budget', 'owner_id']}
+            )
+            
+            return JsonResponse({'success': True, 'message': f'Project "{project.name}" updated successfully.'})
+    
+    except DomainException as e:
+        return ExceptionMapper.to_json_response(e, request)
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
+

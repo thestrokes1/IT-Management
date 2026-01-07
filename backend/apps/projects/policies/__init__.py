@@ -39,7 +39,7 @@ class ProjectContext:
         )
 
 
-class ProjectPolicy(AuthorizationPolicy, RoleBasedPolicy):
+class ProjectPolicy(RoleBasedPolicy):
     """
     Authorization policy for Project entities.
     
@@ -351,6 +351,9 @@ class ProjectPolicy(AuthorizationPolicy, RoleBasedPolicy):
 # Policy Factory
 # =============================================================================
 
+# Store reference to class before function shadows it
+_ProjectPolicyClass = ProjectPolicy
+
 _project_policy: Optional[ProjectPolicy] = None
 
 
@@ -363,7 +366,7 @@ def get_project_policy() -> ProjectPolicy:
     """
     global _project_policy
     if _project_policy is None:
-        _project_policy = ProjectPolicy()
+        _project_policy = _ProjectPolicyClass()
     return _project_policy
 
 
