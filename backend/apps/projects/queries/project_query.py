@@ -25,7 +25,7 @@ class ProjectQuery:
         """
         from apps.projects.models import Project
         return Project.objects.select_related(
-            'created_by', 'owner'
+            'created_by', 'updated_by', 'category', 'project_manager'
         ).prefetch_related('members').order_by('-created_at')[:50]
     
     @staticmethod
@@ -36,7 +36,7 @@ class ProjectQuery:
         """
         from apps.projects.models import Project
         projects = Project.objects.select_related(
-            'created_by', 'owner'
+            'created_by', 'updated_by', 'category', 'project_manager'
         ).prefetch_related('members').order_by('-created_at')[:50]
         return [ProjectDTO.from_orm(p) for p in projects]
     
@@ -48,7 +48,7 @@ class ProjectQuery:
         """
         from apps.projects.models import Project
         queryset = Project.objects.select_related(
-            'created_by', 'owner'
+            'created_by', 'updated_by', 'category', 'project_manager'
         ).prefetch_related('members').order_by('-created_at')
         return ProjectListDTO.from_queryset(queryset, page, page_size)
     
@@ -63,7 +63,7 @@ class ProjectQuery:
         from apps.projects.models import Project
         try:
             project = Project.objects.select_related(
-                'created_by', 'owner'
+                'created_by', 'updated_by', 'category', 'project_manager'
             ).prefetch_related('members').get(id=project_id)
             return ProjectDTO.from_orm(project)
         except (Project.DoesNotExist, ValueError):
@@ -79,9 +79,9 @@ class ProjectQuery:
         """
         from apps.projects.models import Project
         try:
-            project = Project.objects.prefetch_related(
-                'members__user', 'category', 'owner', 'created_by'
-            ).get(id=project_id)
+            project = Project.objects.select_related(
+                'created_by', 'updated_by', 'category', 'project_manager'
+            ).prefetch_related('members__user').get(id=project_id)
             return ProjectDetailDTO.from_orm(project)
         except (Project.DoesNotExist, ValueError):
             return None
