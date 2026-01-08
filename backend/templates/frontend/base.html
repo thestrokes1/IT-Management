@@ -49,16 +49,72 @@
     
     <!-- Custom CSS -->
     <style>
+        /* Sidebar Transitions */
         .sidebar {
-            transition: transform 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
         }
-        .sidebar.collapsed {
-            transform: translateX(-100%);
+        .sidebar-icon-only {
+            width: 5rem !important;
         }
+        .sidebar-full {
+            width: 16rem !important;
+        }
+        
+        /* Text visibility transitions */
+        .sidebar-text {
+            transition: opacity 0.2s ease-in-out, visibility 0.2s;
+            opacity: 1;
+            visibility: visible;
+        }
+        .sidebar-text.hidden-text {
+            opacity: 0;
+            visibility: hidden;
+            width: 0;
+            overflow: hidden;
+        }
+        
+        /* Main content transitions */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
         }
-
+        
+        /* Logo transitions */
+        .logo-text {
+            transition: opacity 0.2s ease-in-out, width 0.2s, visibility 0.2s;
+            opacity: 1;
+            white-space: nowrap;
+        }
+        .logo-text.collapsed {
+            opacity: 0;
+            width: 0;
+            visibility: hidden;
+        }
+        
+        /* Nav item transitions */
+        .nav-item-content {
+            transition: all 0.2s ease-in-out;
+        }
+        .nav-link-text {
+            transition: opacity 0.2s ease-in-out, width 0.2s, visibility 0.2s, max-width 0.2s;
+            opacity: 1;
+            max-width: 200px;
+        }
+        .nav-link-text.collapsed {
+            opacity: 0;
+            width: 0;
+            max-width: 0;
+            visibility: hidden;
+            overflow: hidden;
+        }
+        
+        /* Badge transitions */
+        .nav-badge {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .nav-badge.collapsed {
+            opacity: 0;
+        }
+        
         /* Mobile responsive improvements */
         @media (max-width: 1023px) {
             .sidebar {
@@ -267,91 +323,101 @@
     
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <div id="sidebar" class="sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform lg:translate-x-0 lg:static lg:inset-0">
-            <div class="flex items-center justify-center h-16 px-4 bg-primary-600">
+        <div id="sidebar" class="sidebar fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform lg:translate-x-0 lg:static lg:inset-0 sidebar-icon-only"
+             onmouseenter="expandSidebar()" onmouseleave="collapseSidebar()">
+            <!-- Logo Section -->
+            <div class="flex items-center h-16 px-4 bg-primary-600">
                 <div class="flex items-center">
-                    <i class="fas fa-laptop-code text-white text-xl mr-2"></i>
-                    <h1 class="text-white text-lg font-bold">IT Management</h1>
+                    <i class="fas fa-laptop-code text-white text-xl"></i>
+                    <h1 class="text-white text-lg font-bold ml-3 sidebar-text whitespace-nowrap overflow-hidden">IT Management</h1>
                 </div>
                 <button id="sidebar-toggle" class="lg:hidden ml-auto text-white">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
+            <!-- Navigation -->
             <nav class="mt-8">
-                <div class="px-4">
-                    <a href="{% url 'frontend:dashboard' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg {% if request.resolver_match.url_name == 'dashboard' %}bg-primary-100 text-primary-700{% endif %}">
-                        <i class="fas fa-tachometer-alt mr-3"></i>
-                        <span>Dashboard</span>
+                <div class="px-2 lg:px-4">
+                    <a href="{% url 'frontend:dashboard' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-primary-50 rounded-lg {% if request.resolver_match.url_name == 'dashboard' %}bg-primary-100{% endif %}">
+                        <i class="fas fa-tachometer-alt text-lg w-6 text-center text-blue-500 {% if request.resolver_match.url_name == 'dashboard' %}text-blue-600{% endif %}"></i>
+                        <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'dashboard' %}text-blue-700 font-medium{% endif %}">Dashboard</span>
                     </a>
                     
-                    <a href="{% url 'frontend:assets' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'assets' %}bg-primary-100 text-primary-700{% endif %}">
-                        <i class="fas fa-desktop mr-3"></i>
-                        <span>Assets</span>
+                    <a href="{% url 'frontend:assets' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-green-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'assets' %}bg-green-100{% endif %}">
+                        <i class="fas fa-desktop text-lg w-6 text-center text-green-500 {% if request.resolver_match.url_name == 'assets' %}text-green-600{% endif %}"></i>
+                        <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'assets' %}text-green-700 font-medium{% endif %}">Assets</span>
                         {% if dashboard_stats.total_assets > 0 %}
-                        <span class="ml-auto bg-primary-500 text-white text-xs px-2 py-1 rounded-full">{{ dashboard_stats.total_assets }}</span>
+                        <span class="ml-auto bg-green-500 text-white text-xs px-2 py-1 rounded-full sidebar-text">{{ dashboard_stats.total_assets }}</span>
                         {% endif %}
                     </a>
                     
-                    <a href="{% url 'frontend:projects' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'projects' %}bg-primary-100 text-primary-700{% endif %}">
-                        <i class="fas fa-project-diagram mr-3"></i>
-                        <span>Projects</span>
+                    <a href="{% url 'frontend:projects' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'projects' %}bg-purple-100{% endif %}">
+                        <i class="fas fa-project-diagram text-lg w-6 text-center text-purple-500 {% if request.resolver_match.url_name == 'projects' %}text-purple-600{% endif %}"></i>
+                        <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'projects' %}text-purple-700 font-medium{% endif %}">Projects</span>
                         {% if dashboard_stats.active_projects > 0 %}
-                        <span class="ml-auto bg-green-500 text-white text-xs px-2 py-1 rounded-full">{{ dashboard_stats.active_projects }}</span>
+                        <span class="ml-auto bg-purple-500 text-white text-xs px-2 py-1 rounded-full sidebar-text">{{ dashboard_stats.active_projects }}</span>
                         {% endif %}
                     </a>
                     
-                    <a href="{% url 'frontend:tickets' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'tickets' %}bg-primary-100 text-primary-700{% endif %}">
-                        <i class="fas fa-ticket-alt mr-3"></i>
-                        <span>Tickets</span>
+                    <a href="{% url 'frontend:tickets' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-red-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'tickets' %}bg-red-100{% endif %}">
+                        <i class="fas fa-ticket-alt text-lg w-6 text-center text-red-500 {% if request.resolver_match.url_name == 'tickets' %}text-red-600{% endif %}"></i>
+                        <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'tickets' %}text-red-700 font-medium{% endif %}">Tickets</span>
                         {% if dashboard_stats.open_tickets > 0 %}
-                        <span class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full notification-badge">{{ dashboard_stats.open_tickets }}</span>
+                        <span class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full notification-badge sidebar-text">{{ dashboard_stats.open_tickets }}</span>
                         {% endif %}
                     </a>
                     
-                    <a href="{% url 'frontend:users' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'users' %}bg-primary-100 text-primary-700{% endif %}">
-                        <i class="fas fa-users mr-3"></i>
-                        <span>Users</span>
+                    <a href="{% url 'frontend:users' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-cyan-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'users' %}bg-cyan-100{% endif %}">
+                        <i class="fas fa-users text-lg w-6 text-center text-cyan-500 {% if request.resolver_match.url_name == 'users' %}text-cyan-600{% endif %}"></i>
+                        <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'users' %}text-cyan-700 font-medium{% endif %}">Users</span>
                         {% if dashboard_stats.active_users > 0 %}
-                        <span class="ml-auto bg-blue-500 text-white text-xs px-2 py-1 rounded-full">{{ dashboard_stats.active_users }}</span>
+                        <span class="ml-auto bg-cyan-500 text-white text-xs px-2 py-1 rounded-full sidebar-text">{{ dashboard_stats.active_users }}</span>
                         {% endif %}
                     </a>
                     
-                    <a href="{% url 'frontend:logs' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'logs' %}bg-primary-100 text-primary-700{% endif %}">
-                        <i class="fas fa-list-alt mr-3"></i>
-                        <span>Logs</span>
+                    <a href="{% url 'frontend:logs' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-yellow-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'logs' %}bg-yellow-100{% endif %}">
+                        <i class="fas fa-list-alt text-lg w-6 text-center text-yellow-500 {% if request.resolver_match.url_name == 'logs' %}text-yellow-600{% endif %}"></i>
+                        <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'logs' %}text-yellow-700 font-medium{% endif %}">Logs</span>
                     </a>
                     
-                    <a href="{% url 'frontend:reports' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'reports' %}bg-primary-100 text-primary-700{% endif %}">
-                        <i class="fas fa-chart-bar mr-3"></i>
-                        <span>Reports</span>
+                    <a href="{% url 'frontend:reports' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-indigo-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'reports' %}bg-indigo-100{% endif %}">
+                        <i class="fas fa-chart-bar text-lg w-6 text-center text-indigo-500 {% if request.resolver_match.url_name == 'reports' %}text-indigo-600{% endif %}"></i>
+                        <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'reports' %}text-indigo-700 font-medium{% endif %}">Reports</span>
                     </a>
                 </div>
                 
                 {% if user.is_authenticated %}
                 <div class="mt-8 pt-8 border-t border-gray-200">
-                    <div class="px-4">
-                        <div class="flex items-center px-4 py-2 text-gray-700">
-                            <i class="fas fa-user-circle mr-3"></i>
-                            <div>
-                                <div class="text-sm font-medium">{{ user.username }}</div>
-                                <div class="text-xs text-gray-500">{{ user.get_role_display }}</div>
+                    <div class="px-2 lg:px-4">
+                        <div class="flex items-center px-2 lg:px-4 py-3 text-gray-700">
+                            <i class="fas fa-user-circle text-lg w-6 text-center text-primary-500"></i>
+                            <div class="sidebar-text ml-3 overflow-hidden">
+                                <div class="text-sm font-medium whitespace-nowrap">{{ user.username }}</div>
+                                <div class="text-xs text-gray-500 whitespace-nowrap">{{ user.get_role_display }}</div>
                             </div>
                         </div>
                         
-                        <a href="{% url 'frontend:profile' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-lg mt-1 {% if request.resolver_match.url_name == 'profile' %}bg-primary-100 text-primary-700{% endif %}">
-                            <i class="fas fa-user mr-3"></i>
-                            <span>Profile</span>
+                        <a href="{% url 'frontend:profile' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-pink-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'profile' %}bg-pink-100{% endif %}">
+                            <i class="fas fa-user text-lg w-6 text-center text-pink-500 {% if request.resolver_match.url_name == 'profile' %}text-pink-600{% endif %}"></i>
+                            <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'profile' %}text-pink-700 font-medium{% endif %}">Profile</span>
                         </a>
                         
-                        <a href="{% url 'frontend:logout' %}" class="nav-link flex items-center px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-700 rounded-lg mt-1">
-                            <i class="fas fa-sign-out-alt mr-3"></i>
-                            <span>Logout</span>
+                        <a href="{% url 'frontend:logout' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-red-50 rounded-lg mt-1">
+                            <i class="fas fa-sign-out-alt text-lg w-6 text-center text-red-500"></i>
+                            <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden text-red-600">Logout</span>
                         </a>
                     </div>
                 </div>
                 {% endif %}
             </nav>
+            
+            <!-- Sidebar Collapse/Expand Indicator (Desktop Only) -->
+            <div class="hidden lg:flex absolute bottom-4 left-0 right-0 justify-center">
+                <button id="sidebar-hover-toggle" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Toggle Sidebar">
+                    <i class="fas fa-chevron-left text-sm transform transition-transform duration-300" id="sidebar-toggle-icon"></i>
+                </button>
+            </div>
         </div>
         
         <!-- Main Content -->
@@ -961,6 +1027,130 @@
                     });
             } else {
                 document.getElementById('mobile-search-results').innerHTML = '';
+            }
+        });
+        
+        // Sidebar hover expand/collapse functionality
+        let sidebarTimeout = null;
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.querySelector('.main-content');
+        const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
+        let isSidebarExpanded = false;
+        let isManualToggle = false;
+        
+        // Check for saved state in localStorage
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        if (savedState === 'true') {
+            isManualToggle = true;
+            collapseSidebar();
+        }
+        
+        function expandSidebar() {
+            if (isManualToggle) return;
+            
+            clearTimeout(sidebarTimeout);
+            
+            if (!isSidebarExpanded) {
+                sidebar.classList.remove('sidebar-icon-only');
+                sidebar.classList.add('sidebar-full');
+                
+                // Show all sidebar text elements
+                document.querySelectorAll('.sidebar-text').forEach(el => {
+                    el.classList.remove('hidden-text');
+                });
+                
+                // Expand main content
+                if (mainContent) {
+                    mainContent.classList.remove('lg:ml-16');
+                    mainContent.classList.add('lg:ml-64');
+                }
+                
+                // Rotate toggle icon
+                if (sidebarToggleIcon) {
+                    sidebarToggleIcon.classList.remove('rotate-180');
+                }
+                
+                isSidebarExpanded = true;
+            }
+        }
+        
+        function collapseSidebar() {
+            if (isManualToggle) return;
+            
+            sidebarTimeout = setTimeout(() => {
+                sidebar.classList.remove('sidebar-full');
+                sidebar.classList.add('sidebar-icon-only');
+                
+                // Hide all sidebar text elements
+                document.querySelectorAll('.sidebar-text').forEach(el => {
+                    el.classList.add('hidden-text');
+                });
+                
+                // Collapse main content
+                if (mainContent) {
+                    mainContent.classList.remove('lg:ml-64');
+                    mainContent.classList.add('lg:ml-16');
+                }
+                
+                // Rotate toggle icon
+                if (sidebarToggleIcon) {
+                    sidebarToggleIcon.classList.add('rotate-180');
+                }
+                
+                isSidebarExpanded = false;
+            }, 100);
+        }
+        
+        // Manual toggle button (for desktop)
+        const sidebarHoverToggle = document.getElementById('sidebar-hover-toggle');
+        if (sidebarHoverToggle) {
+            sidebarHoverToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                isManualToggle = !isManualToggle;
+                
+                if (isManualToggle) {
+                    // Collapse sidebar
+                    sidebar.classList.remove('sidebar-full');
+                    sidebar.classList.add('sidebar-icon-only');
+                    document.querySelectorAll('.sidebar-text').forEach(el => {
+                        el.classList.add('hidden-text');
+                    });
+                    if (mainContent) {
+                        mainContent.classList.remove('lg:ml-64');
+                        mainContent.classList.add('lg:ml-16');
+                    }
+                    if (sidebarToggleIcon) {
+                        sidebarToggleIcon.classList.add('rotate-180');
+                    }
+                    localStorage.setItem('sidebarCollapsed', 'true');
+                } else {
+                    // Expand sidebar
+                    sidebar.classList.remove('sidebar-icon-only');
+                    sidebar.classList.add('sidebar-full');
+                    document.querySelectorAll('.sidebar-text').forEach(el => {
+                        el.classList.remove('hidden-text');
+                    });
+                    if (mainContent) {
+                        mainContent.classList.remove('lg:ml-16');
+                        mainContent.classList.add('lg:ml-64');
+                    }
+                    if (sidebarToggleIcon) {
+                        sidebarToggleIcon.classList.remove('rotate-180');
+                    }
+                    localStorage.setItem('sidebarCollapsed', 'false');
+                }
+            });
+        }
+        
+        // Prevent collapse when hovering on sidebar
+        sidebar.addEventListener('mouseenter', function() {
+            clearTimeout(sidebarTimeout);
+        });
+        
+        sidebar.addEventListener('mouseleave', function() {
+            if (!isManualToggle) {
+                collapseSidebar();
             }
         });
     </script>
