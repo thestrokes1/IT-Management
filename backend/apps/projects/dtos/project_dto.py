@@ -31,7 +31,7 @@ class ProjectDTO:
             status=obj.status,
             priority=obj.priority,
             created_at=obj.created_at,
-            owner_name=obj.owner.username if obj.owner else None
+            owner_name=obj.created_by.username if obj.created_by else None
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -144,8 +144,8 @@ class ProjectDetailDTO:
             created_at=obj.created_at,
             updated_at=obj.updated_at,
             category=category_dto,
-            owner_id=obj.owner.id if obj.owner else None,
-            owner_name=obj.owner.username if obj.owner else None,
+            owner_id=obj.project_manager.id if obj.project_manager else None,
+            owner_name=obj.project_manager.username if obj.project_manager else None,
             created_by_id=obj.created_by.id if obj.created_by else None,
             created_by_name=obj.created_by.username if obj.created_by else None,
             members=members_dto

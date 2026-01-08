@@ -570,14 +570,19 @@ class TransactionEventPublisher:
 class ImmediateEventPublisher:
     """Mixin for services that need immediate event dispatch."""
     
-    @property
-    def _dispatcher(self) -> EventDispatcher:
-        """Get the singleton event dispatcher."""
-        return EventDispatcher()
+    _dispatcher: Optional[EventDispatcher] = None
     
-    def _publish_event(self, event: DomainEvent) -> None:
+    @classmethod
+    def _get_dispatcher(cls) -> EventDispatcher:
+        """Get the singleton event dispatcher."""
+        if cls._dispatcher is None:
+            cls._dispatcher = EventDispatcher()
+        return cls._dispatcher
+    
+    @classmethod
+    def _publish_event(cls, event: DomainEvent) -> None:
         """Immediately dispatch an event."""
-        self._dispatcher.dispatch_now(event)
+        cls._get_dispatcher().dispatch_now(event)
 
 
 # Backward compatibility alias

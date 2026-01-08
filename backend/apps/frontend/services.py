@@ -233,7 +233,7 @@ class ProjectService(EventPublisher):
             PermissionDeniedError: If user lacks permission
         """
         from apps.projects.models import (
-            Project, ProjectCategory, ProjectMembership
+            Project, ProjectCategory, ProjectMember
         )
         from apps.users.models import User
         from datetime import datetime
@@ -270,7 +270,8 @@ class ProjectService(EventPublisher):
         
         # Get related objects (will raise NotFoundError if not found)
         category = cls._get_category_or_raise(category_id)
-        owner = cls._get_user_or_raise(owner_id)
+        # Default to request.user if no valid owner is provided (since project_manager is required)
+        owner = cls._get_user_or_raise(owner_id) or request.user
         
         # Parse budget
         try:
@@ -291,7 +292,7 @@ class ProjectService(EventPublisher):
             start_date=start_date_obj,
             end_date=end_date_obj,
             budget=budget_value,
-            owner=owner,
+            project_manager=owner,
             created_by=request.user
         )
         
@@ -299,10 +300,10 @@ class ProjectService(EventPublisher):
         for member_id in team_members:
             try:
                 member = User.objects.get(id=member_id)
-                ProjectMembership.objects.get_or_create(
+                ProjectMember.objects.get_or_create(
                     project=project,
                     user=member,
-                    defaults={'role': 'MEMBER', 'joined_at': timezone.now()}
+                    defaults={'role': 'MEMBER', 'joined_date': timezone.now().date()}
                 )
             except (User.DoesNotExist, ValueError):
                 # Skip invalid member IDs
@@ -417,7 +418,8 @@ class ProjectService(EventPublisher):
         
         # Get related objects (will raise NotFoundError if not found)
         category = cls._get_category_or_raise(category_id)
-        owner = cls._get_user_or_raise(owner_id)
+        # Default to existing project_manager if no valid owner is provided
+        owner = cls._get_user_or_raise(owner_id) or project.project_manager
         
         # Parse budget
         try:
@@ -448,7 +450,7 @@ class ProjectService(EventPublisher):
         project.start_date = start_date_obj
         project.end_date = end_date_obj
         project.budget = budget_value
-        project.owner = owner
+        project.project_manager = owner
         project.updated_by = request.user
         project.save()
         

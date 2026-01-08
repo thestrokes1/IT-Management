@@ -114,17 +114,21 @@ class PermissionDeniedError(DomainException):
         self,
         message: Optional[str] = None,
         required_roles: Optional[list] = None,
+        details: Optional[dict] = None,
         *args,
         **kwargs
     ):
-        details = kwargs.get('details', {}) or {}
+        # Start with provided details or empty dict
+        final_details = details.copy() if details else {}
+        
+        # Add required_roles if provided
         if required_roles:
-            details['required_roles'] = required_roles
+            final_details['required_roles'] = required_roles
         
         super().__init__(
             message=message or "You do not have permission to perform this action",
             code="PERMISSION_DENIED",
-            details=details,
+            details=final_details,
             *args,
             **kwargs
         )

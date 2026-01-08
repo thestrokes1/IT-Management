@@ -11,7 +11,7 @@ from django.http import JsonResponse
 
 class AdminRequiredMixin:
     """
-    Mixin that requires the user to have admin role.
+    Mixin that requires the user to have admin role (SUPERADMIN or IT_ADMIN).
     """
     
     def dispatch(self, request, *args, **kwargs):
@@ -20,7 +20,7 @@ class AdminRequiredMixin:
                 return JsonResponse({'error': 'Authentication required.'}, status=401)
             return redirect('frontend:login')
         
-        if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']:
+        if not hasattr(request.user, 'role') or request.user.role not in ['SUPERADMIN', 'IT_ADMIN']:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'error': 'Permission denied.'}, status=403)
             messages.error(request, 'You do not have permission to perform this action.')

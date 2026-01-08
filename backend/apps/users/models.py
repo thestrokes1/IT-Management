@@ -77,43 +77,83 @@ class User(AbstractUser):
     
     @property
     def is_admin(self):
-        """Check if user has admin privileges"""
+        """Check if user has admin privileges (SUPERADMIN, IT_ADMIN)"""
         return self.role in ['SUPERADMIN', 'IT_ADMIN']
     
     @property
     def is_manager(self):
-        """Check if user has manager privileges"""
+        """Check if user has manager privileges (SUPERADMIN, IT_ADMIN, MANAGER)"""
         return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
     
     @property
     def is_technician(self):
-        """Check if user has technician privileges"""
+        """Check if user has technician privileges (SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN)"""
         return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
     
     @property
+    def can_view_dashboard(self):
+        """Check if user can view dashboard - All roles can access"""
+        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN', 'VIEWER']
+    
+    @property
+    def can_access_assets(self):
+        """Check if user can access Assets menu (SUPERADMIN, IT_ADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+    
+    @property
+    def can_access_projects(self):
+        """Check if user can access Projects menu (SUPERADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'MANAGER']
+    
+    @property
+    def can_access_tickets(self):
+        """Check if user can access Tickets menu - All roles can access"""
+        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN', 'VIEWER']
+    
+    @property
+    def can_access_users(self):
+        """Check if user can access Users menu (SUPERADMIN, IT_ADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+    
+    @property
+    def can_access_logs(self):
+        """Check if user can access Logs menu (SUPERADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'MANAGER']
+    
+    @property
+    def can_access_reports(self):
+        """Check if user can access Reports menu (SUPERADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'MANAGER']
+    
+    @property
     def can_manage_users(self):
-        """Check if user can manage other users"""
+        """Check if user can manage other users (SUPERADMIN, IT_ADMIN)"""
         return self.role in ['SUPERADMIN', 'IT_ADMIN']
     
     @property
     def can_manage_assets(self):
-        """Check if user can manage assets"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
+        """Check if user can manage assets (SUPERADMIN, IT_ADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
     
     @property
     def can_manage_projects(self):
-        """Check if user can manage projects"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
+        """Check if user can manage projects (SUPERADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'MANAGER']
     
     @property
     def can_manage_tickets(self):
-        """Check if user can manage tickets"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
+        """Check if user can manage tickets - All roles can access"""
+        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN', 'VIEWER']
     
     @property
     def can_view_logs(self):
-        """Check if user can view audit logs"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN']
+        """Check if user can view audit logs (SUPERADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'MANAGER']
+    
+    @property
+    def can_view_reports(self):
+        """Check if user can view reports (SUPERADMIN, MANAGER)"""
+        return self.role in ['SUPERADMIN', 'MANAGER']
     
     def save(self, *args, **kwargs):
         # Set email from username if not provided

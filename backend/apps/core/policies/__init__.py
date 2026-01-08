@@ -177,6 +177,17 @@ class RoleBasedPolicy(AuthorizationPolicy):
         'owner': 5,
     }
     
+    # Map uppercase user roles to lowercase internal roles
+    ROLE_MAPPING = {
+        'VIEWER': 'viewer',
+        'TECHNICIAN': 'member',
+        'MEMBER': 'member',
+        'MANAGER': 'manager',
+        'IT_ADMIN': 'admin',
+        'SUPERADMIN': 'admin',
+        'ADMIN': 'admin',
+    }
+    
     def _get_user_role(self, user: Any) -> str:
         """
         Get the user's role for authorization.
@@ -187,16 +198,29 @@ class RoleBasedPolicy(AuthorizationPolicy):
             user: User to get role for
             
         Returns:
-            Role name string
+            Role name string (lowercase)
         """
         if not user or not user.is_authenticated:
             return 'anonymous'
         
+        # Check for uppercase role and map to lowercase
         if hasattr(user, 'role'):
-            return user.role
-        elif hasattr(user, 'user_type'):
-            return user.user_type
-        elif user.is_superuser:
+            role = user.role.upper() if isinstance(user.role, str) else user.role
+            if isinstance(role, str) and role in self.ROLE_MAPPING:
+                return self.ROLE_MAPPING[role]
+            elif isinstance(role, str):
+                return role.lower()
+            return role
+        
+        if hasattr(user, 'user_type'):
+            user_type = user.user_type.upper() if isinstance(user.user_type, str) else user.user_type
+            if isinstance(user_type, str) and user_type in self.ROLE_MAPPING:
+                return self.ROLE_MAPPING[user_type]
+            elif isinstance(user_type, str):
+                return user_type.lower()
+            return user_type
+        
+        if user.is_superuser:
             return 'admin'
         
         return 'member'
