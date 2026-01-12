@@ -1,6 +1,20 @@
 """
 Template tags for menu permissions.
 Provides template-level access control for menu items based on user roles.
+
+All permission checks delegate to the User model's can_access_* properties
+for consistency with the backend permission system.
+
+Menu Access Matrix:
+| Menu Item   | SUPERADMIN | IT_ADMIN | MANAGER | TECHNICIAN | VIEWER |
+|-------------|------------|----------|---------|------------|--------|
+| Dashboard   | ✅         | ✅       | ✅      | ✅         | ✅     |
+| Assets      | ✅         | ✅       | ✅      | ✅         | ❌     |
+| Projects    | ✅         | ❌       | ✅      | ❌         | ❌     |
+| Tickets     | ✅         | ✅       | ✅      | ✅         | ✅     |
+| Users       | ✅         | ✅       | ✅      | ❌         | ❌     |
+| Logs        | ✅         | ✅       | ✅      | ✅         | ❌     |
+| Reports     | ✅         | ❌       | ✅      | ❌         | ❌     |
 """
 
 from django import template
@@ -9,7 +23,8 @@ from django.template import TemplateSyntaxError
 
 register = template.Library()
 
-# Menu access configuration based on role
+# Menu access configuration based on role - kept for backward compatibility
+# but can_access_menu() now delegates to user.can_access_* properties
 MENU_ACCESS = {
     'dashboard': {
         'SUPERADMIN': True,
@@ -22,7 +37,7 @@ MENU_ACCESS = {
         'SUPERADMIN': True,
         'IT_ADMIN': True,
         'MANAGER': True,
-        'TECHNICIAN': False,
+        'TECHNICIAN': True,
         'VIEWER': False,
     },
     'projects': {
@@ -48,9 +63,9 @@ MENU_ACCESS = {
     },
     'logs': {
         'SUPERADMIN': True,
-        'IT_ADMIN': False,
+        'IT_ADMIN': True,
         'MANAGER': True,
-        'TECHNICIAN': False,
+        'TECHNICIAN': True,
         'VIEWER': False,
     },
     'reports': {
@@ -60,6 +75,17 @@ MENU_ACCESS = {
         'TECHNICIAN': False,
         'VIEWER': False,
     },
+}
+
+# Map menu names to User model properties
+MENU_PROPERTY_MAP = {
+    'dashboard': 'can_access_dashboard',
+    'assets': 'can_access_assets',
+    'projects': 'can_access_projects',
+    'tickets': 'can_access_tickets',
+    'users': 'can_access_users',
+    'logs': 'can_access_logs',
+    'reports': 'can_access_reports',
 }
 
 
@@ -75,10 +101,17 @@ def can_access_menu(menu_name, user):
     if not user.is_authenticated:
         return False
     
-    # Get user role, default to VIEWER if not set
-    user_role = getattr(user, 'role', 'VIEWER')
+    # Superusers always have access
+    if user.is_superuser:
+        return True
     
-    # Check if menu exists and user has access
+    # Map menu name to user model property and delegate
+    prop_name = MENU_PROPERTY_MAP.get(menu_name)
+    if prop_name and hasattr(user, prop_name):
+        return getattr(user, prop_name)
+    
+    # Fallback to MENU_ACCESS dict for backward compatibility
+    user_role = getattr(user, 'role', 'VIEWER')
     if menu_name in MENU_ACCESS:
         return MENU_ACCESS[menu_name].get(user_role, False)
     
@@ -109,9 +142,7 @@ def if_menu_access(menu_name, user):
             <a href="...">Assets</a>
         {% endif_menu_access %}
     """
-    if can_access_menu(menu_name, user):
-        return True
-    return False
+    return can_access_menu(menu_name, user)
 
 
 @register.filter
@@ -161,11 +192,13 @@ def get_accessible_menus(user):
     if not user.is_authenticated:
         return []
     
-    user_role = getattr(user, 'role', 'VIEWER')
+    # Superusers have access to all menus
+    if user.is_superuser:
+        return list(MENU_ACCESS.keys())
     
     accessible = []
-    for menu_name, access_dict in MENU_ACCESS.items():
-        if access_dict.get(user_role, False):
+    for menu_name in MENU_ACCESS.keys():
+        if can_access_menu(menu_name, user):
             accessible.append(menu_name)
     
     return accessible
@@ -181,4 +214,3 @@ def show_menu_item(menu_name, user):
     Returns: True if menu item should be displayed.
     """
     return can_access_menu(menu_name, user)
-

@@ -86,6 +86,22 @@ class CanManageUsers(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated and request.user.can_manage_users
 
+    from rest_framework import permissions
+
+class CanChangeUserRole(permissions.BasePermission):
+    """
+    Allows changing another user's role.
+    SUPERADMIN only.
+    """
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.user.can_change_user_role
+        )
+
+
 class CanViewLogs(permissions.BasePermission):
     """
     Custom permission to only allow users who can view audit logs.

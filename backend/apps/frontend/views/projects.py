@@ -128,7 +128,7 @@ class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplate
                 start_date=request.POST.get('start_date', ''),
                 end_date=request.POST.get('end_date', ''),
                 budget=request.POST.get('budget', ''),
-                owner_id=request.POST.get('owner', ''),
+                owner_id=request.POST.get('project_manager', ''),
                 team_members=request.POST.getlist('team_members', [])
             )
             
@@ -232,7 +232,7 @@ class EditProjectView(SafeTemplateView):
                 start_date=request.POST.get('start_date', ''),
                 end_date=request.POST.get('end_date', ''),
                 budget=request.POST.get('budget', ''),
-                owner_id=request.POST.get('owner', ''),
+                owner_id=request.POST.get('project_manager', ''),
                 team_members=request.POST.getlist('team_members', [])
             )
             

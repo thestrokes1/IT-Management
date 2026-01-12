@@ -5,6 +5,8 @@ Imports views from the apps.frontend.views package.
 
 from django.urls import path
 from apps.frontend import views
+from apps.frontend.views import users as user_views
+
 
 app_name = 'frontend'
 
@@ -43,13 +45,13 @@ urlpatterns = [
     path('assets/api/<int:asset_id>/', views.asset_crud, name='asset_crud'),
     
     # Users
-    path('users/', views.UsersView.as_view(), name='users'),
-    path('users/create/', views.CreateUserView.as_view(), name='create-user'),
-    path('users/<int:user_id>/edit/', views.EditUserView.as_view(), name='edit-user'),
-    path('users/<int:user_id>/', views.EditUserView.as_view(), name='user-detail'),
-    path('users/<int:user_id>/delete/', views.delete_user, name='delete_user'),
-    path('api/users/<int:user_id>/', views.delete_user, name='user_api_delete'),
     
+    path('users/', user_views.UsersView.as_view(), name='users'),
+    path('users/create/', user_views.CreateUserView.as_view(), name='create-user'),
+    path('users/<int:user_id>/edit/', user_views.EditUserView.as_view(), name='edit-user'),
+    path('users/<int:user_id>/delete/', user_views.delete_user, name='delete_user'),
+    path('users/<int:user_id>/change-role/', user_views.change_user_role, name='change-user-role'),
+
     # Profile and settings
     path('profile/', views.ProfileView.as_view(), name='profile'),
     path('logs/', views.LogsView.as_view(), name='logs'),

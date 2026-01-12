@@ -26,10 +26,16 @@ from apps.assets.serializers import (
     AssetSearchSerializer
 )
 from apps.assets.permissions import (
-    CanManageAssets, IsAssetOwnerOrReadOnly, CanAssignAssets,
-    CanViewMaintenanceRecords, CanManageMaintenance, CanViewAuditLogs,
-    CanGenerateReports, CanManageCategories
+    CanManageAssets,
+    IsAssetOwnerOrReadOnly,
+    CanAssignAssets,
+    CanViewMaintenanceRecords,
+    CanManageMaintenance,
+    CanViewAssetAuditLogs,
+    CanGenerateAssetReports,
+    CanManageAssetCategories,
 )
+
 from apps.users.models import User
 
 class AssetCategoryViewSet(viewsets.ModelViewSet):
@@ -38,7 +44,7 @@ class AssetCategoryViewSet(viewsets.ModelViewSet):
     """
     queryset = AssetCategory.objects.all()
     serializer_class = AssetCategorySerializer
-    permission_classes = [CanManageCategories]
+    permission_classes = [CanManageAssetCategories]
     
     def get_queryset(self):
         queryset = AssetCategory.objects.all()
@@ -544,7 +550,7 @@ class AssetAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     Asset audit log viewset.
     """
     serializer_class = AssetAuditLogSerializer
-    permission_classes = [CanViewAuditLogs]
+    permission_classes = [CanViewAssetAuditLogs]
     
     def get_queryset(self):
         queryset = AssetAuditLog.objects.select_related('asset', 'user')

@@ -49,6 +49,28 @@ class CanManageUsersMixin:
         return super().dispatch(request, *args, **kwargs)
 
 
+class CanChangeUserRoleMixin:
+    """
+    Mixin that requires the user to be a SUPERADMIN to change user roles.
+    Only SUPERADMIN can change user roles - this is the highest privilege.
+    """
+    
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'Authentication required.'}, status=401)
+            return redirect('frontend:login')
+        
+        # Only SUPERADMIN can change user roles
+        if not hasattr(request.user, 'role') or request.user.role != 'SUPERADMIN':
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'Only Super Administrator can change user roles.'}, status=403)
+            messages.error(request, 'Only Super Administrator can change user roles.')
+            return redirect('frontend:dashboard')
+        
+        return super().dispatch(request, *args, **kwargs)
+
+
 class CanManageTicketsMixin:
     """
     Mixin that requires the user to have ticket management permissions.

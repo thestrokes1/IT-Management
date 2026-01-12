@@ -12,12 +12,14 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.utils import timezone
 from django.core.cache import cache
+from apps.users.application import UserUseCases
 
 from apps.users.models import User, UserProfile, UserSession, LoginAttempt
 from apps.users.serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserListSerializer,
     UserDetailSerializer, UserUpdateSerializer, ChangePasswordSerializer,
-    UserSessionSerializer, LoginAttemptSerializer, UserStatisticsSerializer
+    UserSessionSerializer, LoginAttemptSerializer, UserStatisticsSerializer,
+    ChangeUserRoleSerializer
 )
 from apps.users.permissions import (
     IsAdminOrReadOnly, IsOwnerOrAdmin, CanManageUsers, IsSelfOrAdmin
@@ -170,6 +172,45 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'message': 'Password changed successfully'})
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(
+        detail=True,
+        methods=['post'],
+        permission_classes=[CanManageUsers],
+    )
+    def change_role(self, request, pk=None):
+        """
+        Change a user's role (SUPERADMIN only).
+        """
+        target_user = self.get_object()
+        serializer = ChangeUserRoleSerializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+
+        result = UserUseCases.change_user_role(
+            actor=request.user,
+            target_user=target_user,
+            new_role=serializer.validated_data['role'],
+            idempotency_key=f"change-role-{request.user.id}-{target_user.id}",
+        )
+
+        if not result.success:
+            return Response(
+                {"error": result.error},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "message": "User role updated successfully",
+                "user_id": result.user_id,
+                "old_role": result.old_role,
+                "new_role": result.new_role,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
     
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):

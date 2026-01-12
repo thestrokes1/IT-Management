@@ -367,7 +367,7 @@ class ProjectService(EventPublisher):
             PermissionDeniedError: If user lacks permission
         """
         from apps.projects.models import (
-            Project, ProjectCategory, ProjectMembership
+            Project, ProjectCategory, ProjectMember
         )
         from apps.users.models import User
         from datetime import datetime
@@ -383,7 +383,7 @@ class ProjectService(EventPublisher):
             'status': project.status,
             'priority': project.priority,
             'budget': project.budget,
-            'owner_id': str(project.owner_id) if project.owner_id else None,
+            'project_manager_id': str(project.project_manager_id) if project.project_manager_id else None,
         }
         
         # Check authorization using Policy
@@ -438,7 +438,7 @@ class ProjectService(EventPublisher):
             'status': status or 'PLANNING',
             'priority': priority or 'MEDIUM',
             'budget': budget_value,
-            'owner_id': str(owner_id) if owner_id else None,
+            'project_manager_id': str(owner.id) if owner else None,
         }
         
         # Update project
@@ -455,14 +455,14 @@ class ProjectService(EventPublisher):
         project.save()
         
         # Update team members
-        ProjectMembership.objects.filter(project=project).delete()
+        ProjectMember.objects.filter(project=project).delete()
         for member_id in team_members:
             try:
                 member = User.objects.get(id=member_id)
-                ProjectMembership.objects.get_or_create(
+                ProjectMember.objects.get_or_create(
                     project=project,
                     user=member,
-                    defaults={'role': 'MEMBER', 'joined_at': timezone.now()}
+                    defaults={'role': 'MEMBER', 'joined_date': timezone.now().date()}
                 )
             except (User.DoesNotExist, ValueError):
                 pass
@@ -505,7 +505,7 @@ class ProjectService(EventPublisher):
             NotFoundError: If project not found
             PermissionDeniedError: If user lacks permission
         """
-        from apps.projects.models import Project, ProjectTask, ProjectMembership
+        from apps.projects.models import Project, Task, ProjectMember
         
         # Get project or raise NotFoundError
         project = cls._get_project_or_raise(project_id)
@@ -519,8 +519,8 @@ class ProjectService(EventPublisher):
         
         with transaction.atomic():
             # Delete related records
-            ProjectTask.objects.filter(project=project).delete()
-            ProjectMembership.objects.filter(project=project).delete()
+            Task.objects.filter(project=project).delete()
+            ProjectMember.objects.filter(project=project).delete()
             project.delete()
         
         # Emit domain event - NO logging/persistence logic in service
