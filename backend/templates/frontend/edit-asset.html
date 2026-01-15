@@ -32,8 +32,9 @@
         </nav>
     </div>
 
-    <!-- Edit Asset Form -->
-    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+<!-- Edit Asset Form -->
+{% if permissions.can_update %}
+<div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
         <form method="POST" id="editAssetForm" class="space-y-4 sm:space-y-6">
             {% csrf_token %}
             
@@ -191,6 +192,17 @@
             </div>
         </form>
     </div>
+{% else %}
+<div class="bg-white rounded-lg shadow-md p-6 text-center">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Permission Denied</h3>
+    <p class="text-sm text-gray-600 mb-4">
+        You do not have permission to edit this asset.
+    </p>
+    <a href="{% url 'frontend:assets' %}"
+       class="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+        Back to Assets
+    </a>
 </div>
+{% endif %}
 {% endblock %}
 

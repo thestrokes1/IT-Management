@@ -10,11 +10,14 @@
     </div>
 
     <!-- Create Ticket Button -->
-    <div class="mb-6">
-        <a href="{% url 'frontend:create-ticket' %}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-            + Create New Ticket
-        </a>
-    </div>
+            {% if permissions.can_create %}
+        <div class="mb-6">
+            <a href="{% url 'frontend:create-ticket' %}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                + Create New Ticket
+            </a>
+        </div>
+        {% endif %}
+
 
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -90,12 +93,16 @@
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-600">{% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</td>
                             <td class="px-6 py-4 text-sm">
-                                {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
-                                <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
-                                {% else %}
-                                <a href="#" onclick="return false;" class="text-gray-400 cursor-not-allowed mr-4" title="Admin only">Edit</a>
-                                {% endif %}
-                                <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
+                                {% if permissions_map[ticket.id].can_update %}
+<a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
+{% else %}
+<span class="text-gray-400 cursor-not-allowed mr-4">Edit</span>
+{% endif %}
+                            
+                                {% if permissions_map[ticket.id].can_delete %}
+<button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
+{% endif %}
+
                             </td>
                         </tr>
                         {% endfor %}
@@ -121,12 +128,16 @@
                             <div class="text-sm text-gray-600 mt-1">By: {% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</div>
                         </div>
                         <div class="flex space-x-2 ml-2">
-                            {% if user.role in 'SUPERADMIN,IT_ADMIN' %}
-                            <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
+                            {% if permissions_map[ticket.id].can_update %}
+<a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
+
                                 <i class="fas fa-edit text-sm"></i>
                             </a>
                             {% endif %}
-                            <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 p-1">
+                            {% if permissions_map[ticket.id].can_delete %}
+<button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 p-1">
+{% endif %}
+
                                 <i class="fas fa-trash text-sm"></i>
                             </button>
                         </div>

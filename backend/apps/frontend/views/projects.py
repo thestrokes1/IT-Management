@@ -18,6 +18,10 @@ from apps.projects.queries import ProjectQuery
 from apps.core.exceptions import DomainException, PermissionDeniedError
 from apps.core.exception_mapper import ExceptionMapper, SafeTemplateView
 from apps.projects.policies import ProjectPolicy
+from apps.projects.domain.services.project_authority import (
+    get_project_permissions, 
+    can_create_project,
+)
 
 
 class ProjectsView(LoginRequiredMixin, SafeTemplateView):
@@ -48,12 +52,21 @@ class ProjectsView(LoginRequiredMixin, SafeTemplateView):
         status_choices = ProjectQuery.get_status_choices()
         priority_choices = ProjectQuery.get_priority_choices()
         
+        # Compute permissions map for each project
+        projects_list = projects_dto.projects
+        permissions_map = {}
+        for project in projects_list:
+            # Get the actual project object for permissions check
+            project_obj = project.to_dict() if hasattr(project, 'to_dict') else project
+            permissions_map[project.id] = get_project_permissions(self.request.user, project_obj)
+        
         context.update({
-            'projects': projects_dto.projects,  # List of ProjectDTO
+            'projects': projects_list,  # List of ProjectDTO
             'projects_dict': projects_dto.to_list(),  # List of dicts for templates
             'total_count': projects_dto.total_count,
             'status_choices': status_choices,
             'priority_choices': priority_choices,
+            'permissions_map': permissions_map,
             'can_create': policy.can_create(self.request.user).allowed,
             'can_edit_any': self._can_edit_any(),
             'can_delete_any': self._can_delete_any(),
@@ -105,11 +118,17 @@ class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplate
         categories = ProjectQuery.get_categories()
         available_users = ProjectQuery.get_active_users()
         
+        # Pass permissions object for template consistency
+        permissions = {
+            'can_create': can_create_project(self.request.user),
+        }
+        
         context.update({
             'categories': categories,
             'categories_dict': [c.to_dict() for c in categories] if hasattr(categories[0], 'to_dict') else categories,
             'available_users': available_users,
-            'form': {}
+            'form': {},
+            'permissions': permissions,
         })
         return context
     
@@ -201,16 +220,21 @@ class EditProjectView(SafeTemplateView):
         
         # Check delete permission for context
         policy = ProjectPolicy()
-        can_delete = policy.can_delete(self.request.user, project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto).allowed
+        project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
+        can_delete = policy.can_delete(self.request.user, project_dict).allowed
+        
+        # Compute permissions for the project
+        permissions = get_project_permissions(self.request.user, project_dict)
         
         context.update({
             'project': project_dto,  # ProjectDetailDTO
-            'project_dict': project_dto.to_dict(),  # Dict for templates
+            'project_dict': project_dict,  # Dict for templates
             'categories': categories,
             'categories_dict': [c.to_dict() for c in categories] if hasattr(categories[0], 'to_dict') else categories,
             'available_users': available_users,
             'form': {},
             'can_delete': can_delete,
+            'permissions': permissions,
         })
         return context
     

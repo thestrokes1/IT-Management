@@ -75,11 +75,21 @@
                                 </span>
                             </td>
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
-                                <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
-<a href="{% url 'frontend:edit-user' user.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
-                                    <button onclick="deleteUser({{ user.id }})" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
-                                </div>
-                            </td>
+                            <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
+                                {% if permissions_map[user.id].can_update %}
+                                    <a href="{% url 'frontend:edit-user' user.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
+                                {% endif %}
+
+                                {% if permissions_map[user.id].can_delete %}
+                                    <button onclick="deleteUser({{ user.id }})"
+                                            class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">
+                                        Delete
+                                    </button>
+                                {% endif %}
+
+                            </div>
+                        </td>
+
                         </tr>
                         {% endfor %}
                     {% else %}

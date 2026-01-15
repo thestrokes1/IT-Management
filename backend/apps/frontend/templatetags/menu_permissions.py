@@ -214,3 +214,20 @@ def show_menu_item(menu_name, user):
     Returns: True if menu item should be displayed.
     """
     return can_access_menu(menu_name, user)
+
+
+@register.filter
+def get_item(dictionary, key):
+    """
+    Get an item from a dictionary by key.
+    
+    Usage: {{ permissions_map|get_item:asset.id }}
+    
+    Returns: The value associated with the key, or an empty string if not found.
+    """
+    if dictionary is None:
+        return {}
+    try:
+        return dictionary.get(key, {})
+    except (TypeError, AttributeError):
+        return {}

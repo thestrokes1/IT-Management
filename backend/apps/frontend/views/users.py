@@ -13,6 +13,12 @@ from django.views.generic import TemplateView
 
 from apps.frontend.mixins import CanManageUsersMixin
 from apps.users.models import User
+from apps.users.domain.services.user_authority import (
+    get_user_permissions, 
+    can_create_user,
+    assert_can_delete_user,
+)
+from apps.core.domain.authorization import AuthorizationError
 
 
 # =========================
@@ -25,8 +31,19 @@ class UsersView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['users'] = User.objects.filter(is_active=True).order_by('-date_joined')
-        context['role_choices'] = User.ROLE_CHOICES
+        users = User.objects.filter(is_active=True).order_by('-date_joined')
+        
+        # Compute permissions map for each user
+        permissions_map = {
+            user.id: get_user_permissions(self.request.user, user)
+            for user in users
+        }
+        
+        context.update({
+            'users': users,
+            'role_choices': User.ROLE_CHOICES,
+            'permissions_map': permissions_map,
+        })
         return context
 
 
@@ -37,6 +54,19 @@ class UsersView(LoginRequiredMixin, TemplateView):
 class CreateUserView(CanManageUsersMixin, TemplateView):
     template_name = 'frontend/create-user.html'
     login_url = 'frontend:login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Pass permissions object for template consistency
+        permissions = {
+            'can_create': can_create_user(self.request.user),
+        }
+        
+        context.update({
+            'permissions': permissions,
+        })
+        return context
 
     def post(self, request, *args, **kwargs):
         try:
@@ -87,10 +117,15 @@ class EditUserView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        # Compute permissions for the edit user
+        permissions = get_user_permissions(self.request.user, self.edit_user)
+        
         context.update({
             'edit_user': self.edit_user,
             'role_choices': User.ROLE_CHOICES,
             'can_change_role': self.can_change_role,
+            'permissions': permissions,
         })
         return context
 
@@ -150,20 +185,23 @@ def change_user_role(request, user_id):
 @login_required(login_url='frontend:login')
 @require_http_methods(["POST", "DELETE"])
 def delete_user(request, user_id):
-    if request.user.role not in ['SUPERADMIN', 'IT_ADMIN']:
-        return JsonResponse({'error': 'Permission denied.'}, status=403)
-
+    """
+    Delete a user.
+    Uses domain authority for authorization.
+    """
     try:
-        user = get_object_or_404(User, id=user_id)
-
-        if user == request.user:
-            return JsonResponse({'error': 'You cannot delete yourself.'}, status=400)
-
-        username = user.username
-        user.delete()
-
+        target_user = get_object_or_404(User, id=user_id)
+        
+        # Check domain permission
+        assert_can_delete_user(request.user, target_user)
+        
+        username = target_user.username
+        target_user.delete()
+        
         return JsonResponse({'success': True, 'message': f'User {username} deleted.'})
-
+    
+    except AuthorizationError as e:
+        return JsonResponse({'error': str(e)}, status=403)
     except Exception as e:
         import traceback
         traceback.print_exc()

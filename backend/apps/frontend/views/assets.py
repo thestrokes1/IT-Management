@@ -13,6 +13,12 @@ from django.views.generic import TemplateView
 from apps.frontend.mixins import CanManageAssetsMixin
 from apps.frontend.services import AssetService
 from apps.assets.queries import AssetQuery
+from apps.assets.domain.services.asset_authority import (
+    get_asset_permissions, 
+    can_create_asset,
+    assert_can_delete_asset,
+)
+from apps.core.domain.authorization import AuthorizationError
 
 
 class AssetsView(LoginRequiredMixin, TemplateView):
@@ -30,10 +36,18 @@ class AssetsView(LoginRequiredMixin, TemplateView):
         status_choices = AssetQuery.get_status_choices()
         category_choices = AssetQuery.get_categories()
         
+        # Compute permissions map for each asset
+        permissions_map = {}
+        for asset in assets:
+            # Get the actual asset object for permissions check
+            asset_obj = asset.to_dict() if hasattr(asset, 'to_dict') else asset
+            permissions_map[asset.id] = get_asset_permissions(self.request.user, asset_obj)
+        
         context.update({
             'assets': assets,
             'status_choices': status_choices,
-            'category_choices': category_choices
+            'category_choices': category_choices,
+            'permissions_map': permissions_map,
         })
         return context
 
@@ -52,10 +66,16 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
         categories = AssetQuery.get_categories()
         available_users = AssetQuery.get_active_users()
         
+        # Pass permissions object for template consistency
+        permissions = {
+            'can_create': can_create_asset(self.request.user),
+        }
+        
         context.update({
             'categories': categories,
             'available_users': available_users,
-            'form': {}
+            'form': {},
+            'permissions': permissions,
         })
         return context
     
@@ -112,11 +132,17 @@ class EditAssetView(CanManageAssetsMixin, TemplateView):
         categories = AssetQuery.get_categories()
         available_users = AssetQuery.get_active_users()
         
+        # Compute permissions for the asset
+        asset_dict = asset.to_dict() if hasattr(asset, 'to_dict') else asset
+        permissions = get_asset_permissions(self.request.user, asset_dict)
+        
         context.update({
             'asset': asset,
+            'asset_dict': asset_dict,
             'categories': categories,
             'available_users': available_users,
-            'form': {}
+            'form': {},
+            'permissions': permissions,
         })
         return context
     
@@ -160,6 +186,7 @@ def delete_asset(request, asset_id):
     """
     Delete an asset.
     Uses AssetService for write operation.
+    Uses domain authority for authorization.
     """
     # Check if user is authenticated
     if not request.user.is_authenticated:
@@ -167,18 +194,25 @@ def delete_asset(request, asset_id):
             return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
         return redirect('frontend:login')
     
-    # Check permissions
-    if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']:
-        return JsonResponse({
-            'error': 'You do not have permission to delete assets. Only ADMIN or SUPERADMIN roles can delete assets.'
-        }, status=403)
-    
     try:
+        # Get asset for authorization check
+        asset = AssetQuery.get_by_id(asset_id)
+        if asset is None:
+            return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
+        
+        # Convert to dict if it's a DTO
+        asset_data = asset.to_dict() if hasattr(asset, 'to_dict') else asset
+        
+        # Check domain permission
+        assert_can_delete_asset(request.user, asset_data)
+        
         # Use Service for write operation
         AssetService.delete_asset(asset_id)
         
         return JsonResponse({'success': True, 'message': f'Asset deleted successfully.'})
     
+    except AuthorizationError as e:
+        return JsonResponse({'error': str(e)}, status=403)
     except Exception as e:
         import traceback
         traceback.print_exc()

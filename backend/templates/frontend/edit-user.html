@@ -103,22 +103,28 @@
             </div>
 
             <!-- Status -->
+            {% if permissions.can_deactivate %}
             <div>
                 <label class="flex items-center gap-2">
                     <input type="checkbox"
-                           name="is_active"
-                           {% if edit_user.is_active %}checked{% endif %}>
+                        name="is_active"
+                        {% if edit_user.is_active %}checked{% endif %}>
                     Active User
                 </label>
             </div>
+            {% endif %}
+
 
             <!-- Actions -->
             <div class="flex gap-4">
-                <button type="submit"
+                 {% if permissions.can_update %}
+                    <button type="submit"
                         id="saveBtn"
                         class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
                     Save Changes
-                </button>
+                    </button>
+                {% endif %}
+
 
                 <a href="{% url 'frontend:users' %}"
                    class="bg-gray-200 px-6 py-2 rounded hover:bg-gray-300">
@@ -129,7 +135,7 @@
     </div>
 
     <!-- SEPARATE ROLE CHANGE FORM -->
-    {% if request.user.role == 'SUPERADMIN' %}
+    {% if permissions.can_change_role %}
     <div class="mt-10 bg-white rounded-lg shadow border p-6 border-red-200">
         <h2 class="text-lg font-semibold mb-4 text-red-700">
             Change User Role

@@ -1,3 +1,4 @@
+{% load menu_permissions %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -339,12 +340,14 @@
             <!-- Navigation -->
             <nav class="mt-8">
                 <div class="px-2 lg:px-4">
+                    {% if_menu_access 'dashboard' user %}
                     <a href="{% url 'frontend:dashboard' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-primary-50 rounded-lg {% if request.resolver_match.url_name == 'dashboard' %}bg-primary-100{% endif %}">
                         <i class="fas fa-tachometer-alt text-lg w-6 text-center text-blue-500 {% if request.resolver_match.url_name == 'dashboard' %}text-blue-600{% endif %}"></i>
                         <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'dashboard' %}text-blue-700 font-medium{% endif %}">Dashboard</span>
                     </a>
+                    {% endif_menu_access %}
                     
-                    {% if user.can_access_assets %}
+                    {% if_menu_access 'assets' user %}
                     <a href="{% url 'frontend:assets' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-green-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'assets' %}bg-green-100{% endif %}">
                         <i class="fas fa-desktop text-lg w-6 text-center text-green-500 {% if request.resolver_match.url_name == 'assets' %}text-green-600{% endif %}"></i>
                         <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'assets' %}text-green-700 font-medium{% endif %}">Assets</span>
@@ -352,9 +355,9 @@
                         <span class="ml-auto bg-green-500 text-white text-xs px-2 py-1 rounded-full sidebar-text">{{ dashboard_stats.total_assets }}</span>
                         {% endif %}
                     </a>
-                    {% endif %}
+                    {% endif_menu_access %}
                     
-                    {% if user.can_access_projects %}
+                    {% if_menu_access 'projects' user %}
                     <a href="{% url 'frontend:projects' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'projects' %}bg-purple-100{% endif %}">
                         <i class="fas fa-project-diagram text-lg w-6 text-center text-purple-500 {% if request.resolver_match.url_name == 'projects' %}text-purple-600{% endif %}"></i>
                         <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'projects' %}text-purple-700 font-medium{% endif %}">Projects</span>
@@ -362,9 +365,9 @@
                         <span class="ml-auto bg-purple-500 text-white text-xs px-2 py-1 rounded-full sidebar-text">{{ dashboard_stats.active_projects }}</span>
                         {% endif %}
                     </a>
-                    {% endif %}
+                    {% endif_menu_access %}
                     
-                    {% if user.can_access_tickets %}
+                    {% if_menu_access 'tickets' user %}
                     <a href="{% url 'frontend:tickets' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-red-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'tickets' %}bg-red-100{% endif %}">
                         <i class="fas fa-ticket-alt text-lg w-6 text-center text-red-500 {% if request.resolver_match.url_name == 'tickets' %}text-red-600{% endif %}"></i>
                         <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'tickets' %}text-red-700 font-medium{% endif %}">Tickets</span>
@@ -372,9 +375,9 @@
                         <span class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full notification-badge sidebar-text">{{ dashboard_stats.open_tickets }}</span>
                         {% endif %}
                     </a>
-                    {% endif %}
+                    {% endif_menu_access %}
                     
-                    {% if user.can_access_users %}
+                    {% if_menu_access 'users' user %}
                     <a href="{% url 'frontend:users' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-cyan-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'users' %}bg-cyan-100{% endif %}">
                         <i class="fas fa-users text-lg w-6 text-center text-cyan-500 {% if request.resolver_match.url_name == 'users' %}text-cyan-600{% endif %}"></i>
                         <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'users' %}text-cyan-700 font-medium{% endif %}">Users</span>
@@ -382,21 +385,21 @@
                         <span class="ml-auto bg-cyan-500 text-white text-xs px-2 py-1 rounded-full sidebar-text">{{ dashboard_stats.active_users }}</span>
                         {% endif %}
                     </a>
-                    {% endif %}
+                    {% endif_menu_access %}
                     
-                    {% if user.can_access_logs %}
+                    {% if_menu_access 'logs' user %}
                     <a href="{% url 'frontend:logs' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-yellow-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'logs' %}bg-yellow-100{% endif %}">
                         <i class="fas fa-list-alt text-lg w-6 text-center text-yellow-500 {% if request.resolver_match.url_name == 'logs' %}text-yellow-600{% endif %}"></i>
                         <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'logs' %}text-yellow-700 font-medium{% endif %}">Logs</span>
                     </a>
-                    {% endif %}
+                    {% endif_menu_access %}
                     
-                    {% if user.can_access_reports %}
+                    {% if_menu_access 'reports' user %}
                     <a href="{% url 'frontend:reports' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-indigo-50 rounded-lg mt-1 {% if request.resolver_match.url_name == 'reports' %}bg-indigo-100{% endif %}">
                         <i class="fas fa-chart-bar text-lg w-6 text-center text-indigo-500 {% if request.resolver_match.url_name == 'reports' %}text-indigo-600{% endif %}"></i>
                         <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'reports' %}text-indigo-700 font-medium{% endif %}">Reports</span>
                     </a>
-                    {% endif %}
+                    {% endif_menu_access %}
                 </div>
                 
                 {% if user.is_authenticated %}

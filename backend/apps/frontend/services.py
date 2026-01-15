@@ -1,7 +1,7 @@
 # Frontend services module.
 # Contains command services for state mutations (create, update, delete).
 # Uses domain exceptions for error handling - no HttpResponse/JsonResponse in services.
-# Uses authorization policies for permission checks.
+# Uses domain authority for authorization checks.
 # Uses domain events for activity tracking (no persistence logic in services).
 
 from typing import Optional, Dict
@@ -14,7 +14,22 @@ from apps.core.exceptions import (
     PermissionDeniedError,
     DomainException,
 )
-from apps.projects.policies import ProjectPolicy
+from apps.core.domain.authorization import AuthorizationError
+from apps.projects.domain.services.project_authority import (
+    assert_can_create_project,
+    assert_can_update_project,
+    assert_can_delete_project,
+)
+from apps.tickets.domain.services.ticket_authority import (
+    can_create_ticket,
+    can_update_ticket,
+    can_delete_ticket,
+)
+from apps.assets.domain.services.asset_authority import (
+    can_create_asset,
+    can_update_asset,
+    can_delete_asset,
+)
 from apps.core.events import (
     EventPublisher,
     ProjectCreated,
@@ -28,12 +43,9 @@ class ProjectService(EventPublisher):
     Service class for Project commands.
     Handles all state mutations for projects.
     Raises ONLY domain exceptions - no HTTP responses.
-    Uses ProjectPolicy for authorization checks.
+    Uses domain authority for authorization checks.
     Uses EventPublisher to emit domain events after successful commands.
     """
-    
-    # Policy instance for authorization checks
-    _policy = ProjectPolicy()
     
     @classmethod
     def _get_project_or_raise(cls, project_id: int):
@@ -238,9 +250,9 @@ class ProjectService(EventPublisher):
         from apps.users.models import User
         from datetime import datetime
         
-        # Check authorization using Policy
-        # Policy raises PermissionDeniedError if not allowed
-        cls._policy.can_create(request.user).require('create', 'project')
+        # Check authorization using domain authority
+        # Raises PermissionDeniedError if not allowed
+        assert_can_create_project(request.user)
         
         # Validate input data
         validated = cls._validate_project_data(name, description)
@@ -386,9 +398,9 @@ class ProjectService(EventPublisher):
             'project_manager_id': str(project.project_manager_id) if project.project_manager_id else None,
         }
         
-        # Check authorization using Policy
-        # Policy raises PermissionDeniedError if not allowed
-        cls._policy.can_edit(request.user, project).require('edit', 'project')
+        # Check authorization using domain authority
+        # Raises PermissionDeniedError if not allowed
+        assert_can_update_project(request.user, project)
         
         # Validate input data
         validated = cls._validate_project_data(name, description)
@@ -513,9 +525,9 @@ class ProjectService(EventPublisher):
         # Store project name before deletion for event
         project_name = project.name
         
-        # Check authorization using Policy
-        # Policy raises PermissionDeniedError if user lacks permission
-        cls._policy.can_delete(user, project).require('delete', 'project')
+        # Check authorization using domain authority
+        # Raises PermissionDeniedError if user lacks permission
+        assert_can_delete_project(user, project)
         
         with transaction.atomic():
             # Delete related records
@@ -571,6 +583,11 @@ class TicketService(EventPublisher):
         """Create a new ticket."""
         from apps.tickets.models import Ticket, TicketCategory, TicketType
         from datetime import datetime
+        
+        # Check authorization using domain authority
+        # Raises PermissionDeniedError if not allowed
+        if not can_create_ticket(request.user):
+            raise PermissionDeniedError("You are not allowed to create tickets.")
         
         # Validate required fields
         if not title or not title.strip():
@@ -765,6 +782,11 @@ class AssetService(EventPublisher):
         from apps.assets.models import Asset, AssetCategory
         from datetime import datetime
         
+        # Check authorization using domain authority
+        # Raises PermissionDeniedError if not allowed
+        if not can_create_asset(request.user):
+            raise PermissionDeniedError("You are not allowed to create assets.")
+        
         # Validate required fields
         if not name or not name.strip():
             raise ValidationError(message="Name is required", field='name')
@@ -851,6 +873,11 @@ class AssetService(EventPublisher):
         
         asset = cls._get_asset_or_raise(asset_id)
         
+        # Check authorization using domain authority
+        # Raises PermissionDeniedError if not allowed
+        if not can_update_asset(request.user, asset):
+            raise PermissionDeniedError("You are not allowed to update this asset.")
+        
         # Validate required fields
         if not name or not name.strip():
             raise ValidationError(message="Name is required", field='name')
@@ -910,9 +937,15 @@ class AssetService(EventPublisher):
         return asset
     
     @classmethod
-    def delete_asset(cls, asset_id: int) -> bool:
+    def delete_asset(cls, request, asset_id: int) -> bool:
         """Delete an asset."""
         asset = cls._get_asset_or_raise(asset_id)
+        
+        # Check authorization using domain authority
+        # Raises PermissionDeniedError if not allowed
+        if not can_delete_asset(request.user, asset):
+            raise PermissionDeniedError("You are not allowed to delete this asset.")
+        
         asset.delete()
         return True
 
