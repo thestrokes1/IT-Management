@@ -12,11 +12,12 @@ from apps.tickets.domain.services.ticket_authority import (
     can_assign_ticket,
     can_close_ticket,
     get_ticket_permissions,
-    assert_can_update,
-    assert_can_delete,
-    assert_can_assign,
-    assert_can_close,
+    assert_can_update_ticket,
+    assert_can_delete_ticket,
+    assert_can_assign_ticket,
+    assert_can_close_ticket,
 )
+
 
 __all__ = [
     'can_create_ticket',

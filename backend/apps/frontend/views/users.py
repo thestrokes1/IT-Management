@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
-from apps.frontend.mixins import CanManageUsersMixin
+from apps.frontend.mixins import CanManageUsersMixin, FrontendAdminReadMixin
 from apps.users.models import User
 from apps.users.domain.services.user_authority import (
     get_user_permissions, 
@@ -25,7 +25,13 @@ from apps.core.domain.authorization import AuthorizationError
 # USERS LIST
 # =========================
 
-class UsersView(LoginRequiredMixin, TemplateView):
+class UsersView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
+    """
+    Users management web interface.
+    Only MANAGER+ roles can view the users list.
+    This matches API behavior where CanManageUsers requires IT_ADMIN+.
+    Uses FrontendAdminReadMixin for consistent permission enforcement.
+    """
     template_name = 'frontend/users.html'
     login_url = 'frontend:login'
 

@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
-from apps.frontend.mixins import CanManageAssetsMixin
+from apps.frontend.mixins import CanManageAssetsMixin, FrontendAdminReadMixin
 from apps.frontend.services import AssetService
 from apps.assets.queries import AssetQuery
 from apps.assets.domain.services.asset_authority import (
@@ -21,17 +21,19 @@ from apps.assets.domain.services.asset_authority import (
 from apps.core.domain.authorization import AuthorizationError
 
 
-class AssetsView(LoginRequiredMixin, TemplateView):
+class AssetsView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
     """
     Assets management web interface.
-    Uses AssetQuery for read operations.
+    Uses AssetQuery for read operations with role-based access control.
+    Only MANAGER+ roles can view all assets. VIEWER/TECHNICIAN are blocked.
+    Uses FrontendAdminReadMixin for consistent permission enforcement.
     """
     template_name = 'frontend/assets.html'
     login_url = 'frontend:login'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Use Query for reads
+        # Use Query for reads - only reached if permission granted
         assets = AssetQuery.get_all()
         status_choices = AssetQuery.get_status_choices()
         category_choices = AssetQuery.get_categories()

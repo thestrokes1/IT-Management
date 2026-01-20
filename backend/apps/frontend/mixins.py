@@ -7,6 +7,9 @@ from django.shortcuts import redirect, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.http import JsonResponse
+from django.core.exceptions import PermissionDenied
+
+from apps.core.domain.authority_base import is_admin_override
 
 
 class AdminRequiredMixin:
@@ -248,4 +251,33 @@ class Handle403Mixin:
     def get_redirect_url(self):
         """Get the redirect URL for permission denied."""
         return 'frontend:dashboard'
+
+
+class FrontendAdminReadMixin:
+    """
+    Reusable mixin for frontend READ permission checks.
+    
+    Uses domain authority (is_admin_override) for permission enforcement.
+    Only SUPERADMIN and MANAGER roles can access views using this mixin.
+    
+    Benefits:
+    - Single source of truth for admin read permissions
+    - Uses domain authority functions (no hardcoded role strings)
+    - Consistent HTTP 403 behavior across all admin-read views
+    
+    Usage:
+        class AssetsView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
+            # dispatch() is automatically handled by the mixin
+            pass
+    """
+    
+    def dispatch(self, request, *args, **kwargs):
+        """
+        Enforce admin-only read access.
+        Uses domain authority for permission check.
+        Raises PermissionDenied (HTTP 403) for unauthorized access.
+        """
+        if not is_admin_override(request.user):
+            raise PermissionDenied('You do not have permission to view this resource.')
+        return super().dispatch(request, *args, **kwargs)
 

@@ -28,8 +28,10 @@ class ProjectsView(LoginRequiredMixin, SafeTemplateView):
     """
     Projects management web interface.
     Uses ProjectQuery for read operations (returns DTOs).
-    Uses ProjectPolicy for view-level authorization.
     SafeTemplateView handles domain exceptions automatically.
+    
+    Read access: All authenticated users can view projects they're members of.
+    This matches API behavior where non-admin users see only their projects.
     """
     template_name = 'frontend/projects.html'
     login_url = 'frontend:login'
@@ -37,15 +39,6 @@ class ProjectsView(LoginRequiredMixin, SafeTemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Check view permission using Policy
-        policy = ProjectPolicy()
-        auth_result = policy.can_view(self.request.user)
-        
-        if not auth_result.allowed:
-            # Still show projects, but might limit visibility in template
-            # Policy will raise exception if critical
-            pass
         
         # Use Query for reads - returns DTOs
         projects_dto = ProjectQuery.get_list_dto()
@@ -60,6 +53,10 @@ class ProjectsView(LoginRequiredMixin, SafeTemplateView):
             project_obj = project.to_dict() if hasattr(project, 'to_dict') else project
             permissions_map[project.id] = get_project_permissions(self.request.user, project_obj)
         
+        # Check create permission using domain authority
+        policy = ProjectPolicy()
+        can_create = policy.can_create(self.request.user).allowed
+        
         context.update({
             'projects': projects_list,  # List of ProjectDTO
             'projects_dict': projects_dto.to_list(),  # List of dicts for templates
@@ -67,7 +64,7 @@ class ProjectsView(LoginRequiredMixin, SafeTemplateView):
             'status_choices': status_choices,
             'priority_choices': priority_choices,
             'permissions_map': permissions_map,
-            'can_create': policy.can_create(self.request.user).allowed,
+            'can_create': can_create,
             'can_edit_any': self._can_edit_any(),
             'can_delete_any': self._can_delete_any(),
         })

@@ -21,6 +21,8 @@ from apps.tickets.domain.services.ticket_authority import (
     assert_can_update_ticket,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.core.domain.roles import is_superadmin_or_manager
+from django.core.exceptions import PermissionDenied
 
 
 def get_assign_field_config(user):
@@ -51,20 +53,35 @@ def get_assign_field_config(user):
 class TicketsView(LoginRequiredMixin, TemplateView):
     """
     Tickets management web interface.
-    Uses TicketQuery for read operations.
+    Uses TicketQuery for read operations with role-based filtering.
+    Matches API behavior: Technicians see only their own/assigned tickets.
     """
     template_name = 'frontend/tickets.html'
     login_url = 'frontend:login'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        tickets = TicketQuery.get_all()
+        user = self.request.user
+        
+        # Apply role-based filtering to match API behavior
+        # SUPERADMIN, MANAGER, IT_ADMIN see all tickets
+        # TECHNICIAN sees only tickets they created or are assigned to
+        if is_superadmin_or_manager(user.role) or user.role == 'IT_ADMIN':
+            # Admin roles get all tickets
+            tickets = TicketQuery.get_all()
+        elif user.role == 'TECHNICIAN':
+            # Technicians see only their own or assigned tickets
+            tickets = self._get_technician_tickets()
+        else:
+            # VIEWER - no tickets visible (shouldn't reach here based on menu)
+            tickets = TicketQuery.get_all().none() if hasattr(TicketQuery.get_all(), 'none') else []
+        
         status_choices = TicketQuery.get_status_choices()
         priority_choices = TicketQuery.get_priority_choices()
 
-        # Compute permissions map for each ticket
-        permissions_map = {
-            ticket.id: get_ticket_permissions(self.request.user, ticket)
+        # Compute permissions for each ticket (template-safe)
+        permissions_by_ticket = {
+            ticket.id: get_ticket_permissions(user, ticket)
             for ticket in tickets
         }
 
@@ -72,9 +89,26 @@ class TicketsView(LoginRequiredMixin, TemplateView):
             'tickets': tickets,
             'status_choices': status_choices,
             'priority_choices': priority_choices,
-            'permissions_map': permissions_map,
+            'permissions_by_ticket': permissions_by_ticket,
         })
+
         return context
+    
+    def _get_technician_tickets(self):
+        """
+        Get tickets visible to a technician: created by them OR assigned to them.
+        This matches the API queryset filtering in apps/tickets/views.py.
+        """
+        all_tickets = TicketQuery.get_all()
+        user = self.request.user
+        
+        # Filter tickets where user is creator or assignee
+        filtered = [
+            t for t in all_tickets
+            if (hasattr(t, 'created_by_id') and t.created_by_id == user.id) or
+               (hasattr(t, 'assigned_to_id') and t.assigned_to_id == user.id)
+        ]
+        return filtered
 
 
 class CreateTicketView(LoginRequiredMixin, TemplateView):

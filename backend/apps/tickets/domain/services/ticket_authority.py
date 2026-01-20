@@ -218,55 +218,29 @@ def get_ticket_permissions(user, ticket) -> dict:
     }
 
 
-def assert_can_update_ticket(user, ticket) -> None:
-    """
-    Assert that user can update the ticket.
-
-    Raises:
-        AuthorizationError: If user is not authorized
-    """
+def assert_can_update(user, ticket):
     if not can_update_ticket(user, ticket):
-        raise AuthorizationError(
-            f"User '{user.username}' is not authorized to update ticket"
-        )
+        raise AuthorizationError("Cannot update ticket")
 
-
-def assert_can_delete_ticket(user, ticket) -> None:
-    """
-    Assert that user can delete the ticket.
-
-    Raises:
-        AuthorizationError: If user is not authorized
-    """
+def assert_can_delete(user, ticket):
     if not can_delete_ticket(user, ticket):
-        raise AuthorizationError(
-            f"User '{user.username}' is not authorized to delete ticket"
-        )
+        raise AuthorizationError("Cannot delete ticket")
 
+def assert_can_assign(user, ticket):
+    if not can_assign_ticket(user, ticket):
+        raise AuthorizationError("Cannot assign ticket")
 
-def assert_can_assign_ticket(user, ticket, assignee) -> None:
-    """
-    Assert that user can assign the ticket.
-
-    Raises:
-        AuthorizationError: If user is not authorized
-    """
-    if not can_assign_ticket(user, ticket, assignee):
-        raise AuthorizationError(
-            f"User '{user.username}' is not authorized to assign ticket"
-        )
-
-
-def assert_can_close_ticket(user, ticket) -> None:
-    """
-    Assert that user can close the ticket.
-
-    Raises:
-        AuthorizationError: If user is not authorized
-    """
+def assert_can_close(user, ticket):
     if not can_close_ticket(user, ticket):
-        raise AuthorizationError(
-            f"User '{user.username}' is not authorized to close ticket"
-        )
+        raise AuthorizationError("Cannot close ticket")
+
+
+# Aliases with _ticket suffix for frontend compatibility
+assert_can_update_ticket = assert_can_update
+assert_can_delete_ticket = assert_can_delete
+assert_can_assign_ticket = assert_can_assign
+assert_can_close_ticket = assert_can_close
+
+
 
 
