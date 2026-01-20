@@ -8,7 +8,7 @@ Contains pure domain logic without Django dependencies.
 """
 
 from apps.core.domain.roles import (
-    is_superadmin_or_manager,
+    is_admin_role,
     has_strictly_higher_role,
 )
 
@@ -17,24 +17,26 @@ def is_admin_override(user) -> bool:
     """
     Check if user has admin override privileges.
 
-    SUPERADMIN and MANAGER roles have full access to modify
+    SUPERADMIN, MANAGER, and IT_ADMIN roles have full access to modify
     any resource regardless of ownership or hierarchy.
 
     Args:
         user: User instance to check
 
     Returns:
-        bool: True if user.role is SUPERADMIN or MANAGER
+        bool: True if user.role is SUPERADMIN, MANAGER, or IT_ADMIN
 
     Examples:
         >>> is_admin_override(superadmin_user)
         True
         >>> is_admin_override(manager_user)
         True
+        >>> is_admin_override(it_admin_user)
+        True
         >>> is_admin_override(technician_user)
         False
     """
-    return is_superadmin_or_manager(user.role)
+    return is_admin_role(user.role)
 
 
 def is_owner(user, resource_owner) -> bool:
