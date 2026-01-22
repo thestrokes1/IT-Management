@@ -212,3 +212,93 @@ def delete_user(request, user_id):
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# =========================
+# PROFILE WITH MY TICKET HISTORY
+# =========================
+
+class ProfileView(LoginRequiredMixin, TemplateView):
+    template_name = 'frontend/profile.html'
+    login_url = 'frontend:login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Get tickets created by or assigned to user
+        created = user.created_tickets.all()
+        assigned = user.assigned_tickets.all()
+        my_tickets = (created | assigned).distinct().order_by('-created_at')[:50]
+        
+        # Compute stats in Python
+        created_count = created.count()
+        assigned_count = assigned.count()
+        resolved_count = created.filter(status='RESOLVED').count()
+        can_reopen = user.role in ['TECHNICIAN', 'MANAGER', 'IT_ADMIN', 'SUPERADMIN']
+        can_reopen_count = created.filter(status='RESOLVED').count() if can_reopen else 0
+        
+        context.update({
+            'my_tickets': my_tickets,
+            'can_reopen_ticket': can_reopen,
+            'stats': {
+                'created_count': created_count,
+                'assigned_count': assigned_count,
+                'resolved_count': resolved_count,
+                'can_reopen_count': can_reopen_count,
+            }
+        })
+        return context
+
+
+# =========================
+# REOPEN TICKET FROM PROFILE
+# =========================
+
+@login_required(login_url='frontend:login')
+@require_http_methods(["POST"])
+def profile_reopen_ticket(request, ticket_id):
+    """
+    Reopen a ticket from the profile page.
+    Technicians can only reopen their OWN resolved tickets.
+    Managers/Admins can reopen any resolved ticket.
+    """
+    from apps.tickets.models import Ticket
+    from django.utils import timezone
+    
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    user = request.user
+    
+    # Check if ticket can be reopened
+    if ticket.status not in ['RESOLVED', 'CLOSED']:
+        messages.error(request, 'Only resolved or closed tickets can be reopened.')
+        return redirect('frontend:profile')
+    
+    # Permission check
+    can_reopen = False
+    if user.role in ['MANAGER', 'IT_ADMIN', 'SUPERADMIN']:
+        can_reopen = True
+    elif user.role == 'TECHNICIAN' and (ticket.created_by == user or ticket.assigned_to == user):
+        can_reopen = True
+    
+    if not can_reopen:
+        messages.error(request, 'You do not have permission to reopen this ticket.')
+        return redirect('frontend:profile')
+    
+    # Reopen the ticket
+    old_status = ticket.status
+    ticket.status = 'IN_PROGRESS' if user.role == 'TECHNICIAN' else 'OPEN'
+    ticket.last_updated_by = user
+    ticket.save()
+    
+    # Log the reopen action
+    from apps.core.services.activity_logger import log_activity
+    log_activity(
+        actor=user,
+        action=f"Reopened ticket from {old_status} to {ticket.status}",
+        target_object=ticket,
+        description=f"Ticket reopened by {user.username}"
+    )
+    
+    messages.success(request, f'Ticket #{ticket.id} has been reopened.')
+    return redirect('frontend:profile')
