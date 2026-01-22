@@ -46,11 +46,12 @@ class AssetsView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
             permissions_map[asset.id] = get_asset_permissions(self.request.user, asset_obj)
         
         context.update({
-            'assets': assets,
-            'status_choices': status_choices,
-            'category_choices': category_choices,
-            'permissions_map': permissions_map,
-        })
+        'assets': assets,
+        'status_choices': status_choices,
+        'category_choices': category_choices,
+        'permissions_map': permissions_map,
+        'permissions': {'can_create': can_create_asset(self.request.user)},
+    })
         return context
 
 
@@ -70,8 +71,8 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
         
         # Pass permissions object for template consistency
         permissions = {
-            'can_create': can_create_asset(self.request.user),
-        }
+        'can_create': can_create_asset(self.request.user),
+    }
         
         context.update({
             'categories': categories,

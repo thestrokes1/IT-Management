@@ -64,7 +64,7 @@ class ProjectsView(LoginRequiredMixin, SafeTemplateView):
             'status_choices': status_choices,
             'priority_choices': priority_choices,
             'permissions_map': permissions_map,
-            'can_create': can_create,
+            'permissions': {'can_create': can_create},
             'can_edit_any': self._can_edit_any(),
             'can_delete_any': self._can_delete_any(),
         })

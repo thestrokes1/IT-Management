@@ -85,11 +85,17 @@ class TicketsView(LoginRequiredMixin, TemplateView):
             for ticket in tickets
         }
 
+        # Add global permissions for template
+        permissions = {
+            'can_create': ticket_can_create(user),
+        }
+
         context.update({
             'tickets': tickets,
             'status_choices': status_choices,
             'priority_choices': priority_choices,
             'permissions_by_ticket': permissions_by_ticket,
+            'permissions': permissions,
         })
 
         return context
