@@ -151,8 +151,9 @@ class User(AbstractUser):
     
     @property
     def can_access_assets(self):
-        """Check if user can access Assets menu (MANAGER or above)."""
-        return self.has_min_role(UserRole.MANAGER)
+        """Check if user can access Assets menu (TECHNICIAN or above)."""
+        return self.has_min_role(UserRole.TECHNICIAN)
+
     
     @property
     def can_access_projects(self):
@@ -186,8 +187,9 @@ class User(AbstractUser):
     
     @property
     def can_manage_assets(self):
-        """Check if user can manage assets (MANAGER or above)."""
-        return self.has_min_role(UserRole.MANAGER)
+        """Check if user can manage assets (TECHNICIAN or above)."""
+        return self.has_min_role(UserRole.TECHNICIAN)
+
     
     @property
     def can_manage_projects(self):

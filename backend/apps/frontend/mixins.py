@@ -257,27 +257,42 @@ class FrontendAdminReadMixin:
     """
     Reusable mixin for frontend READ permission checks.
     
-    Uses domain authority (is_admin_override) for permission enforcement.
-    Only SUPERADMIN and MANAGER roles can access views using this mixin.
-    
-    Benefits:
-    - Single source of truth for admin read permissions
-    - Uses domain authority functions (no hardcoded role strings)
-    - Consistent HTTP 403 behavior across all admin-read views
-    
-    Usage:
-        class AssetsView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
-            # dispatch() is automatically handled by the mixin
-            pass
+    Menu Access Matrix:
+    - Assets: SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN
+    - Logs: SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN
+    - Projects: SUPERADMIN, IT_ADMIN, MANAGER
+    - Users: SUPERADMIN, IT_ADMIN, MANAGER
+    - Reports: SUPERADMIN, IT_ADMIN, MANAGER
     """
     
+    READ_ROLES = {
+        'assets': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN'],
+        'logs': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN'],
+        'projects': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER'],
+        'users': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER'],
+        'reports': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER'],
+    }
+    
     def dispatch(self, request, *args, **kwargs):
-        """
-        Enforce admin-only read access.
-        Uses domain authority for permission check.
-        Raises PermissionDenied (HTTP 403) for unauthorized access.
-        """
-        if not is_admin_override(request.user):
+        path = request.path.lower()
+        
+        if '/assets/' in path:
+            allowed_roles = self.READ_ROLES.get('assets')
+        elif '/logs/' in path:
+            allowed_roles = self.READ_ROLES.get('logs')
+        elif '/projects/' in path:
+            allowed_roles = self.READ_ROLES.get('projects')
+        elif '/users/' in path:
+            allowed_roles = self.READ_ROLES.get('users')
+        elif '/reports/' in path:
+            allowed_roles = self.READ_ROLES.get('reports')
+        else:
+            allowed_roles = ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        
+        user_role = getattr(request.user, 'role', None)
+        if user_role not in allowed_roles:
             raise PermissionDenied('You do not have permission to view this resource.')
+        
         return super().dispatch(request, *args, **kwargs)
+
 
