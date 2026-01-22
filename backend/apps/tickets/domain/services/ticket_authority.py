@@ -195,26 +195,131 @@ def can_close_ticket(user, ticket) -> bool:
     return False
 
 
-def get_ticket_permissions(user, ticket) -> dict:
+def can_resolve_ticket(user, ticket) -> bool:
     """
-    Get all permissions for a user on a specific ticket.
+    Check if user can resolve a ticket.
     
-    Returns a dictionary with all permission checks.
+    Rules (same as UPDATE/CLOSE):
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: allowed if ticket.created_by.role rank is lower
+    - TECHNICIAN: allowed only if ticket.created_by == user
+    - VIEWER: never allowed
     
     Args:
         user: User instance
         ticket: Ticket instance
         
     Returns:
-        dict: Dictionary with permission keys and boolean values
+        bool: True if user can resolve the ticket
+    """
+    # SUPERADMIN and MANAGER have full access
+    if is_superadmin_or_manager(user.role):
+        return True
+    
+    # IT_ADMIN can resolve if created_by has lower role rank
+    if user.role == _ROLE_IT_ADMIN:
+        if has_strictly_higher_role(user.role, ticket.created_by.role):
+            return True
+    
+    # TECHNICIAN can only resolve their own created tickets
+    if user.role == _ROLE_TECHNICIAN:
+        return ticket.created_by_id == user.id
+    
+    # VIEWER cannot resolve
+    return False
+
+
+def can_reopen_ticket(user, ticket) -> bool:
+    """
+    Check if user can reopen a ticket.
+    
+    Rules:
+    - Ticket MUST be in RESOLVED status
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: allowed if ticket.created_by.role rank is lower
+    - TECHNICIAN: allowed ONLY if ticket.created_by == user (their own ticket)
+    - VIEWER: never allowed
+    
+    Args:
+        user: User instance
+        ticket: Ticket instance
+        
+    Returns:
+        bool: True if user can reopen the ticket
+    """
+    # Ticket must be RESOLVED to be reopened
+    if ticket.status != 'RESOLVED':
+        return False
+    
+    # SUPERADMIN and MANAGER have full access
+    if is_superadmin_or_manager(user.role):
+        return True
+    
+    # IT_ADMIN can reopen if created_by has lower role rank
+    if user.role == _ROLE_IT_ADMIN:
+        if has_strictly_higher_role(user.role, ticket.created_by.role):
+            return True
+    
+    # TECHNICIAN can only reopen their own created tickets
+    if user.role == _ROLE_TECHNICIAN:
+        return ticket.created_by_id == user.id
+    
+    # VIEWER cannot reopen
+    return False
+
+
+def can_assign_self(user, ticket) -> bool:
+    """
+    Check if user can assign a ticket to themselves.
+    
+    Rules:
+    - SUPERADMIN, MANAGER, IT_ADMIN: always allowed
+    - TECHNICIAN: allowed ONLY if ticket.created_by == user and ticket not already assigned to self
+    - VIEWER: never allowed
+    
+    Args:
+        user: User instance
+        ticket: Ticket instance
+        
+    Returns:
+        bool: True if user can assign the ticket to themselves
+    """
+    # Admin roles can always assign
+    if is_superadmin_or_manager(user.role) or user.role == _ROLE_IT_ADMIN:
+        return True
+    
+    # TECHNICIAN can only claim their own unassigned tickets
+    if user.role == _ROLE_TECHNICIAN:
+        # Can claim if they created it and it's not already assigned to them
+        return ticket.created_by_id == user.id and ticket.assigned_to_id != user.id
+    
+    # VIEWER cannot assign
+    return False
+
+
+def get_ticket_permissions(user, ticket) -> dict:
+    """
+    Get all permissions for a user on a specific ticket.
+    
+    Returns a dictionary with permission checks for UI rendering.
+    No side effects - pure read-only permission check.
+    
+    Args:
+        user: User instance
+        ticket: Ticket instance
+        
+    Returns:
+        dict: Dictionary with permission keys and boolean values:
+            - can_assign_self: User can assign ticket to themselves
+            - can_edit: User can update the ticket
+            - can_resolve: User can resolve the ticket
+            - can_reopen: User can reopen the ticket (only if RESOLVED)
     """
     return {
-        'can_create': can_create_ticket(user),
-        'can_read': can_read_ticket(user, ticket),
-        'can_update': can_update_ticket(user, ticket),
-        'can_delete': can_delete_ticket(user, ticket),
-        'can_assign': can_assign_ticket(user, ticket, ticket.assigned_to),
-        'can_close': can_close_ticket(user, ticket),
+        'can_assign_self': can_assign_self(user, ticket),
+        'can_edit': can_update_ticket(user, ticket),
+        'can_resolve': can_resolve_ticket(user, ticket),
+        'can_reopen': can_reopen_ticket(user, ticket),
     }
 
 
@@ -234,12 +339,57 @@ def assert_can_close(user, ticket):
     if not can_close_ticket(user, ticket):
         raise AuthorizationError("Cannot close ticket")
 
+def assert_can_resolve(user, ticket):
+    if not can_resolve_ticket(user, ticket):
+        raise AuthorizationError("Cannot resolve ticket")
+
+def assert_can_reopen(user, ticket):
+    if not can_reopen_ticket(user, ticket):
+        raise AuthorizationError("Cannot reopen ticket")
+
+def assert_can_cancel(user, ticket):
+    """
+    Check if user can cancel a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: allowed if ticket.created_by.role rank is lower
+    - TECHNICIAN: allowed only if ticket.created_by == user
+    - VIEWER: never allowed
+    
+    Args:
+        user: User instance
+        ticket: Ticket instance
+        
+    Raises:
+        AuthorizationError: If user cannot cancel the ticket
+    """
+    # SUPERADMIN and MANAGER have full access
+    if is_superadmin_or_manager(user.role):
+        return
+    
+    # IT_ADMIN can cancel if created_by has lower role rank
+    if user.role == _ROLE_IT_ADMIN:
+        if has_strictly_higher_role(user.role, ticket.created_by.role):
+            return
+    
+    # TECHNICIAN can only cancel their own created tickets
+    if user.role == _ROLE_TECHNICIAN:
+        if ticket.created_by_id == user.id:
+            return
+    
+    # VIEWER cannot cancel
+    raise AuthorizationError("Cannot cancel ticket")
+
 
 # Aliases with _ticket suffix for frontend compatibility
 assert_can_update_ticket = assert_can_update
 assert_can_delete_ticket = assert_can_delete
 assert_can_assign_ticket = assert_can_assign
 assert_can_close_ticket = assert_can_close
+assert_can_resolve_ticket = assert_can_resolve
+assert_can_reopen_ticket = assert_can_reopen
+assert_can_cancel_ticket = assert_can_cancel
 
 
 

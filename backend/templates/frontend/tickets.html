@@ -95,6 +95,7 @@
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-600">{% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</td>
                             <td class="px-6 py-4 text-sm">
+                                <a href="/tickets/{{ ticket.id }}/" class="text-blue-600 hover:text-blue-900 mr-4">[ Open ]</a>
                                 {% if ticket_perms.can_update %}
 <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
 {% else %}

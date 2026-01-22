@@ -10,7 +10,6 @@
         <p class="text-xs sm:text-base text-gray-600">Manage and track all IT assets in your organization</p>
     </div>
 
-            <!-- Add Asset Button -->
             {% if permissions.can_create %}
             <div class="mb-6">
                 <a href="{% url 'frontend:create-asset' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
@@ -20,7 +19,6 @@
             {% endif %}
 
 
-    <!-- Filters -->
     <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
             <div>
@@ -46,10 +44,8 @@
                     <option value="RETIRED">Retired</option>
                 </select>
             </div>
-        </div>
     </div>
 
-    <!-- Assets Table -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-xs sm:text-sm">
@@ -84,6 +80,7 @@
                             </td>
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
+                                    <a href="/assets/{{ asset.id }}/" class="text-blue-600 hover:text-blue-900">[ Open ]</a>
                                     {% with permissions=permissions_map|get_item:asset.id %}
                                         {% if permissions.can_update %}
                                                 <a href="{% url 'frontend:edit-asset' asset.id %}" class="text-blue-600 hover:text-blue-900">
@@ -114,48 +111,39 @@
                                         Create one
                                     </a>
                                 {% endif %}
-
                             </td>
                         </tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
-    </div>
 
-    <!-- API Access -->
     <div class="mt-6 sm:mt-8 bg-blue-50 rounded-lg p-4 sm:p-6">
         <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2">API Access</h3>
         <p class="text-xs sm:text-sm text-gray-600 mb-4">Access assets via REST API:</p>
         <code class="bg-gray-100 p-3 rounded text-sm text-gray-800">GET /api/assets/</code>
     </div>
-</div>
 
 <script>
-// Debug: Log when page loads
 console.log('Assets page loaded');
 
 function deleteAsset(assetId, assetName) {
     console.log('deleteAsset called with:', assetId, assetName);
-    
-    // Check if showConfirmation is available, otherwise use browser confirm
     const useNativeConfirm = typeof showConfirmation !== 'function';
     console.log('Using native confirm:', useNativeConfirm);
     
     const confirmed = useNativeConfirm 
-        ? confirm(`Are you sure you want to delete "${assetName}"? This action cannot be undone.`)
+        ? confirm(\)
         : true;
     
     if (useNativeConfirm || typeof showConfirmation !== 'function') {
-        // Use native confirm dialog
         if (confirmed) {
             executeDelete(assetId);
         }
     } else {
-        // Use custom confirmation modal
         showConfirmation(
             'Delete Asset',
-            `Are you sure you want to delete "${assetName}"? This action cannot be undone.`,
+            \,
             function() {
                 executeDelete(assetId);
             }
@@ -165,12 +153,11 @@ function deleteAsset(assetId, assetName) {
 
 function executeDelete(assetId) {
     console.log('Delete confirmed for asset:', assetId);
-    
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
                      document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
     console.log('CSRF Token:', csrfToken ? 'found' : 'not found');
     
-    fetch(`/assets/api/${assetId}/`, {
+    fetch(\, {
         method: 'DELETE',
         headers: {
             'X-CSRFToken': csrfToken || '{{ csrf_token }}'
@@ -182,21 +169,19 @@ function executeDelete(assetId) {
             return response.json();
         }
         return response.text().then(text => {
-            throw new Error(text || `HTTP ${response.status}`);
+            throw new Error(text || \);
         });
     })
     .then(data => {
         console.log('Response data:', data);
         if (data.success) {
             showToast('Asset deleted successfully', 'success');
-            // Remove the row immediately for better UX
-            const row = document.querySelector(`.asset-row[data-id="${assetId}"]`);
+            const row = document.querySelector(\);
             if (row) {
                 row.style.transition = 'opacity 0.3s';
                 row.style.opacity = '0';
                 setTimeout(() => {
                     row.remove();
-                    // Check if there are no more assets
                     const remainingRows = document.querySelectorAll('.asset-row');
                     if (remainingRows.length === 0) {
                         location.reload();
@@ -216,7 +201,6 @@ function executeDelete(assetId) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Search functionality
     const searchInput = document.getElementById('searchAssets');
     const categoryFilter = document.getElementById('categoryFilter');
     const statusFilter = document.getElementById('statusFilter');
@@ -234,8 +218,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const status = row.cells[3].textContent.trim();
 
             const matchesSearch = name.includes(searchTerm) || tag.includes(searchTerm);
-            const matchesCategory = !selectedCategory || category.includes(selectedCategory);
-            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
 
             row.style.display = matchesSearch && matchesCategory && matchesStatus ? '' : 'none';
         });
@@ -247,4 +229,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-
