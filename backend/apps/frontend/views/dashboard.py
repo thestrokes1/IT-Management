@@ -46,7 +46,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         user_role = getattr(user, 'role', 'VIEWER')
         
         # Determine what the user can access based on role
-        can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
         can_access_projects = user_role in ['SUPERADMIN', 'MANAGER']
         can_access_users = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
         can_access_logs = user_role in ['SUPERADMIN', 'MANAGER']
@@ -96,18 +96,35 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             stats['security_events'] = SecurityEvent.objects.filter(status__in=['OPEN', 'INVESTIGATING']).count() if SecurityEvent else 0
             stats['system_errors'] = SystemLog.objects.filter(level__in=['ERROR', 'CRITICAL']).count() if SystemLog else 0
         
+                # Get recent tickets
+        try:
+            recent_tickets = Ticket.objects.select_related('category', 'assigned_to', 'requester').order_by('-created_at')[:10]
+        except:
+            recent_tickets = []
+
+        # Get recent assets (for users with asset access)
+        if can_access_assets:
+            try:
+                recent_assets = Asset.objects.select_related('category', 'assigned_to').order_by('-created_at')[:10]
+                open_assets_count = Asset.objects.filter(status__in=['MAINTENANCE', 'INACTIVE']).count()
+            except:
+                recent_assets = []
+                open_assets_count = 0
+        else:
+            recent_assets = []
+            open_assets_count = 0
+
         context.update({
             'recent_logs': recent_logs,
+            'recent_tickets': recent_tickets,
+            'recent_assets': recent_assets,
+            'open_assets_count': open_assets_count,
             'user_count': stats['user_count'],
             'asset_count': stats['asset_count'],
             'project_count': stats['project_count'],
             'ticket_count': stats['ticket_count'],
             'security_events': stats['security_events'],
             'system_errors': stats['system_errors'],
-            # Role flags for template
-            'can_access_assets': can_access_assets,
-            'can_access_projects': can_access_projects,
-            'can_access_users': can_access_users,
             'can_access_logs': can_access_logs,
             'can_access_reports': can_access_reports,
             'user_role': user_role,
@@ -127,7 +144,7 @@ def dashboard_api(request):
     
     if request.method == 'GET':
         # Determine what the user can access
-        can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
         can_access_projects = user_role in ['SUPERADMIN', 'MANAGER']
         can_access_users = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
         
