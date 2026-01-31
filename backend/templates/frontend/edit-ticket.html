@@ -173,6 +173,19 @@
             <!-- Assignment -->
             <div>
                 <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 border-b pb-2">Assignment</h3>
+                {% if ticket_perms.can_assign_self and not ticket.assigned_to %}
+<form method="post"
+      action="{% url 'frontend:ticket_assign_self' ticket.id %}"
+      class="mb-4"
+      onsubmit="return confirm('Assign this ticket to yourself?');">
+    {% csrf_token %}
+    <button type="submit"
+        class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition text-sm">
+        Assign to me
+    </button>
+</form>
+{% endif %}
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {% if assign_config.visible %}
                     <div>

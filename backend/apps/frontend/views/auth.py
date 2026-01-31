@@ -64,3 +64,16 @@ class MaintenanceView(TemplateView):
     """
     template_name = 'frontend/maintenance.html'
 
+
+# Wrapper functions for URL patterns
+def login_view(request):
+    """User login view."""
+    view = LoginView.as_view()
+    return view(request)
+
+
+def logout_view(request):
+    """User logout view."""
+    view = LogoutView.as_view()
+    return view(request)
+

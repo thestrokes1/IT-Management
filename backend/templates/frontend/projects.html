@@ -45,6 +45,7 @@
                     <option value="URGENT">Urgent</option>
                 </select>
             </div>
+        </div>
     </div>
 
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -80,7 +81,8 @@
                             <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 hidden lg:table-cell">{{ project.start_date|date:"Y-m-d" }}</td>
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
-                                    <a href="/projects/{{ project.id }}/" class="text-blue-600 hover:text-blue-900">[ Open ]</a>
+                                    <a href="/projects/{{ project.id }}/" class="text-blue-600 hover:text-blue-900">Open</a>
+                                    
                                     {% if project_perms.can_update %}
                                         <a href="{% url 'frontend:edit-project' project.id %}" class="text-blue-600 hover:text-blue-900">
                                             Edit
@@ -105,35 +107,37 @@
                     {% else %}
                         <tr>
                             <td colspan="6" class="px-3 sm:px-6 py-8 text-center text-gray-500 text-xs sm:text-sm">
-                            No projects found.
-                            {% if permissions.can_create %}
-                                <a href="{% url 'frontend:create-project' %}" class="text-blue-600 hover:text-blue-900">
-                                    Create one
-                                </a>
-                            {% endif %}
+                                No projects found.
+                                {% if permissions.can_create %}
+                                    <a href="{% url 'frontend:create-project' %}" class="text-blue-600 hover:text-blue-900">
+                                        Create one
+                                    </a>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
+    </div>
 
     <div class="mt-6 sm:mt-8 bg-blue-50 rounded-lg p-4 sm:p-6">
         <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2">API Access</h3>
         <p class="text-xs sm:text-sm text-gray-600 mb-4">Access projects via REST API:</p>
         <code class="bg-gray-100 p-3 rounded text-xs sm:text-sm text-gray-800 block overflow-x-auto">GET /api/projects/</code>
     </div>
+</div>
 
 <script>
 function deleteProject(projectId, projectName) {
     showConfirmation(
         'Delete Project',
-        \,
+        'Are you sure you want to delete "' + projectName + '"? This action cannot be undone.',
         function() {
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
                              document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
             
-            fetch(\, {
+            fetch('/projects/api/' + projectId + '/', {
                 method: 'DELETE',
                 headers: {
                     'X-CSRFToken': csrfToken || '{{ csrf_token }}'
@@ -144,19 +148,16 @@ function deleteProject(projectId, projectName) {
                     return response.json();
                 }
                 return response.text().then(text => {
-                    throw new Error(text || \);
+                    throw new Error(text || 'HTTP ' + response.status);
                 });
             })
             .then(data => {
                 if (data.success !== false) {
-                    const projectRow = document.querySelector(\);
+                    const projectRow = document.querySelector('.project-row[data-id="' + projectId + '"]');
                     if (projectRow) {
-                        projectRow.fadeOut = function() {
-                            this.style.opacity = '0';
-                            this.style.transition = 'opacity 0.3s ease-out';
-                            setTimeout(() => this.remove(), 300);
-                        };
-                        projectRow.fadeOut();
+                        projectRow.style.opacity = '0';
+                        projectRow.style.transition = 'opacity 0.3s ease-out';
+                        setTimeout(() => projectRow.remove(), 300);
                     }
                     showToast('Project deleted successfully', 'success');
                 } else {
@@ -188,6 +189,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const priority = row.cells[3].textContent.trim().toUpperCase();
 
             const matchesSearch = name.includes(searchTerm);
+            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
+            const matchesPriority = !selectedPriority || priority.includes(selectedPriority);
 
             row.style.display = matchesSearch && matchesStatus && matchesPriority ? '' : 'none';
         });
@@ -199,3 +202,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

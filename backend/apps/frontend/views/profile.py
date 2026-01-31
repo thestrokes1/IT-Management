@@ -119,3 +119,22 @@ class ReportsView(LoginRequiredMixin, TemplateView):
         
         return context
 
+
+# Wrapper functions for URL patterns
+def profile(request):
+    """User profile view."""
+    view = ProfileView.as_view()
+    return view(request)
+
+
+def logs(request):
+    """Logs view."""
+    view = LogsView.as_view()
+    return view(request)
+
+
+def reports(request):
+    """Reports view."""
+    view = ReportsView.as_view()
+    return view(request)
+

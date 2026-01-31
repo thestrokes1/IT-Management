@@ -1,258 +1,371 @@
 """
 Permissions classes for Assets Management.
-Role-based access control for asset operations.
 
-遵循 RBAC 规则:
-- 所有权限检查必须使用 user.can_* 属性
-- 永远不要直接检查 user.role 字符串或用户组
-- User 模型是权限判断的唯一真实来源
+Role-based access control for asset operations.
+All permission checks are enforced server-side using domain authority services.
+
+IMPORTANT: All permission checks MUST use the domain authority services
+to ensure consistent enforcement across all entry points (API, views, etc.).
 """
 
 from rest_framework import permissions
 from apps.assets.models import Asset
 
 
-class CanManageAssets(permissions.BasePermission):
+class CanViewAssets(permissions.BasePermission):
     """
-    资产管理的完整权限（创建、编辑、删除、分配等）。
+    Check if user can view assets.
     
-    授权规则:
-    - MANAGER 及以上角色拥有此权限
-    - 对应 User.can_manage_assets 属性
+    Rules:
+    - VIEWER: NOT allowed
+    - All other roles: allowed
     """
     
     def has_permission(self, request, view):
+        from apps.assets.domain.services.asset_authority import can_view_list
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_manage_assets
+            and can_view_list(request.user)
+        )
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_view
+        return can_view(request.user, obj)
+
+
+class CanCreateAssets(permissions.BasePermission):
+    """
+    Check if user can create assets.
+    
+    Rules:
+    - VIEWER: NOT allowed
+    - TECHNICIAN and above: allowed
+    """
+    
+    def has_permission(self, request, view):
+        from apps.assets.domain.services.asset_authority import can_create
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and can_create(request.user)
         )
 
 
-class CanViewAssets(permissions.BasePermission):
+class CanEditAsset(permissions.BasePermission):
     """
-    查看资产列表的权限。
+    Check if user can edit an asset.
     
-    授权规则:
-    - 所有已认证用户均可查看资产列表
-    - 对应 User.can_access_assets 属性
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if assigned_to == user
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_edit
+        return can_edit(request.user, obj)
+
+
+class CanDeleteAsset(permissions.BasePermission):
+    """
+    Check if user can delete an asset.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if assigned_to == user
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_delete
+        return can_delete(request.user, obj)
+
+
+class CanAssignAsset(permissions.BasePermission):
+    """
+    Check if user can assign an asset to a user.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: NEVER allowed
+    - VIEWER: NOT allowed
     """
     
     def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role in (
+            'SUPERADMIN', 'MANAGER', 'IT_ADMIN'
+        )
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_assign
+        return can_assign(request.user, obj, None)
+
+
+class CanUnassignAsset(permissions.BasePermission):
+    """
+    Check if user can unassign an asset.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: NEVER allowed
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_unassign
+        return can_unassign(request.user, obj)
+
+
+class CanSelfAssignAsset(permissions.BasePermission):
+    """
+    Check if user can self-assign an asset.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if unassigned
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_self_assign
+        return can_self_assign(request.user, obj)
+
+
+class CanViewAssetLogs(permissions.BasePermission):
+    """
+    Check if user can view asset logs/history.
+    
+    Rules:
+    - IT_ADMIN and above: always allowed
+    - TECHNICIAN, VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_view_logs
+        return can_view_logs(request.user, obj)
+
+
+class CanAddAssetMaintenance(permissions.BasePermission):
+    """
+    Check if user can add maintenance records.
+    
+    Rules:
+    - VIEWER: NOT allowed
+    - TECHNICIAN: only if assigned_to == user
+    - IT_ADMIN and above: allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_add_maintenance
+        return can_add_maintenance(request.user, obj)
+
+
+class CanViewAssetMaintenance(permissions.BasePermission):
+    """
+    Check if user can view maintenance records.
+    
+    Rules:
+    - VIEWER: NOT allowed
+    - TECHNICIAN: only if assigned_to == user
+    - IT_ADMIN and above: allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_view_maintenance
+        return can_view_maintenance(request.user, obj)
+
+
+# =============================================================================
+# Legacy permissions (for backward compatibility)
+# =============================================================================
+
+class CanManageAssets(permissions.BasePermission):
+    """
+    Custom permission to only allow users who can manage assets.
+    """
+    
+    def has_permission(self, request, view):
+        from apps.assets.domain.services.asset_authority import can_create
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_access_assets
+            and can_create(request.user)
         )
 
 
 class IsAssetOwnerOrReadOnly(permissions.BasePermission):
     """
-    资产对象级权限：允许资产所有者或具有管理权限的用户操作。
+    Asset object-level permission: allows asset owner or users with management permission.
     
-    读取权限: 所有可以访问资产的用户
-    写入权限: 资产管理者或资产分配的用户
+    Read permissions: All users who can access assets
+    Write permissions: Asset managers or assigned users
+    
+    This is kept for backward compatibility - prefer using CanEditAsset.
     """
     
     def has_object_permission(self, request, view, obj):
-        # 读取权限：所有已认证用户（已通过 has_permission 预检查）
+        from apps.assets.domain.services.asset_authority import can_edit, can_view
+        
+        # Read permissions
         if request.method in permissions.SAFE_METHODS:
-            return True
+            return can_view(request.user, obj)
         
-        # 写入权限：资产管理者
-        if request.user.can_manage_assets:
-            return True
-        
-        # 资产所有者可以更新分配给自己的资产
-        if hasattr(obj, 'assigned_to') and obj.assigned_to == request.user:
-            return True
-        
-        # 资产创建者可以更新自己创建的资产
-        if hasattr(obj, 'created_by') and obj.created_by == request.user:
-            return True
-        
-        return False
+        # Write permissions
+        return can_edit(request.user, obj)
 
 
 class CanViewAssetDetails(permissions.BasePermission):
     """
-    查看资产详情的权限。
-    
-    授权规则:
-    - 资产管理者可以查看所有资产
-    - 用户可以查看分配给自己的资产
-    - 用户可以查看自己创建的资产
+    Check if user can view asset details.
     """
     
     def has_object_permission(self, request, view, obj):
-        # 资产管理者可以查看所有
-        if request.user.can_manage_assets:
-            return True
-        
-        # 用户可以查看分配给自己的资产
-        if hasattr(obj, 'assigned_to') and obj.assigned_to == request.user:
-            return True
-        
-        # 用户可以查看自己创建的资产
-        if hasattr(obj, 'created_by') and obj.created_by == request.user:
-            return True
-        
-        return False
+        from apps.assets.domain.services.asset_authority import can_view
+        return can_view(request.user, obj)
 
 
 class CanAssignAssets(permissions.BasePermission):
     """
-    分配资产的权限。
-    
-    授权规则:
-    - 具有资产分配权限的用户
-    - 对应 User.can_manage_assets（资产管理者可以分配）
+    Check if user can assign assets.
     """
     
     def has_permission(self, request, view):
-        return (
-            request.user 
-            and request.user.is_authenticated 
-            and request.user.can_manage_assets
+        return request.user.is_authenticated and request.user.role in (
+            'SUPERADMIN', 'MANAGER', 'IT_ADMIN'
         )
 
 
 class CanViewMaintenanceRecords(permissions.BasePermission):
     """
-    查看维护记录的权限。
-    
-    授权规则:
-    - 资产管理者可以查看所有维护记录
-    - 用户可以查看分配给自己资产的维护记录
+    Check if user can view maintenance records.
     """
     
     def has_object_permission(self, request, view, obj):
-        # 资产管理者可以查看所有
-        if request.user.can_manage_assets:
-            return True
-        
-        # 用户可以查看分配给自己资产的维护记录
-        if hasattr(obj, 'asset') and hasattr(obj.asset, 'assigned_to'):
-            if obj.asset.assigned_to == request.user:
-                return True
-        
-        return False
+        from apps.assets.domain.services.asset_authority import can_view_maintenance
+        return can_view_maintenance(request.user, obj.asset)
 
 
 class CanManageMaintenance(permissions.BasePermission):
     """
-    管理维护记录的权限。
-    
-    授权规则:
-    - 技术人员及以上角色
-    - 使用 User.is_technician 属性（TECHNICIAN 或更高角色）
+    Check if user can manage maintenance records.
     """
     
     def has_permission(self, request, view):
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.is_technician
+            and request.user.role in ('IT_ADMIN', 'MANAGER', 'SUPERADMIN')
         )
 
 
 class CanViewAssetAuditLogs(permissions.BasePermission):
     """
-    查看资产审计日志的权限。
-    
-    授权规则:
-    - 具有查看日志权限的用户
-    - 对应 User.can_view_logs 属性
+    Check if user can view asset audit logs.
     """
     
     def has_permission(self, request, view):
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_view_logs
+            and request.user.role in ('IT_ADMIN', 'MANAGER', 'SUPERADMIN')
         )
 
 
 class CanGenerateAssetReports(permissions.BasePermission):
     """
-    生成资产报告的权限。
-    
-    授权规则:
-    - 具有创建报告权限的用户
-    - 对应 User.can_create_reports 属性
+    Check if user can generate asset reports.
     """
     
     def has_permission(self, request, view):
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_create_reports
+            and request.user.role in ('MANAGER', 'SUPERADMIN')
         )
 
 
 class CanManageAssetCategories(permissions.BasePermission):
     """
-    管理资产类别的权限。
-    
-    授权规则:
-    - IT_ADMIN 或 SUPERADMIN 角色
-    - 使用 User.can_manage_settings 属性
+    Check if user can manage asset categories.
     """
     
     def has_permission(self, request, view):
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_manage_settings
+            and request.user.role in ('IT_ADMIN', 'MANAGER', 'SUPERADMIN')
         )
 
 
 class CanApproveAssetRetirement(permissions.BasePermission):
     """
-    批准资产报废的权限。
-    
-    授权规则:
-    - IT_ADMIN 或 SUPERADMIN 角色
-    - 使用 User.can_manage_settings 属性
+    Check if user can approve asset retirement.
     """
     
     def has_permission(self, request, view):
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_manage_settings
+            and request.user.role in ('IT_ADMIN', 'MANAGER', 'SUPERADMIN')
         )
 
 
 class CanExportAssets(permissions.BasePermission):
     """
-    导出资产数据的权限。
-    
-    授权规则:
-    - 具有导出数据权限的用户
-    - 对应 User.can_export_data 属性
+    Check if user can export asset data.
     """
     
     def has_permission(self, request, view):
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_export_data
+            and request.user.role in ('MANAGER', 'SUPERADMIN')
         )
 
 
 class CanImportAssets(permissions.BasePermission):
     """
-    导入资产数据的权限。
-    
-    授权规则:
-    - 与导出权限相同，需要 MANAGER 或更高角色
-    - 对应 User.can_export_data 属性（导入需要管理权限）
+    Check if user can import asset data.
     """
     
     def has_permission(self, request, view):
         return (
             request.user 
             and request.user.is_authenticated 
-            and request.user.can_export_data
+            and request.user.role in ('MANAGER', 'SUPERADMIN')
         )
+
+
+class CanReassignAsset(permissions.BasePermission):
+    """
+    Check if user can reassign an asset to another user.
+    
+    Rules:
+    - MANAGER / IT_ADMIN / SUPERADMIN: can always reassign
+    - TECHNICIAN: CANNOT reassign assets (even their own)
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_reassign
+        return can_reassign(request.user, obj)
+
+
+class IsAssignedAssetUser(permissions.BasePermission):
+    """
+    Check if user is the assigned asset user.
+    
+    Rules:
+    - User must be the assigned user
+    - ADMIN roles always have access
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.assets.domain.services.asset_authority import can_edit
+        return can_edit(request.user, obj)
+

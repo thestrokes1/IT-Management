@@ -452,19 +452,26 @@ class EventDispatcher:
             event: DomainEvent to publish
             using: Database alias to use for transaction checking
         """
-        from django.db import transaction, connection
+        from django.db import transaction, connections
         
-        # Check if we're in a transaction
-        if connection.uses_oracle():
-            # Oracle doesn't support savepoint rollback in the same way
-            # Dispatch immediately for Oracle
-            self._dispatch_now(event)
-        else:
+        # Check if we're in an active transaction
+        try:
+            # Check if we have an active transaction on the default connection
+            connection = connections[using]
+            in_transaction = connection.in_transaction()
+        except Exception:
+            # If we can't determine transaction state, dispatch immediately
+            in_transaction = False
+        
+        if in_transaction:
             # Use transaction.on_commit for transactional safety
             transaction.on_commit(
                 lambda: self._dispatch_now(event),
                 using=using
             )
+        else:
+            # No active transaction, dispatch immediately
+            self._dispatch_now(event)
     
     def _dispatch_now(self, event: DomainEvent) -> None:
         """
@@ -473,7 +480,7 @@ class EventDispatcher:
         Args:
             event: DomainEvent to publish
         """
-        type_key = event.event_type.value if isinstance(event.event_type, EventType) else str(event_type)
+        type_key = event.event_type.value if isinstance(event.event_type, EventType) else str(event.event_type)
         
         # Get handlers for this event type
         handlers = self._handlers.get(type_key, []).copy()
@@ -615,4 +622,3 @@ def unregister_handler(
 ) -> None:
     """Convenience function to unregister an event handler."""
     EventDispatcher().unregister(event_type, handler, wildcard)
-

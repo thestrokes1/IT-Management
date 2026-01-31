@@ -1,6 +1,7 @@
 """
 User management views for IT Management Platform.
 Contains all user-related views (list, create, edit, delete, role change).
+Uses permission_mapper for consistent UI permission flags.
 """
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -19,6 +20,11 @@ from apps.users.domain.services.user_authority import (
     assert_can_delete_user,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.frontend.permissions_mapper import (
+    build_user_ui_permissions,
+    build_users_permissions_map,
+    get_list_permissions,
+)
 
 
 # =========================
@@ -29,8 +35,18 @@ class UsersView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
     """
     Users management web interface.
     Only MANAGER+ roles can view the users list.
-    This matches API behavior where CanManageUsers requires IT_ADMIN+.
-    Uses FrontendAdminReadMixin for consistent permission enforcement.
+    Uses permission_mapper for consistent UI permission flags.
+    
+    UI Permission Flags Contract:
+    {
+        "can_view": bool,
+        "can_update": bool,
+        "can_delete": bool,
+        "can_assign": bool,
+        "can_unassign": bool,
+        "can_self_assign": bool,
+        "assigned_to_me": bool,
+    }
     """
     template_name = 'frontend/users.html'
     login_url = 'frontend:login'
@@ -39,16 +55,18 @@ class UsersView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         users = User.objects.filter(is_active=True).order_by('-date_joined')
         
-        # Compute permissions map for each user
-        permissions_map = {
-            user.id: get_user_permissions(self.request.user, user)
-            for user in users
-        }
+        # Build permissions map using permission_mapper
+        permissions_map = build_users_permissions_map(self.request.user, users)
+        
+        # Get list permissions
+        list_permissions = get_list_permissions(self.request.user)
+        list_permissions['can_create'] = can_create_user(self.request.user)
         
         context.update({
             'users': users,
             'role_choices': User.ROLE_CHOICES,
             'permissions_map': permissions_map,
+            'permissions': list_permissions,
         })
         return context
 
@@ -64,13 +82,12 @@ class CreateUserView(CanManageUsersMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Pass permissions object for template consistency
-        permissions = {
-            'can_create': can_create_user(self.request.user),
-        }
+        # Get list permissions for template consistency
+        list_permissions = get_list_permissions(self.request.user)
+        list_permissions['can_create'] = can_create_user(self.request.user)
         
         context.update({
-            'permissions': permissions,
+            'permissions': list_permissions,
         })
         return context
 
@@ -124,8 +141,8 @@ class EditUserView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Compute permissions for the edit user
-        permissions = get_user_permissions(self.request.user, self.edit_user)
+        # Build UI permission flags using permission_mapper
+        permissions = build_user_ui_permissions(self.request.user, self.edit_user)
         
         context.update({
             'edit_user': self.edit_user,
@@ -238,9 +255,13 @@ class ProfileView(LoginRequiredMixin, TemplateView):
         can_reopen = user.role in ['TECHNICIAN', 'MANAGER', 'IT_ADMIN', 'SUPERADMIN']
         can_reopen_count = created.filter(status='RESOLVED').count() if can_reopen else 0
         
+        # Build permissions for own profile
+        profile_permissions = build_user_ui_permissions(user, user)
+        
         context.update({
             'my_tickets': my_tickets,
             'can_reopen_ticket': can_reopen,
+            'permissions': profile_permissions,
             'stats': {
                 'created_count': created_count,
                 'assigned_count': assigned_count,
@@ -302,3 +323,56 @@ def profile_reopen_ticket(request, ticket_id):
     
     messages.success(request, f'Ticket #{ticket.id} has been reopened.')
     return redirect('frontend:profile')
+
+
+# Wrapper functions for URL patterns
+def users(request):
+    """Users list view."""
+    view = UsersView.as_view()
+    return view(request)
+
+
+def edit_user(request, user_id):
+    """Edit user view."""
+    view = EditUserView.as_view()
+    return view(request, user_id=user_id)
+
+
+def create_user(request):
+    """Create user view."""
+    view = CreateUserView.as_view()
+    return view(request)
+
+
+def change_user_role(request, user_id):
+    """Change user role view."""
+    from django.views.decorators.http import require_http_methods
+    from django.shortcuts import get_object_or_404, redirect
+    from django.contrib import messages
+    from apps.users.models import User
+    
+    if request.method == 'POST':
+        if request.user.role != 'SUPERADMIN':
+            messages.error(request, 'Only SUPERADMIN can change roles.')
+            return redirect('frontend:edit-user', user_id=user_id)
+
+        target_user = get_object_or_404(User, id=user_id)
+        new_role = request.POST.get('role')
+
+        valid_roles = [r[0] for r in User.ROLE_CHOICES]
+        if new_role not in valid_roles:
+            messages.error(request, 'Invalid role.')
+            return redirect('frontend:edit-user', user_id=user_id)
+
+        if target_user.role == new_role:
+            messages.info(request, 'User already has this role.')
+            return redirect('frontend:edit-user', user_id=user_id)
+
+        target_user.role = new_role
+        target_user.save(update_fields=['role'])
+
+        messages.success(request, f'Role changed to {new_role}.')
+        return redirect('frontend:edit-user', user_id=user_id)
+    
+    return redirect('frontend:edit-user', user_id=user_id)
+

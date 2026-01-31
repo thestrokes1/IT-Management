@@ -1,10 +1,274 @@
 """
 Permissions classes for Tickets Management.
+
 Role-based access control for ticket and support operations.
+All permission checks are enforced server-side using domain authority services.
+
+IMPORTANT: All permission checks MUST use the domain authority services
+to ensure consistent enforcement across all entry points (API, views, etc.).
 """
 
 from rest_framework import permissions
 from apps.tickets.models import Ticket, TicketComment, TicketAttachment
+
+
+class CanViewTickets(permissions.BasePermission):
+    """
+    Check if user can view tickets.
+    
+    Rules:
+    - VIEWER: NOT allowed
+    - All other roles: allowed
+    """
+    
+    def has_permission(self, request, view):
+        from apps.tickets.domain.services.ticket_authority import can_view_list
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and can_view_list(request.user)
+        )
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_view
+        return can_view(request.user, obj)
+
+
+class CanCreateTickets(permissions.BasePermission):
+    """
+    Check if user can create tickets.
+    
+    Rules:
+    - VIEWER: NOT allowed
+    - All other roles: allowed
+    """
+    
+    def has_permission(self, request, view):
+        from apps.tickets.domain.services.ticket_authority import can_create
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and can_create(request.user)
+        )
+
+
+class CanEditTicket(permissions.BasePermission):
+    """
+    Check if user can edit a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if assigned_to == user
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_edit
+        return can_edit(request.user, obj)
+
+
+class CanDeleteTicket(permissions.BasePermission):
+    """
+    Check if user can delete a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if assigned_to == user
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_delete
+        return can_delete(request.user, obj)
+
+
+class CanAssignTicket(permissions.BasePermission):
+    """
+    Check if user can assign a ticket to another user.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: NEVER allowed
+    - VIEWER: NOT allowed
+    """
+    
+    def has_permission(self, request, view):
+        from apps.tickets.domain.services.ticket_authority import can_assign
+        ticket = getattr(view, 'get_object', lambda: None)()
+        if ticket is None:
+            # For list views, check general assign permission
+            return request.user.is_authenticated and request.user.role in (
+                'SUPERADMIN', 'MANAGER', 'IT_ADMIN'
+            )
+        return can_assign(request.user, ticket, None)
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_assign
+        return can_assign(request.user, obj, None)
+
+
+class CanUnassignTicket(permissions.BasePermission):
+    """
+    Check if user can unassign a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: NEVER allowed
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_unassign
+        return can_unassign(request.user, obj)
+
+
+class CanSelfAssignTicket(permissions.BasePermission):
+    """
+    Check if user can self-assign to a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if unassigned
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_self_assign
+        return can_self_assign(request.user, obj)
+
+
+class CanCloseTicket(permissions.BasePermission):
+    """
+    Check if user can close a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if assigned_to == user
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_close
+        return can_close(request.user, obj)
+
+
+class CanResolveTicket(permissions.BasePermission):
+    """
+    Check if user can resolve a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if assigned_to == user
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_resolve
+        return can_resolve(request.user, obj)
+
+
+class CanReopenTicket(permissions.BasePermission):
+    """
+    Check if user can reopen a ticket.
+    
+    Rules:
+    - SUPERADMIN, MANAGER: always allowed
+    - IT_ADMIN: always allowed
+    - TECHNICIAN: only if assigned_to == user
+    - VIEWER: NOT allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_reopen
+        return can_reopen(request.user, obj)
+
+
+class CanAddTicketComment(permissions.BasePermission):
+    """
+    Check if user can add a comment to a ticket.
+    
+    Rules:
+    - VIEWER: NOT allowed
+    - TECHNICIAN: only if assigned_to == user
+    - All other roles: allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_add_comment
+        return can_add_comment(request.user, obj)
+
+
+class CanViewTicketComment(permissions.BasePermission):
+    """
+    Check if user can view a ticket comment.
+    
+    Rules:
+    - VIEWER: cannot view internal comments
+    - TECHNICIAN: only if assigned_to == user
+    - All other roles: allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_view_comment
+        return can_view_comment(request.user, obj.ticket, obj)
+
+
+class CanAddTicketAttachment(permissions.BasePermission):
+    """
+    Check if user can add an attachment to a ticket.
+    
+    Rules:
+    - VIEWER: NOT allowed
+    - TECHNICIAN: only if assigned_to == user
+    - All other roles: allowed
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_add_attachment
+        return can_add_attachment(request.user, obj)
+
+
+class IsTicketRequesterOrAssigned(permissions.BasePermission):
+    """
+    Custom permission to only allow ticket requester or assigned users to edit.
+    Read access for authenticated users.
+    
+    This is kept for backward compatibility - prefer using CanEditTicket.
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        # Read permissions for all authenticated users (except VIEWER)
+        if request.method in permissions.SAFE_METHODS:
+            from apps.tickets.domain.services.ticket_authority import can_view
+            return can_view(request.user, obj)
+        
+        # Write permissions
+        from apps.tickets.domain.services.ticket_authority import can_edit
+        return can_edit(request.user, obj)
+
+
+class IsTicketCreator(permissions.BasePermission):
+    """
+    Custom permission to only allow ticket creators to modify their tickets.
+    
+    This is kept for backward compatibility - prefer using CanEditTicket.
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_edit
+        return can_edit(request.user, obj)
+
+
+# =============================================================================
+# Legacy permissions (for backward compatibility)
+# =============================================================================
 
 class CanManageTickets(permissions.BasePermission):
     """
@@ -12,60 +276,13 @@ class CanManageTickets(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.can_manage_tickets
+        from apps.tickets.domain.services.ticket_authority import can_create
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and can_create(request.user)
+        )
 
-class IsTicketRequesterOrAssigned(permissions.BasePermission):
-    """
-    Custom permission to only allow ticket requester or assigned users to edit.
-    Read access for authenticated users.
-    """
-    
-    def has_object_permission(self, request, view, obj):
-        # Read permissions for all authenticated users
-        if request.method in permissions.SAFE_METHODS:
-            return request.user.is_authenticated
-        
-        # Write permissions for ticket requester, assigned user, or admin
-        if request.user.is_admin:
-            return True
-        
-        if hasattr(obj, 'requester'):
-            # For tickets
-            return (obj.requester == request.user or 
-                    obj.assigned_to == request.user or
-                    request.user.can_manage_tickets)
-        else:
-            # For comments and attachments
-            ticket = obj.ticket
-            return (ticket.requester == request.user or 
-                    ticket.assigned_to == request.user or
-                    obj.user == request.user or
-                    request.user.can_manage_tickets)
-
-class IsTicketCreator(permissions.BasePermission):
-    """
-    Custom permission to only allow ticket creators to modify their tickets.
-    """
-    
-    def has_object_permission(self, request, view, obj):
-        # Admin can modify all
-        if request.user.is_admin:
-            return True
-        
-        if hasattr(obj, 'requester'):
-            # For tickets
-            return obj.requester == request.user or request.user.can_manage_tickets
-        else:
-            # For comments and attachments
-            return obj.user == request.user or request.user.can_manage_tickets
-
-class CanCreateTickets(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can create tickets.
-    """
-    
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
 
 class CanViewTicketDetails(permissions.BasePermission):
     """
@@ -73,23 +290,9 @@ class CanViewTicketDetails(permissions.BasePermission):
     """
     
     def has_object_permission(self, request, view, obj):
-        # Admin can view all
-        if request.user.is_admin:
-            return True
-        
-        # Ticket requester can view their tickets
-        if obj.requester == request.user:
-            return True
-        
-        # Assigned user can view assigned tickets
-        if obj.assigned_to == request.user:
-            return True
-        
-        # Users with ticket management rights can view all tickets
-        if request.user.can_manage_tickets:
-            return True
-        
-        return False
+        from apps.tickets.domain.services.ticket_authority import can_view
+        return can_view(request.user, obj)
+
 
 class CanManageTicketCategories(permissions.BasePermission):
     """
@@ -97,49 +300,12 @@ class CanManageTicketCategories(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_tickets
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
 
-class CanAssignTickets(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can assign tickets.
-    """
-    
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_technician
-        )
-
-class CanResolveTickets(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can resolve tickets.
-    """
-    
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_technician
-        )
-
-class CanCloseTickets(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can close tickets.
-    """
-    
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_technician
-        )
-
-class CanEscalateTickets(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can escalate tickets.
-    """
-    
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_technician
-        )
 
 class CanViewTicketComments(permissions.BasePermission):
     """
@@ -147,28 +313,9 @@ class CanViewTicketComments(permissions.BasePermission):
     """
     
     def has_object_permission(self, request, view, obj):
-        # Admin can view all
-        if request.user.is_admin:
-            return True
-        
-        ticket = obj.ticket
-        
-        # Ticket requester can view all comments
-        if ticket.requester == request.user:
-            # Check if user can view internal comments
-            if hasattr(obj, 'is_internal') and obj.is_internal:
-                return request.user.can_manage_tickets
-            return True
-        
-        # Assigned user can view all comments
-        if ticket.assigned_to == request.user:
-            return True
-        
-        # Users with ticket management rights can view all comments
-        if request.user.can_manage_tickets:
-            return True
-        
-        return False
+        from apps.tickets.domain.services.ticket_authority import can_view_comment
+        return can_view_comment(request.user, obj.ticket, obj)
+
 
 class CanCreateTicketComments(permissions.BasePermission):
     """
@@ -176,25 +323,9 @@ class CanCreateTicketComments(permissions.BasePermission):
     """
     
     def has_object_permission(self, request, view, obj):
-        # Admin can create comments
-        if request.user.is_admin:
-            return True
-        
-        ticket = obj.ticket
-        
-        # Ticket requester can create comments
-        if ticket.requester == request.user:
-            return True
-        
-        # Assigned user can create comments
-        if ticket.assigned_to == request.user:
-            return True
-        
-        # Users with ticket management rights can create comments
-        if request.user.can_manage_tickets:
-            return True
-        
-        return False
+        from apps.tickets.domain.services.ticket_authority import can_add_comment
+        return can_add_comment(request.user, obj.ticket)
+
 
 class CanManageTicketAttachments(permissions.BasePermission):
     """
@@ -202,29 +333,9 @@ class CanManageTicketAttachments(permissions.BasePermission):
     """
     
     def has_object_permission(self, request, view, obj):
-        # Admin can manage all attachments
-        if request.user.is_admin:
-            return True
-        
-        ticket = obj.ticket
-        
-        # Ticket requester can manage attachments
-        if ticket.requester == request.user:
-            return True
-        
-        # Assigned user can manage attachments
-        if ticket.assigned_to == request.user:
-            return True
-        
-        # Attachment creator can manage their attachments
-        if obj.user == request.user:
-            return True
-        
-        # Users with ticket management rights can manage attachments
-        if request.user.can_manage_tickets:
-            return True
-        
-        return False
+        from apps.tickets.domain.services.ticket_authority import can_add_attachment
+        return can_add_attachment(request.user, obj.ticket)
+
 
 class CanViewTicketHistory(permissions.BasePermission):
     """
@@ -232,9 +343,12 @@ class CanViewTicketHistory(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_admin
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanViewTicketTemplates(permissions.BasePermission):
     """
@@ -242,9 +356,12 @@ class CanViewTicketTemplates(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_technician
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role != 'VIEWER'
         )
+
 
 class CanManageTicketTemplates(permissions.BasePermission):
     """
@@ -252,9 +369,12 @@ class CanManageTicketTemplates(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_tickets
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanViewSLAs(permissions.BasePermission):
     """
@@ -262,9 +382,12 @@ class CanViewSLAs(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_admin
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanManageSLAs(permissions.BasePermission):
     """
@@ -272,9 +395,12 @@ class CanManageSLAs(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_tickets
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanViewTicketReports(permissions.BasePermission):
     """
@@ -282,9 +408,12 @@ class CanViewTicketReports(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_manager
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanGenerateTicketReports(permissions.BasePermission):
     """
@@ -292,9 +421,12 @@ class CanGenerateTicketReports(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_manager
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanRateTicketSatisfaction(permissions.BasePermission):
     """
@@ -302,8 +434,8 @@ class CanRateTicketSatisfaction(permissions.BasePermission):
     """
     
     def has_object_permission(self, request, view, obj):
-        # Only the ticket requester can rate satisfaction
         return hasattr(obj, 'ticket') and obj.ticket.requester == request.user
+
 
 class CanViewTicketEscalations(permissions.BasePermission):
     """
@@ -311,9 +443,12 @@ class CanViewTicketEscalations(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_technician
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role != 'VIEWER'
         )
+
 
 class CanManageTicketEscalations(permissions.BasePermission):
     """
@@ -321,9 +456,12 @@ class CanManageTicketEscalations(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_technician
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanAccessTicketStatistics(permissions.BasePermission):
     """
@@ -331,9 +469,12 @@ class CanAccessTicketStatistics(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_manage_tickets or request.user.is_manager
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
         )
+
 
 class CanManageTicketWorkflows(permissions.BasePermission):
     """
@@ -341,4 +482,37 @@ class CanManageTicketWorkflows(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.is_admin
+        return (
+            request.user 
+            and request.user.is_authenticated 
+            and request.user.role in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN')
+        )
+
+
+class IsAssignedTechnician(permissions.BasePermission):
+    """
+    Custom permission to check if user is the assigned technician.
+    
+    Rules:
+    - User must be the assigned technician
+    - ADMIN roles always have access
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_edit
+        return can_edit(request.user, obj)
+
+
+class CanReassignTicket(permissions.BasePermission):
+    """
+    Custom permission to check if user can reassign a ticket.
+    
+    Rules:
+    - MANAGER / IT_ADMIN / SUPERADMIN: can always reassign
+    - TECHNICIAN: CANNOT reassign tickets (even their own)
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        from apps.tickets.domain.services.ticket_authority import can_reassign
+        return can_reassign(request.user, obj)
+

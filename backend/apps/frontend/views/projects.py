@@ -1,8 +1,9 @@
-# Project views for IT Management Platform.
-# Contains all project-related views (list, create, edit, delete).
-# Uses CQRS pattern: Queries return DTOs, Services raise domain exceptions.
-# Uses ExceptionMapper for centralized error handling.
-# Uses ProjectPolicy for view-level authorization.
+"""
+Project views for IT Management Platform.
+Contains all project-related views (list, create, edit, delete).
+Uses CQRS pattern: Queries return DTOs, Services raise domain exceptions.
+Uses permission_mapper for consistent UI permission flags.
+"""
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
@@ -22,16 +23,29 @@ from apps.projects.domain.services.project_authority import (
     get_project_permissions, 
     can_create_project,
 )
+from apps.frontend.permissions_mapper import (
+    build_project_ui_permissions,
+    build_projects_permissions_map,
+    get_list_permissions,
+)
 
 
 class ProjectsView(LoginRequiredMixin, SafeTemplateView):
     """
     Projects management web interface.
     Uses ProjectQuery for read operations (returns DTOs).
-    SafeTemplateView handles domain exceptions automatically.
+    Uses permission_mapper for consistent UI permission flags.
     
-    Read access: All authenticated users can view projects they're members of.
-    This matches API behavior where non-admin users see only their projects.
+    UI Permission Flags Contract:
+    {
+        "can_view": bool,
+        "can_update": bool,
+        "can_delete": bool,
+        "can_assign": bool,
+        "can_unassign": bool,
+        "can_self_assign": bool,
+        "assigned_to_me": bool,
+    }
     """
     template_name = 'frontend/projects.html'
     login_url = 'frontend:login'
@@ -45,69 +59,37 @@ class ProjectsView(LoginRequiredMixin, SafeTemplateView):
         status_choices = ProjectQuery.get_status_choices()
         priority_choices = ProjectQuery.get_priority_choices()
         
-        # Compute permissions map for each project
+        # Convert DTOs to list for processing
         projects_list = projects_dto.projects
-        permissions_map = {}
-        for project in projects_list:
-            # Get the actual project object for permissions check
-            project_obj = project.to_dict() if hasattr(project, 'to_dict') else project
-            permissions_map[project.id] = get_project_permissions(self.request.user, project_obj)
         
-        # Check create permission using domain authority
-        policy = ProjectPolicy()
-        can_create = policy.can_create(self.request.user).allowed
+        # Build permissions map using permission_mapper
+        permissions_map = build_projects_permissions_map(self.request.user, projects_list)
+        
+        # Get list-level permissions
+        list_permissions = get_list_permissions(self.request.user)
+        list_permissions['can_create'] = can_create_project(self.request.user)
         
         context.update({
-            'projects': projects_list,  # List of ProjectDTO
-            'projects_dict': projects_dto.to_list(),  # List of dicts for templates
+            'projects': projects_list,
+            'projects_dict': projects_dto.to_list(),
             'total_count': projects_dto.total_count,
             'status_choices': status_choices,
             'priority_choices': priority_choices,
             'permissions_map': permissions_map,
-            'permissions': {'can_create': can_create},
-            'can_edit_any': self._can_edit_any(),
-            'can_delete_any': self._can_delete_any(),
+            'permissions': list_permissions,
         })
         return context
-    
-    def _can_edit_any(self) -> bool:
-        """Check if user can edit any project (admin-level)."""
-        policy = ProjectPolicy()
-        auth_result = policy.can_manage(self.request.user)
-        return auth_result.allowed
-    
-    def _can_delete_any(self) -> bool:
-        """Check if user can delete any project (admin-level)."""
-        policy = ProjectPolicy()
-        # Check delete permission with None project (general delete permission)
-        auth_result = policy.can_delete(self.request.user, None)
-        return auth_result.allowed
 
 
 class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplateView):
     """
     Create new project web interface.
     Uses ProjectQuery for reads (DTOs), ProjectService for writes.
-    Uses ProjectPolicy for authorization at view level.
-    SafeTemplateView handles domain exceptions automatically.
+    Uses permission_mapper for UI permission flags.
     """
     template_name = 'frontend/create-project.html'
     login_url = 'frontend:login'
     redirect_url = 'frontend:projects'
-    
-    def dispatch(self, request, *args, **kwargs):
-        """Check create permission at dispatch time."""
-        policy = ProjectPolicy()
-        auth_result = policy.can_create(request.user)
-        
-        if not auth_result.allowed:
-            # Raise domain exception - will be handled by SafeTemplateView
-            raise PermissionDeniedError(
-                message=auth_result.reason,
-                details={'action': 'create', 'resource_type': 'project'}
-            )
-        
-        return super().dispatch(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -115,17 +97,16 @@ class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplate
         categories = ProjectQuery.get_categories()
         available_users = ProjectQuery.get_active_users()
         
-        # Pass permissions object for template consistency
-        permissions = {
-            'can_create': can_create_project(self.request.user),
-        }
+        # Get list permissions for template consistency
+        list_permissions = get_list_permissions(self.request.user)
+        list_permissions['can_create'] = can_create_project(self.request.user)
         
         context.update({
             'categories': categories,
             'categories_dict': [c.to_dict() for c in categories] if hasattr(categories[0], 'to_dict') else categories,
             'available_users': available_users,
             'form': {},
-            'permissions': permissions,
+            'permissions': list_permissions,
         })
         return context
     
@@ -133,7 +114,6 @@ class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplate
         """Handle project creation using Service."""
         try:
             # Use Service for write operation
-            # May raise DomainException (NotFoundError, ValidationError, PermissionDeniedError)
             project = ProjectService.create_project(
                 request=request,
                 name=request.POST.get('name', '').strip(),
@@ -148,12 +128,10 @@ class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplate
                 team_members=request.POST.getlist('team_members', [])
             )
             
-            # Success - add message and redirect
             messages.success(request, f'Project "{project.name}" created successfully!')
             return redirect('frontend:projects')
         
         except DomainException:
-            # Let SafeTemplateView handle this
             raise
 
 
@@ -161,8 +139,7 @@ class EditProjectView(SafeTemplateView):
     """
     Edit project web interface.
     Uses ProjectQuery for reads (DTOs), ProjectService for writes.
-    Uses ProjectPolicy for authorization at view level.
-    SafeTemplateView handles domain exceptions automatically.
+    Uses permission_mapper for UI permission flags.
     """
     template_name = 'frontend/edit-project.html'
     login_url = 'frontend:login'
@@ -187,7 +164,8 @@ class EditProjectView(SafeTemplateView):
         
         # Check edit permission using Policy
         policy = ProjectPolicy()
-        auth_result = policy.can_edit(request.user, project.to_dict() if hasattr(project, 'to_dict') else project)
+        project_dict = project.to_dict() if hasattr(project, 'to_dict') else project
+        auth_result = policy.can_edit(request.user, project_dict)
         
         if not auth_result.allowed:
             raise PermissionDeniedError(
@@ -205,7 +183,6 @@ class EditProjectView(SafeTemplateView):
         project_dto = ProjectQuery.get_with_details(project_id)
         
         if project_dto is None:
-            # Let exception handler deal with this
             from apps.core.exceptions import NotFoundError
             raise NotFoundError(
                 resource_type="Project",
@@ -215,22 +192,19 @@ class EditProjectView(SafeTemplateView):
         categories = ProjectQuery.get_categories()
         available_users = ProjectQuery.get_active_users()
         
-        # Check delete permission for context
-        policy = ProjectPolicy()
+        # Convert to dict for permissions
         project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
-        can_delete = policy.can_delete(self.request.user, project_dict).allowed
         
-        # Compute permissions for the project
-        permissions = get_project_permissions(self.request.user, project_dict)
+        # Build UI permission flags using permission_mapper
+        permissions = build_project_ui_permissions(self.request.user, project_dict)
         
         context.update({
-            'project': project_dto,  # ProjectDetailDTO
-            'project_dict': project_dict,  # Dict for templates
+            'project': project_dto,
+            'project_dict': project_dict,
             'categories': categories,
             'categories_dict': [c.to_dict() for c in categories] if hasattr(categories[0], 'to_dict') else categories,
             'available_users': available_users,
             'form': {},
-            'can_delete': can_delete,
             'permissions': permissions,
         })
         return context
@@ -241,7 +215,6 @@ class EditProjectView(SafeTemplateView):
             project_id = self.kwargs.get('project_id')
             
             # Use Service for write operation
-            # May raise DomainException (NotFoundError, ValidationError, PermissionDeniedError)
             project = ProjectService.update_project(
                 request=request,
                 project_id=project_id,
@@ -257,12 +230,10 @@ class EditProjectView(SafeTemplateView):
                 team_members=request.POST.getlist('team_members', [])
             )
             
-            # Success - add message and redirect
             messages.success(request, f'Project "{project.name}" updated successfully!')
             return redirect('frontend:projects')
         
         except DomainException:
-            # Let SafeTemplateView handle this
             raise
 
 
@@ -273,7 +244,6 @@ def delete_project(request, project_id):
     Delete a project.
     Uses ProjectService for write operation.
     Uses ProjectPolicy for authorization.
-    Uses ExceptionMapper for consistent error handling.
     """
     # Check if user is authenticated
     if not request.user.is_authenticated:
@@ -288,19 +258,19 @@ def delete_project(request, project_id):
         if project_dto is None:
             return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
         
+        # Convert to dict for permission check
+        project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
+        
         # Check permission using Policy
-        # Policy raises PermissionDeniedError if not allowed
         policy = ProjectPolicy()
-        policy.can_delete(request.user, project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto).require('delete', 'project')
+        policy.can_delete(request.user, project_dict).require('delete', 'project')
         
         # Use Service for write operation
-        # May raise DomainException (NotFoundError, PermissionDeniedError)
         ProjectService.delete_project(project_id, user=request.user)
         
         return JsonResponse({'success': True, 'message': f'Project deleted successfully.'})
     
     except DomainException as e:
-        # Use ExceptionMapper for consistent error response
         return ExceptionMapper.to_json_response(e, request)
     
     except Exception as e:
@@ -324,8 +294,10 @@ def project_crud(request, project_id):
             if project_dto is None:
                 return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
             
+            project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
+            
             policy = ProjectPolicy()
-            policy.can_delete(request.user, project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto).require('delete', 'project')
+            policy.can_delete(request.user, project_dict).require('delete', 'project')
             
             # Use Service for delete operation
             ProjectService.delete_project(project_id, user=request.user)
@@ -341,9 +313,11 @@ def project_crud(request, project_id):
             if project_dto is None:
                 return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
             
+            project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
+            
             # Check permission using Policy
             policy = ProjectPolicy()
-            policy.can_edit(request.user, project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto).require('edit', 'project')
+            policy.can_edit(request.user, project_dict).require('edit', 'project')
             
             # Use Service for partial update
             project = ProjectService.update_project(
@@ -361,4 +335,29 @@ def project_crud(request, project_id):
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
+
+
+# Wrapper functions for URL patterns
+def projects(request):
+    """Projects list view."""
+    view = ProjectsView.as_view()
+    return view(request)
+
+
+def project_detail(request, project_id):
+    """Project detail view."""
+    view = EditProjectView.as_view()
+    return view(request, project_id=project_id)
+
+
+def create_project(request):
+    """Create project view."""
+    view = CreateProjectView.as_view()
+    return view(request)
+
+
+def edit_project(request, project_id):
+    """Edit project view."""
+    view = EditProjectView.as_view()
+    return view(request, project_id=project_id)
 

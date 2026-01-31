@@ -9,20 +9,32 @@ Event handlers write ActivityLog and StatusHistory.
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, Optional
-from apps.core.events import DomainEvent, EventType, EventDispatcher
+from apps.core.events import DomainEvent, EventDispatcher
 
 
 # =============================================================================
-# Ticket Event Types
+# Ticket Event Types (standalone - cannot extend Enum)
 # =============================================================================
 
-class TicketEventType(EventType):
-    """Enumeration of ticket-specific event types."""
+class TicketEventType:
+    """Ticket event type constants as strings."""
     TICKET_ASSIGNED = "ticket.assigned"
+    TICKET_UNASSIGNED = "ticket.unassigned"
     TICKET_UPDATED = "ticket.updated"
     TICKET_RESOLVED = "ticket.resolved"
     TICKET_REOPENED = "ticket.reopened"
     TICKET_STATUS_CHANGED = "ticket.status_changed"
+    
+    @classmethod
+    def values(cls):
+        return [
+            cls.TICKET_ASSIGNED,
+            cls.TICKET_UNASSIGNED,
+            cls.TICKET_UPDATED,
+            cls.TICKET_RESOLVED,
+            cls.TICKET_REOPENED,
+            cls.TICKET_STATUS_CHANGED,
+        ]
 
 
 # =============================================================================
@@ -34,16 +46,16 @@ class TicketEvent(DomainEvent):
     """Base class for all ticket domain events."""
     ticket_id: int = 0
     ticket_title: str = ""
+    entity_type: str = "Ticket"
     
     def __post_init__(self):
-        self.entity_type = "Ticket"
         self.entity_id = self.ticket_id
 
 
 @dataclass
 class TicketAssigned(TicketEvent):
     """Event fired when a ticket is assigned."""
-    event_type: EventType = TicketEventType.TICKET_ASSIGNED
+    event_type: str = TicketEventType.TICKET_ASSIGNED
     assignee_id: Optional[int] = None
     assignee_username: str = ""
     assigner_id: Optional[int] = None
@@ -62,7 +74,7 @@ class TicketAssigned(TicketEvent):
 @dataclass
 class TicketUpdated(TicketEvent):
     """Event fired when a ticket is updated."""
-    event_type: EventType = TicketEventType.TICKET_UPDATED
+    event_type: str = TicketEventType.TICKET_UPDATED
     changes: Dict[str, tuple] = field(default_factory=dict)
     
     def __post_init__(self):
@@ -75,7 +87,7 @@ class TicketUpdated(TicketEvent):
 @dataclass
 class TicketResolved(TicketEvent):
     """Event fired when a ticket is resolved."""
-    event_type: EventType = TicketEventType.TICKET_RESOLVED
+    event_type: str = TicketEventType.TICKET_RESOLVED
     resolution_summary: str = ""
     resolution_time_hours: Optional[float] = None
     
@@ -90,7 +102,7 @@ class TicketResolved(TicketEvent):
 @dataclass
 class TicketReopened(TicketEvent):
     """Event fired when a ticket is reopened."""
-    event_type: EventType = TicketEventType.TICKET_REOPENED
+    event_type: str = TicketEventType.TICKET_REOPENED
     reason: str = ""
     previous_status: str = ""
     
@@ -105,7 +117,7 @@ class TicketReopened(TicketEvent):
 @dataclass
 class TicketStatusChanged(TicketEvent):
     """Event fired when a ticket status changes."""
-    event_type: EventType = TicketEventType.TICKET_STATUS_CHANGED
+    event_type: str = TicketEventType.TICKET_STATUS_CHANGED
     from_status: str = ""
     to_status: str = ""
     
@@ -114,6 +126,21 @@ class TicketStatusChanged(TicketEvent):
         self.metadata = {
             'from_status': self.from_status,
             'to_status': self.to_status,
+        }
+
+
+@dataclass
+class TicketUnassigned(TicketEvent):
+    """Event fired when a ticket is unassigned."""
+    event_type: str = TicketEventType.TICKET_UNASSIGNED
+    unassigned_user_id: Optional[int] = None
+    unassigned_username: str = ""
+    
+    def __post_init__(self):
+        super().__post_init__()
+        self.metadata = {
+            'unassigned_user_id': self.unassigned_user_id,
+            'unassigned_username': self.unassigned_username,
         }
 
 
@@ -211,6 +238,23 @@ class TicketEventHandlers:
             to_status=event.to_status,
             changed_by=event.actor,
         )
+    
+    @staticmethod
+    def handle_ticket_unassigned(event: TicketUnassigned) -> None:
+        """Handle ticket unassigned event."""
+        from apps.core.services.activity_logger import log_activity, ActivityAction
+        
+        log_activity(
+            actor=event.actor,
+            action=ActivityAction.TICKET_UNASSIGNED,
+            target_type='ticket',
+            target_id=event.ticket_id,
+            metadata={
+                'title': event.ticket_title,
+                'unassigned_user_id': event.unassigned_user_id,
+                'unassigned_username': event.unassigned_username,
+            }
+        )
 
 
 # =============================================================================
@@ -227,6 +271,7 @@ def setup_ticket_event_handlers() -> None:
     
     # Register ticket event handlers
     dispatcher.register(TicketEventType.TICKET_ASSIGNED, TicketEventHandlers.handle_ticket_assigned)
+    dispatcher.register(TicketEventType.TICKET_UNASSIGNED, TicketEventHandlers.handle_ticket_unassigned)
     dispatcher.register(TicketEventType.TICKET_UPDATED, TicketEventHandlers.handle_ticket_updated)
     dispatcher.register(TicketEventType.TICKET_RESOLVED, TicketEventHandlers.handle_ticket_resolved)
     dispatcher.register(TicketEventType.TICKET_REOPENED, TicketEventHandlers.handle_ticket_reopened)
@@ -328,3 +373,20 @@ def emit_ticket_status_changed(
     )
     EventDispatcher().dispatch(event)
 
+
+def emit_ticket_unassigned(
+    ticket_id: int,
+    ticket_title: str,
+    actor: Any,
+    unassigned_user_id: Optional[int],
+    unassigned_username: str
+) -> None:
+    """Emit a ticket unassigned event."""
+    event = TicketUnassigned(
+        ticket_id=ticket_id,
+        ticket_title=ticket_title,
+        actor=actor,
+        unassigned_user_id=unassigned_user_id,
+        unassigned_username=unassigned_username,
+    )
+    EventDispatcher().dispatch(event)

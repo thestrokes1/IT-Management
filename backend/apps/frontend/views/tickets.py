@@ -1,290 +1,378 @@
-# Ticket views for IT Management Platform.
-# Contains all ticket-related views (list, create, edit, delete).
-# Uses CQRS pattern: Queries for reads, Services for writes.
+"""
+Ticket views for IT Management Platform.
+Contains all ticket-related views (list, create, edit, delete).
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
+STRICT RBAC ENFORCEMENT:
+- All permission checks use domain authority layer (ticket_authority)
+- NO role checks in views - all permissions delegated to authority
+- CQRS commands handle business logic with authority validation
+- Views translate domain permissions to UI flags via permissions_mapper
+"""
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views import View
+from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib import messages
-from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
-from django.views.generic import TemplateView
-import json
-
-from apps.frontend.mixins import CanManageTicketsMixin
-from apps.frontend.services import TicketService
-from apps.tickets.queries import TicketQuery
-from apps.tickets.domain.services.ticket_authority import (
-    get_ticket_permissions, 
-    can_create_ticket as ticket_can_create,
-    assert_can_delete_ticket,
-    assert_can_update_ticket,
-)
-from apps.core.domain.authorization import AuthorizationError
-from apps.core.domain.roles import is_superadmin_or_manager
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 
+from apps.tickets.models import Ticket
+from apps.tickets.domain.services.ticket_authority import (
+    get_permissions as get_ticket_permissions,
+    can_view as can_view_ticket,
+    can_edit as can_edit_ticket,
+    can_delete as can_delete_ticket,
+    can_assign as can_assign_ticket,
+    can_unassign as can_unassign_ticket,
+    can_assign_to_self as can_assign_to_self_ticket,
+    can_unassign_self as can_unassign_self_ticket,
+    can_close as can_close_ticket,
+    can_reopen as can_reopen_ticket,
+    can_cancel as can_cancel_ticket,
+    can_resolve as can_resolve_ticket,
+)
+from apps.core.domain.authorization import AuthorizationError
+from apps.tickets.application.update_ticket import UpdateTicket
+from apps.tickets.application.delete_ticket import DeleteTicket
+from apps.tickets.application.assign_ticket_to_self import AssignTicketToSelf
+from apps.frontend.permissions_mapper import (
+    build_ticket_ui_permissions,
+    build_tickets_permissions_map,
+    get_list_permissions,
+)
 
-def get_assign_field_config(user):
+
+class TicketsView(LoginRequiredMixin, View):
     """
-    Get assignment field configuration based on user role.
-    Used by templates to control assign field visibility and editability.
-    """
-    role = getattr(user, 'role', None)
-
-    if role == 'VIEWER':
-        return {'visible': False, 'readonly': False, 'default_user_id': None}
-
-    if role == 'TECHNICIAN':
-        return {
-            'visible': True,
-            'readonly': True,
-            'default_user_id': user.id
-        }
-
-    # IT_ADMIN, MANAGER, SUPERADMIN
-    return {
-        'visible': True,
-        'readonly': False,
-        'default_user_id': None
-    }
-
-
-class TicketsView(LoginRequiredMixin, TemplateView):
-    """
-    Tickets management web interface.
-    Uses TicketQuery for read operations with role-based filtering.
-    Matches API behavior: Technicians see only their own/assigned tickets.
-    """
-    template_name = 'frontend/tickets.html'
-    login_url = 'frontend:login'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        
-        # Apply role-based filtering to match API behavior
-        # SUPERADMIN, MANAGER, IT_ADMIN see all tickets
-        # TECHNICIAN sees only tickets they created or are assigned to
-        if is_superadmin_or_manager(user.role) or user.role == 'IT_ADMIN':
-            # Admin roles get all tickets
-            tickets = TicketQuery.get_all()
-        elif user.role == 'TECHNICIAN':
-            # Technicians see only their own or assigned tickets
-            tickets = self._get_technician_tickets()
-        else:
-            # VIEWER - no tickets visible (shouldn't reach here based on menu)
-            tickets = TicketQuery.get_all().none() if hasattr(TicketQuery.get_all(), 'none') else []
-        
-        status_choices = TicketQuery.get_status_choices()
-        priority_choices = TicketQuery.get_priority_choices()
-
-        # Compute permissions for each ticket (template-safe)
-        permissions_by_ticket = {
-            ticket.id: get_ticket_permissions(user, ticket)
-            for ticket in tickets
-        }
-
-        # Add global permissions for template
-        permissions = {
-            'can_create': ticket_can_create(user),
-        }
-
-        context.update({
-            'tickets': tickets,
-            'status_choices': status_choices,
-            'priority_choices': priority_choices,
-            'permissions_by_ticket': permissions_by_ticket,
-            'permissions': permissions,
-        })
-
-        return context
+    List all tickets with proper RBAC enforcement.
     
-    def _get_technician_tickets(self):
-        """
-        Get tickets visible to a technician: created by them OR assigned to them.
-        This matches the API queryset filtering in apps/tickets/views.py.
-        """
-        all_tickets = TicketQuery.get_all()
-        user = self.request.user
+    Passes permissions_by_ticket mapping to template for UI permission flags.
+    Uses permissions_mapper to translate domain authority to UI flags.
+    
+    UI Permission Flags Contract:
+    {
+        "can_view": bool,
+        "can_update": bool,
+        "can_delete": bool,
+        "can_assign": bool,
+        "can_unassign": bool,
+        "can_self_assign": bool,
+        "assigned_to_me": bool,
+    }
+    """
+    def get(self, request):
+        tickets = Ticket.objects.all().order_by('-created_at')
         
-        # Filter tickets where user is creator or assignee
-        filtered = [
-            t for t in all_tickets
-            if (hasattr(t, 'created_by_id') and t.created_by_id == user.id) or
-               (hasattr(t, 'assigned_to_id') and t.assigned_to_id == user.id)
-        ]
-        return filtered
-
-
-class CreateTicketView(LoginRequiredMixin, TemplateView):
-    """
-    Create new support ticket web interface.
-    Uses TicketQuery for reads, TicketService for writes.
-    """
-    template_name = 'frontend/create-ticket.html'
-    login_url = 'frontend:login'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        categories = TicketQuery.get_categories()
-        ticket_types = TicketQuery.get_types()
-        available_users = TicketQuery.get_active_users()
-
-        # Assignment field configuration
-        assign_config = get_assign_field_config(self.request.user)
-
-        # Pass permissions object for template consistency
-        permissions = {
-            'can_create': ticket_can_create(self.request.user),
-        }
-
-        context.update({
-            'categories': categories,
-            'ticket_types': ticket_types,
-            'available_users': available_users,
-            'assign_config': assign_config,
-            'form': {},
-            'permissions': permissions,
-        })
-        return context
-
-    def post(self, request, *args, **kwargs):
-        """Handle ticket creation using Service."""
-        # Check domain permission
-        if not ticket_can_create(request.user):
-            messages.error(request, 'You do not have permission to create tickets.')
-            return redirect('frontend:tickets')
+        # Build permissions map using authority via permissions_mapper
+        permissions_by_ticket = build_tickets_permissions_map(request.user, tickets)
         
-        try:
-            ticket = TicketService.create_ticket(
-                request=request,
-                title=request.POST.get('title', ''),
-                description=request.POST.get('description', ''),
-                category_id=request.POST.get('category', ''),
-                ticket_type_id=request.POST.get('ticket_type', ''),
-                priority=request.POST.get('priority', 'MEDIUM'),
-                impact=request.POST.get('impact', 'MEDIUM'),
-                urgency=request.POST.get('urgency', 'MEDIUM'),
-                assigned_to_id=request.POST.get('assigned_to', ''),
-                due_date=request.POST.get('due_date', '')
-            )
-
-            messages.success(request, f'Ticket #{ticket.id} created successfully!')
-            return redirect('frontend:tickets')
-
-        except Exception as e:
-            messages.error(request, f'Error creating ticket: {str(e)}')
-            context = self.get_context_data()
-            context['form'] = request.POST
-            return render(request, self.template_name, context)
-
-
-class EditTicketView(CanManageTicketsMixin, TemplateView):
-    """
-    Edit ticket web interface.
-    Uses TicketQuery for reads, TicketService for writes.
-    """
-    template_name = 'frontend/edit-ticket.html'
-    login_url = 'frontend:login'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        ticket_id = self.kwargs.get('ticket_id')
-
-        ticket = TicketQuery.get_with_details(ticket_id)
-
-        if ticket is None:
-            messages.error(self.request, 'Ticket not found.')
-            return redirect('frontend:tickets')
-
-        categories = TicketQuery.get_categories()
-        ticket_types = TicketQuery.get_types()
-        available_users = TicketQuery.get_active_users()
-
-        # Compute permissions once per request
-        ticket_perms = get_ticket_permissions(self.request.user, ticket)
-
-        # Assignment field configuration
-        assign_config = get_assign_field_config(self.request.user)
-
-        context.update({
-            'ticket': ticket,
-            'categories': categories,
-            'ticket_types': ticket_types,
-            'available_users': available_users,
-            'ticket_perms': ticket_perms,
-            'assign_config': assign_config,
-            'form': {}
+        # Get list-level permissions
+        list_permissions = get_list_permissions(request.user)
+        
+        return render(request, "frontend/tickets.html", {
+            "tickets": tickets,
+            "permissions_by_ticket": permissions_by_ticket,
+            "permissions": list_permissions,
         })
-        return context
-
-    def post(self, request, *args, **kwargs):
-        """Handle ticket edit using Service."""
-        try:
-            ticket_id = self.kwargs.get('ticket_id')
-
-            ticket = TicketService.update_ticket(
-                request=request,
-                ticket_id=ticket_id,
-                title=request.POST.get('title', ''),
-                description=request.POST.get('description', ''),
-                category_id=request.POST.get('category', ''),
-                ticket_type_id=request.POST.get('ticket_type', ''),
-                status=request.POST.get('status', 'NEW'),
-                priority=request.POST.get('priority', 'MEDIUM'),
-                impact=request.POST.get('impact', 'MEDIUM'),
-                urgency=request.POST.get('urgency', 'MEDIUM'),
-                assigned_to_id=request.POST.get('assigned_to', ''),
-                assigned_team=request.POST.get('assigned_team', ''),
-                location=request.POST.get('location', ''),
-                contact_phone=request.POST.get('contact_phone', ''),
-                contact_email=request.POST.get('contact_email', ''),
-                sla_due_at_str=request.POST.get('sla_due_at', ''),
-                resolution_summary=request.POST.get('resolution_summary', '')
-            )
-
-            messages.success(request, f'Ticket #{ticket.id} updated successfully!')
-            return redirect('frontend:tickets')
-
-        except Exception as e:
-            messages.error(request, f'Error updating ticket: {str(e)}')
-            context = self.get_context_data()
-            context['form'] = request.POST
-            return render(request, self.template_name, context)
 
 
-@login_required(login_url='frontend:login')
-@require_http_methods(["DELETE", "PATCH"])
-def ticket_crud(request, ticket_id):
+class TicketDetailView(LoginRequiredMixin, View):
     """
-    Handle ticket CRUD operations (DELETE and PATCH).
-    Uses TicketService for write operations.
-    Uses domain authority for authorization.
+    Ticket detail view with permission flags for template.
+    
+    Uses domain authority to compute all permission flags via permissions_mapper.
     """
+    def get(self, request, pk):
+        ticket = get_object_or_404(Ticket, pk=pk)
+        
+        # Check view permission using authority
+        if not can_view_ticket(request.user, ticket):
+            raise PermissionDenied("You don't have permission to view this ticket.")
+        
+        # Build UI permission flags using permissions_mapper
+        permissions = build_ticket_ui_permissions(request.user, ticket)
+        
+        # Add additional context flags for template
+        permissions['is_assigned'] = ticket.assigned_to_id is not None
+        
+        # Get list of assignable users based on role
+        from apps.users.models import User
+        user = request.user
+        
+        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+            # Show all technicians for assignment
+            assignable_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
+        elif user.role == 'TECHNICIAN':
+            # Technician can only see themselves for self-assignment
+            assignable_users = User.objects.filter(id=user.id)
+        else:
+            assignable_users = User.objects.none()
+        
+        return render(request, "frontend/ticket_detail.html", {
+            "ticket": ticket,
+            "permissions": permissions,
+            "assignable_users": assignable_users,
+        })
+
+
+class CreateTicketView(LoginRequiredMixin, View):
+    """Create a new ticket."""
+    def get(self, request):
+        # Get list permissions for create check
+        list_perms = get_list_permissions(request.user)
+        return render(request, "frontend/create-ticket.html", {
+            "permissions": list_perms,
+        })
+
+    def post(self, request):
+        ticket = Ticket.objects.create(
+            title=request.POST.get("title", ""),
+            description=request.POST.get("description", ""),
+            created_by=request.user,
+        )
+        return redirect("frontend:tickets")
+
+
+class EditTicketView(LoginRequiredMixin, View):
+    """
+    Edit ticket view with authority-based access control.
+    Uses domain authority to check edit permission.
+    """
+    def get(self, request, pk):
+        ticket = get_object_or_404(Ticket, pk=pk)
+        
+        # Check edit permission using authority
+        if not can_edit_ticket(request.user, ticket):
+            messages.error(request, "You don't have permission to edit this ticket.")
+            return redirect("frontend:ticket-detail", ticket_id=pk)
+        
+        # Build UI permission flags for template consistency
+        permissions = build_ticket_ui_permissions(request.user, ticket)
+        
+        return render(request, "frontend/edit-ticket.html", {
+            "ticket": ticket,
+            "permissions": permissions,
+        })
+
+    def post(self, request, pk):
+        ticket = get_object_or_404(Ticket, pk=pk)
+        
+        # Use CQRS command with authority check
+        update_use_case = UpdateTicket()
+        result = update_use_case.execute(
+            user=request.user,
+            ticket_id=str(ticket.ticket_id),
+            ticket_data={
+                'title': request.POST.get("title", ticket.title),
+                'description': request.POST.get("description", ticket.description),
+            }
+        )
+        
+        if result.success:
+            messages.success(request, "Ticket updated successfully.")
+            return redirect("frontend:ticket-detail", ticket_id=pk)
+        else:
+            messages.error(request, result.error)
+            return render(request, "frontend/edit-ticket.html", {
+                "ticket": ticket
+            })
+
+
+# Function-based views for URLs
+def tickets(request):
+    """List all tickets."""
+    view = TicketsView.as_view()
+    return view(request)
+
+
+def ticket_detail(request, ticket_id):
+    """Show ticket detail."""
+    view = TicketDetailView.as_view()
+    return view(request, pk=ticket_id)
+
+
+def create_ticket(request):
+    """Create a new ticket."""
+    view = CreateTicketView.as_view()
+    return view(request)
+
+
+def edit_ticket(request, ticket_id):
+    """Edit a ticket."""
+    view = EditTicketView.as_view()
+    return view(request, pk=ticket_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def cancel_ticket(request, ticket_id):
+    """
+    Cancel a ticket.
+    Uses domain authority for permission check.
+    """
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    
+    # Check permission using domain authority
+    if not can_cancel_ticket(request.user, ticket):
+        messages.error(request, "You do not have permission to cancel this ticket.")
+        return redirect("frontend:ticket-detail", ticket_id=ticket_id)
+    
+    # Only open or new tickets can be cancelled
+    if ticket.status not in ['NEW', 'OPEN']:
+        messages.error(request, "Only new or open tickets can be cancelled.")
+        return redirect("frontend:ticket-detail", ticket_id=ticket_id)
+    
+    ticket.status = 'CANCELLED'
+    ticket.save()
+    messages.success(request, f"Ticket #{ticket.id} has been cancelled.")
+    return redirect("frontend:tickets")
+
+
+@login_required
+@require_http_methods(["POST", "DELETE"])
+def delete_ticket(request, ticket_id):
+    """
+    Delete a ticket.
+    Uses CQRS command with authority enforcement.
+    """
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
+        return redirect('frontend:login')
+    
     try:
         # Get ticket for authorization check
-        ticket = TicketQuery.get_by_id(ticket_id)
-        if ticket is None:
-            return JsonResponse({'error': f'Ticket with id {ticket_id} not found.'}, status=404)
+        ticket = get_object_or_404(Ticket, id=ticket_id)
         
-        if request.method == 'DELETE':
-            # Check domain permission
-            assert_can_delete_ticket(request.user, ticket)
-            TicketService.delete_ticket(ticket_id)
-            return JsonResponse({'success': True, 'message': 'Ticket deleted successfully.'})
-
-        elif request.method == 'PATCH':
-            # Check domain permission
-            assert_can_update_ticket(request.user, ticket)
-            data = json.loads(request.body)
-            ticket = TicketService.partial_update_ticket(ticket_id, data)
-            return JsonResponse({'success': True, 'message': f'Ticket "{ticket.title}" updated successfully.'})
-
+        # Use CQRS command with authority enforcement
+        delete_use_case = DeleteTicket()
+        result = delete_use_case.execute(
+            user=request.user,
+            ticket_id=str(ticket.ticket_id),
+        )
+        
+        if result.success:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': 'Ticket deleted successfully.'})
+            messages.success(request, f"Ticket #{ticket_id} has been deleted.")
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': result.error}, status=403)
+            messages.error(request, result.error)
+    
     except AuthorizationError as e:
-        return JsonResponse({'error': str(e)}, status=403)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': str(e)}, status=403)
+        messages.error(request, str(e))
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': f'Error deleting ticket: {str(e)}'}, status=500)
+        messages.error(request, f"Error deleting ticket: {str(e)}")
+    
+    return redirect("frontend:tickets")
+
+
+@login_required
+@require_http_methods(["POST"])
+def reopen_ticket(request, ticket_id):
+    """
+    Reopen a closed or cancelled ticket.
+    Uses domain authority for permission check.
+    """
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    
+    # Check permission using domain authority
+    if not can_reopen_ticket(request.user, ticket):
+        messages.error(request, "You do not have permission to reopen this ticket.")
+        return redirect("frontend:ticket-detail", ticket_id=ticket_id)
+    
+    # Only closed or cancelled tickets can be reopened
+    if ticket.status not in ['CLOSED', 'CANCELLED', 'RESOLVED']:
+        messages.error(request, "Only closed, cancelled, or resolved tickets can be reopened.")
+        return redirect("frontend:ticket-detail", ticket_id=ticket_id)
+    
+    ticket.status = 'OPEN'
+    ticket.closed_at = None
+    ticket.save()
+    messages.success(request, f"Ticket #{ticket.id} has been reopened.")
+    return redirect("frontend:ticket-detail", ticket_id=ticket_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def ticket_assign_self(request, ticket_id):
+    """
+    Assign ticket to self using CQRS command.
+    Uses domain authority for permission check.
+    """
+    if not request.user.is_authenticated:
+        return HttpResponseForbidden()
+    
+    ticket = get_object_or_404(Ticket, pk=ticket_id)
+    
+    # Check permission using domain authority
+    if not can_assign_to_self_ticket(request.user, ticket):
+        messages.error(request, "You cannot assign this ticket to yourself.")
+        return redirect("frontend:ticket-detail", ticket_id=ticket_id)
+    
+    # Use CQRS command
+    use_case = AssignTicketToSelf()
+    result = use_case.execute(
+        user=request.user,
+        ticket_id=str(ticket.ticket_id)
+    )
+    
+    if result.success:
+        messages.success(request, result.data.get('message', 'Ticket assigned to you successfully!'))
+    else:
+        messages.error(request, result.error)
+    
+    return redirect("frontend:ticket-detail", ticket_id=ticket_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def ticket_assign_to_user(request, ticket_id, user_id):
+    """Handle assignment of a ticket to a specific user."""
+    from apps.tickets.application.assign_ticket_to_self import AssignTicketToSelf
+    from django.shortcuts import get_object_or_404
+    from apps.tickets.models import Ticket
+    from apps.users.models import User
+    
+    # Get ticket
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    
+    # Get target user
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        messages.error(request, 'User not found.')
+        return redirect('frontend:ticket-detail', ticket_id=ticket_id)
+    
+    # Check permission using domain authority (can_assign)
+    from apps.tickets.domain.services.ticket_authority import can_assign as can_assign_ticket
+    if not can_assign_ticket(request.user, ticket, target_user):
+        messages.error(request, 'You do not have permission to assign this ticket.')
+        return redirect('frontend:ticket-detail', ticket_id=ticket_id)
+    
+    # Use the CQRS command to assign
+    use_case = AssignTicketToSelf()
+    try:
+        result = use_case.execute(request.user, str(ticket.ticket_id), target_user.id)
+        if result.success:
+            messages.success(request, result.data.get('message', f'Ticket assigned to {target_user.username} successfully!'))
+        else:
+            messages.error(request, result.error)
+    except ValueError as e:
+        messages.error(request, str(e))
+    
+    return redirect('frontend:ticket-detail', ticket_id=ticket_id)
+
+
+def ticket_crud(request):
+    """Ticket CRUD endpoint for API compatibility."""
+    return JsonResponse({"status": "ok"})
 

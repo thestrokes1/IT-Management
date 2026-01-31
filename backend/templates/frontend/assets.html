@@ -10,14 +10,13 @@
         <p class="text-xs sm:text-base text-gray-600">Manage and track all IT assets in your organization</p>
     </div>
 
-            {% if permissions.can_create %}
-            <div class="mb-6">
-                <a href="{% url 'frontend:create-asset' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
-                    + Add New Asset
-                </a>
-            </div>
-            {% endif %}
-
+    {% if permissions.can_create %}
+    <div class="mb-6">
+        <a href="{% url 'frontend:create-asset' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
+            + Add New Asset
+        </a>
+    </div>
+    {% endif %}
 
     <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
@@ -44,6 +43,7 @@
                     <option value="RETIRED">Retired</option>
                 </select>
             </div>
+        </div>
     </div>
 
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -62,6 +62,7 @@
                 <tbody class="divide-y divide-gray-200">
                     {% if assets %}
                         {% for asset in assets %}
+                        {% with asset_perms=permissions_map|get_item:asset.id %}
                         <tr class="hover:bg-gray-50 transition asset-row" data-id="{{ asset.id }}">
                             <td class="px-3 sm:px-6 py-2 sm:py-4 font-medium text-gray-900">{{ asset.name }}</td>
                             <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{{ asset.asset_tag }}</td>
@@ -80,27 +81,38 @@
                             </td>
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
-                                    <a href="/assets/{{ asset.id }}/" class="text-blue-600 hover:text-blue-900">[ Open ]</a>
-                                    {% with permissions=permissions_map|get_item:asset.id %}
-                                        {% if permissions.can_update %}
-                                                <a href="{% url 'frontend:edit-asset' asset.id %}" class="text-blue-600 hover:text-blue-900">
-                                                    Edit
-                                                </a>
-                                            {% else %}
-                                                <span class="text-gray-400 cursor-not-allowed" title="No permission to edit">
-                                                    Edit
-                                                </span>
-                                            {% endif %}
+                                    <a href="/assets/{{ asset.id }}/" class="text-blue-600 hover:text-blue-900">Open</a>
+                                    
+                                    {% if asset_perms.assigned_to_me and asset_perms.can_unassign %}
+                                        <form method="post"
+                                              action="{% url 'frontend:asset_unassign_self' asset.id %}"
+                                              style="display:inline;">
+                                            {% csrf_token %}
+                                            <button class="text-orange-600 hover:text-orange-900">
+                                                Unassign
+                                            </button>
+                                        </form>
+                                    {% endif %}
 
-                                        {% if permissions.can_delete %}
-                                            <button onclick="deleteAsset({{ asset.id }}, '{{ asset.name|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
-                                        {% else %}
-                                            <span class="text-gray-400 cursor-not-allowed" title="No permission to delete">Delete</span>
-                                        {% endif %}
-                                    {% endwith %}
+                                    {% if asset_perms.can_update %}
+                                        <a href="{% url 'frontend:edit-asset' asset.id %}" class="text-blue-600 hover:text-blue-900">
+                                            Edit
+                                        </a>
+                                    {% else %}
+                                        <span class="text-gray-400 cursor-not-allowed" title="No permission to edit">
+                                            Edit
+                                        </span>
+                                    {% endif %}
+
+                                    {% if asset_perms.can_delete %}
+                                        <button onclick="deleteAsset({{ asset.id }}, '{{ asset.name|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
+                                    {% else %}
+                                        <span class="text-gray-400 cursor-not-allowed" title="No permission to delete">Delete</span>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
+                        {% endwith %}
                         {% endfor %}
                     {% else %}
                         <tr>
@@ -117,12 +129,14 @@
                 </tbody>
             </table>
         </div>
+    </div>
 
     <div class="mt-6 sm:mt-8 bg-blue-50 rounded-lg p-4 sm:p-6">
         <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2">API Access</h3>
         <p class="text-xs sm:text-sm text-gray-600 mb-4">Access assets via REST API:</p>
         <code class="bg-gray-100 p-3 rounded text-sm text-gray-800">GET /api/assets/</code>
     </div>
+</div>
 
 <script>
 console.log('Assets page loaded');
@@ -133,7 +147,7 @@ function deleteAsset(assetId, assetName) {
     console.log('Using native confirm:', useNativeConfirm);
     
     const confirmed = useNativeConfirm 
-        ? confirm(\)
+        ? confirm('Are you sure you want to delete "' + assetName + '"? This action cannot be undone.')
         : true;
     
     if (useNativeConfirm || typeof showConfirmation !== 'function') {
@@ -143,7 +157,7 @@ function deleteAsset(assetId, assetName) {
     } else {
         showConfirmation(
             'Delete Asset',
-            \,
+            'Are you sure you want to delete "' + assetName + '"? This action cannot be undone.',
             function() {
                 executeDelete(assetId);
             }
@@ -157,7 +171,7 @@ function executeDelete(assetId) {
                      document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
     console.log('CSRF Token:', csrfToken ? 'found' : 'not found');
     
-    fetch(\, {
+    fetch('/assets/api/' + assetId + '/', {
         method: 'DELETE',
         headers: {
             'X-CSRFToken': csrfToken || '{{ csrf_token }}'
@@ -169,14 +183,14 @@ function executeDelete(assetId) {
             return response.json();
         }
         return response.text().then(text => {
-            throw new Error(text || \);
+            throw new Error(text || 'HTTP ' + response.status);
         });
     })
     .then(data => {
         console.log('Response data:', data);
         if (data.success) {
             showToast('Asset deleted successfully', 'success');
-            const row = document.querySelector(\);
+            const row = document.querySelector('.asset-row[data-id="' + assetId + '"]');
             if (row) {
                 row.style.transition = 'opacity 0.3s';
                 row.style.opacity = '0';
@@ -219,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const matchesSearch = name.includes(searchTerm) || tag.includes(searchTerm);
 
-            row.style.display = matchesSearch && matchesCategory && matchesStatus ? '' : 'none';
+            row.style.display = matchesSearch ? '' : 'none';
         });
     }
 
@@ -229,3 +243,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

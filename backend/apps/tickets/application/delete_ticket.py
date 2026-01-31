@@ -3,12 +3,16 @@ Ticket deletion use case.
 
 Application layer for deleting tickets.
 Handles authorization and transaction boundaries.
+Authorization is enforced via domain service with strict RBAC.
 """
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from apps.tickets.domain.services.ticket_authority import assert_can_delete_ticket
+from apps.tickets.domain.services.ticket_authority import (
+    assert_can_delete,
+    can_delete,
+)
 
 
 @dataclass
@@ -34,6 +38,7 @@ class DeleteTicket:
     Business Rules:
     - Authorization check via domain service
     - Cascades deletion of related records
+    - Technician can only delete tickets assigned to them
 
     Input (via execute):
         user: User - User performing the deletion
@@ -86,7 +91,10 @@ class DeleteTicket:
             return DeleteTicketResult.fail("Ticket not found")
 
         # Authorization check - raises AuthorizationError if not authorized
-        assert_can_delete_ticket(user, ticket)
+        try:
+            assert_can_delete(user, ticket)
+        except Exception as e:
+            return DeleteTicketResult.fail(str(e))
 
         # Delete with cascade
         with transaction.atomic():
@@ -113,4 +121,33 @@ class DeleteTicket:
                 'message': 'Ticket deleted successfully',
             }
         )
+
+
+class CanDeleteTicket:
+    """
+    Simple check if user can delete a ticket.
+    
+    Returns:
+        bool: True if user can delete the ticket
+    """
+    
+    def check(self, user: Any, ticket_id: str) -> bool:
+        """
+        Check if user can delete the ticket.
+        
+        Args:
+            user: User attempting to delete
+            ticket_id: UUID of ticket to delete
+            
+        Returns:
+            bool: True if authorized, False otherwise
+        """
+        from apps.tickets.models import Ticket
+        
+        try:
+            ticket = Ticket.objects.get(ticket_id=ticket_id)
+        except Ticket.DoesNotExist:
+            return False
+        
+        return can_delete(user, ticket)
 

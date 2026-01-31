@@ -3,7 +3,8 @@
 
 from django.db.models import QuerySet
 from typing import List, Dict, Any, Optional
-
+from django.db.models import Q
+from apps.assets.models import Asset
 
 class AssetQuery:
     """
@@ -112,3 +113,14 @@ class AssetQuery:
             'category', 'assigned_to'
         ).order_by('name')
 
+    @staticmethod
+    def get_unassigned_or_assigned_to(user):
+        """
+        Assets visible to a technician:
+        - unassigned assets
+        - assets assigned to that technician
+        """
+        return Asset.objects.filter(
+            Q(assigned_to__isnull=True) |
+            Q(assigned_to=user)
+        )

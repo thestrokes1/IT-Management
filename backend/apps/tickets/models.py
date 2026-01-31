@@ -98,6 +98,12 @@ class Ticket(models.Model):
         ('URGENT', 'Urgent'),
     ]
     
+    # Assignment status choices
+    ASSIGNMENT_STATUS_CHOICES = [
+        ('UNASSIGNED', 'Unassigned'),
+        ('ASSIGNED', 'Assigned'),
+    ]
+    
     # Ticket ID (unique identifier)
     ticket_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     
@@ -123,6 +129,9 @@ class Ticket(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tickets_assigned'
     )
     assigned_team = models.CharField(max_length=100, blank=True)
+    assignment_status = models.CharField(
+        max_length=20, choices=ASSIGNMENT_STATUS_CHOICES, default='UNASSIGNED'
+    )
     
     # Timeline
     created_at = models.DateTimeField(auto_now_add=True)

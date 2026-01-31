@@ -1,8 +1,11 @@
-# Asset views for IT Management Platform.
-# Contains all asset-related views (list, create, edit, delete).
-# Uses CQRS pattern: Queries for reads, Services for writes.
+"""
+Asset views for IT Management Platform.
+Contains all asset-related views (list, create, edit, delete).
+Uses CQRS pattern: Queries for reads, Services for writes.
+Uses permission_mapper for consistent UI permission flags.
+"""
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
@@ -19,14 +22,30 @@ from apps.assets.domain.services.asset_authority import (
     assert_can_delete_asset,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.frontend.permissions_mapper import (
+    build_asset_ui_permissions,
+    build_assets_permissions_map,
+    get_list_permissions,
+)
 
 
-class AssetsView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
+class AssetsView(LoginRequiredMixin, TemplateView):
     """
     Assets management web interface.
     Uses AssetQuery for read operations with role-based access control.
     Only MANAGER+ roles can view all assets. VIEWER/TECHNICIAN are blocked.
-    Uses FrontendAdminReadMixin for consistent permission enforcement.
+    Uses permission_mapper for consistent UI permission flags.
+    
+    UI Permission Flags Contract:
+    {
+        "can_view": bool,
+        "can_update": bool,
+        "can_delete": bool,
+        "can_assign": bool,
+        "can_unassign": bool,
+        "can_self_assign": bool,
+        "assigned_to_me": bool,
+    }
     """
     template_name = 'frontend/assets.html'
     login_url = 'frontend:login'
@@ -34,24 +53,30 @@ class AssetsView(LoginRequiredMixin, FrontendAdminReadMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Use Query for reads - only reached if permission granted
-        assets = AssetQuery.get_all()
+        user = self.request.user
+
+        if user.role == 'TECHNICIAN':
+            assets = AssetQuery.get_unassigned_or_assigned_to(user)
+        else:
+            assets = AssetQuery.get_all()
+
         status_choices = AssetQuery.get_status_choices()
         category_choices = AssetQuery.get_categories()
         
-        # Compute permissions map for each asset
-        permissions_map = {}
-        for asset in assets:
-            # Get the actual asset object for permissions check
-            asset_obj = asset.to_dict() if hasattr(asset, 'to_dict') else asset
-            permissions_map[asset.id] = get_asset_permissions(self.request.user, asset_obj)
+        # Build permissions map using permission_mapper
+        permissions_map = build_assets_permissions_map(user, assets)
+        
+        # Get list-level permissions
+        list_permissions = get_list_permissions(user)
+        list_permissions['can_create'] = can_create_asset(user)
         
         context.update({
-        'assets': assets,
-        'status_choices': status_choices,
-        'category_choices': category_choices,
-        'permissions_map': permissions_map,
-        'permissions': {'can_create': can_create_asset(self.request.user)},
-    })
+            'assets': assets,
+            'status_choices': status_choices,
+            'category_choices': category_choices,
+            'permissions_map': permissions_map,
+            'permissions': list_permissions,
+        })
         return context
 
 
@@ -69,16 +94,15 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
         categories = AssetQuery.get_categories()
         available_users = AssetQuery.get_active_users()
         
-        # Pass permissions object for template consistency
-        permissions = {
-        'can_create': can_create_asset(self.request.user),
-    }
+        # Get list permissions for template consistency
+        list_permissions = get_list_permissions(self.request.user)
+        list_permissions['can_create'] = can_create_asset(self.request.user)
         
         context.update({
             'categories': categories,
             'available_users': available_users,
             'form': {},
-            'permissions': permissions,
+            'permissions': list_permissions,
         })
         return context
     
@@ -113,10 +137,55 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
             return render(request, self.template_name, context)
 
 
+class AssetDetailView(LoginRequiredMixin, TemplateView):
+    """
+    Asset detail view.
+    Uses AssetQuery for reads.
+    Uses permission_mapper for UI permission flags.
+    """
+    template_name = 'frontend/asset_detail.html'
+    login_url = 'frontend:login'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        asset_id = self.kwargs.get('asset_id')
+        
+        # Use Query for reads
+        asset = AssetQuery.get_with_details(asset_id)
+        
+        if asset is None:
+            messages.error(self.request, 'Asset not found.')
+            return redirect('frontend:assets')
+        
+        # Build UI permission flags using permission_mapper
+        permissions = build_asset_ui_permissions(self.request.user, asset)
+        
+        # Get list of assignable users based on role
+        from apps.users.models import User
+        user = self.request.user
+        
+        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+            # Show all technicians for assignment
+            assignable_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
+        elif user.role == 'TECHNICIAN':
+            # Technician can only see themselves for self-assignment
+            assignable_users = User.objects.filter(id=user.id)
+        else:
+            assignable_users = User.objects.none()
+        
+        context.update({
+            'asset': asset,
+            'permissions': permissions,
+            'assignable_users': assignable_users,
+        })
+        return context
+
+
 class EditAssetView(CanManageAssetsMixin, TemplateView):
     """
     Edit asset web interface.
     Uses AssetQuery for reads, AssetService for writes.
+    Uses permission_mapper for UI permission flags.
     """
     template_name = 'frontend/edit-asset.html'
     login_url = 'frontend:login'
@@ -135,13 +204,11 @@ class EditAssetView(CanManageAssetsMixin, TemplateView):
         categories = AssetQuery.get_categories()
         available_users = AssetQuery.get_active_users()
         
-        # Compute permissions for the asset
-        asset_dict = asset.to_dict() if hasattr(asset, 'to_dict') else asset
-        permissions = get_asset_permissions(self.request.user, asset_dict)
+        # Build UI permission flags using permission_mapper
+        permissions = build_asset_ui_permissions(self.request.user, asset)
         
         context.update({
             'asset': asset,
-            'asset_dict': asset_dict,
             'categories': categories,
             'available_users': available_users,
             'form': {},
@@ -203,11 +270,8 @@ def delete_asset(request, asset_id):
         if asset is None:
             return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
         
-        # Convert to dict if it's a DTO
-        asset_data = asset.to_dict() if hasattr(asset, 'to_dict') else asset
-        
         # Check domain permission
-        assert_can_delete_asset(request.user, asset_data)
+        assert_can_delete_asset(request.user, asset)
         
         # Use Service for write operation
         AssetService.delete_asset(asset_id)
@@ -220,14 +284,6 @@ def delete_asset(request, asset_id):
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': f'Error deleting asset: {str(e)}'}, status=500)
-
-
-# Re-export asset_crud for backwards compatibility if needed
-try:
-    from apps.assets.views import asset_crud
-    _has_asset_crud = True
-except ImportError:
-    _has_asset_crud = False
 
 
 @login_required(login_url='frontend:login')
@@ -245,13 +301,7 @@ def asset_crud(request, asset_id):
             if asset is None:
                 return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
             
-            # Convert to dict if it's a DTO
-            if hasattr(asset, 'to_dict'):
-                asset_data = asset.to_dict()
-            else:
-                asset_data = asset
-            
-            return JsonResponse({'success': True, 'asset': asset_data})
+            return JsonResponse({'success': True, 'asset': asset})
         
         # DELETE - Delete asset
         elif request.method == 'DELETE':
@@ -297,27 +347,21 @@ def asset_crud(request, asset_id):
             if asset is None:
                 return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
             
-            # Convert to dict if it's a DTO
-            if hasattr(asset, 'to_dict'):
-                asset_data = asset.to_dict()
-            else:
-                asset_data = asset
-            
             # Use Service for partial update
             updated_asset = AssetService.update_asset(
                 request=request,
                 asset_id=asset_id,
-                name=data.get('name', asset_data.get('name', '')).strip(),
-                description=data.get('description', asset_data.get('description', '')).strip(),
-                category_id=data.get('category_id', data.get('category', asset_data.get('category_id'))),
-                serial_number=data.get('serial_number', asset_data.get('serial_number', '')).strip(),
-                asset_tag=data.get('asset_tag', asset_data.get('asset_tag', '')).strip(),
-                status=data.get('status', asset_data.get('status', 'AVAILABLE')),
-                location=data.get('location', asset_data.get('location', '')).strip(),
-                purchase_date=data.get('purchase_date', asset_data.get('purchase_date', '')),
-                purchase_price=data.get('purchase_price', asset_data.get('purchase_price', '')),
-                warranty_expiry=data.get('warranty_expiry', asset_data.get('warranty_expiry', '')),
-                assigned_to_id=data.get('assigned_to_id', data.get('assigned_to', asset_data.get('assigned_to_id')))
+                name=data.get('name', '').strip(),
+                description=data.get('description', '').strip(),
+                category_id=data.get('category_id', data.get('category')),
+                serial_number=data.get('serial_number', '').strip(),
+                asset_tag=data.get('asset_tag', '').strip(),
+                status=data.get('status', 'AVAILABLE'),
+                location=data.get('location', '').strip(),
+                purchase_date=data.get('purchase_date', ''),
+                purchase_price=data.get('purchase_price', ''),
+                warranty_expiry=data.get('warranty_expiry', ''),
+                assigned_to_id=data.get('assigned_to_id', data.get('assigned_to'))
             )
             
             return JsonResponse({'success': True, 'message': f'Asset "{updated_asset.name}" updated successfully.'})
@@ -327,4 +371,139 @@ def asset_crud(request, asset_id):
         traceback.print_exc()
         return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
 
+
+@login_required
+@require_http_methods(["POST"])
+def asset_assign_self(request, asset_id):
+    """Handle self-assignment of an asset."""
+    from apps.assets.application.assign_asset_to_self import AssignAssetToSelf
+    from django.utils.text import slugify
+    from uuid import UUID
+    
+    # Convert asset_id to UUID string
+    try:
+        # Handle case where asset_id might be an integer from URL
+        if isinstance(asset_id, int):
+            from apps.assets.models import Asset
+            asset = get_object_or_404(Asset, id=asset_id)
+            asset_id_str = str(asset.asset_id)
+        else:
+            asset_id_str = str(asset_id)
+    except (ValueError, TypeError):
+        messages.error(request, 'Invalid asset ID.')
+        return redirect('frontend:assets')
+    
+    # Get asset for permission check
+    from apps.assets.models import Asset
+    try:
+        asset = Asset.objects.get(id=asset_id)
+    except Asset.DoesNotExist:
+        messages.error(request, 'Asset not found.')
+        return redirect('frontend:assets')
+    
+    # Check permission using domain authority
+    from apps.assets.domain.services.asset_authority import can_assign_to_self as can_assign_to_self_asset
+    if not can_assign_to_self_asset(request.user, asset):
+        messages.error(request, 'You cannot assign this asset to yourself.')
+        return redirect('frontend:assets')
+
+    
+    # Execute use case - pass the asset_id string, not the asset object
+    use_case = AssignAssetToSelf()
+    try:
+        result = use_case.execute(request.user, asset_id_str)
+        if result.success:
+            messages.success(request, result.data.get('message', 'Asset assigned to you successfully!'))
+        else:
+            messages.error(request, result.error)
+    except ValueError as e:
+        messages.error(request, str(e))
+    
+    return redirect('frontend:assets')
+
+
+@login_required
+@require_http_methods(["POST"])
+def asset_assign_to_user(request, asset_id, user_id):
+    """Handle assignment of an asset to a specific user."""
+    from apps.assets.application.assign_asset_to_self import AssignAssetToSelf
+    from django.shortcuts import get_object_or_404
+    from apps.assets.models import Asset
+    from apps.users.models import User
+    
+    # Get asset
+    asset = get_object_or_404(Asset, id=asset_id)
+    
+    # Get target user
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        messages.error(request, 'User not found.')
+        return redirect('frontend:asset-detail', asset_id=asset_id)
+    
+    # Check permission using domain authority (can_assign)
+    from apps.assets.domain.services.asset_authority import can_assign as can_assign_asset
+    if not can_assign_asset(request.user, asset, target_user):
+        messages.error(request, 'You do not have permission to assign this asset.')
+        return redirect('frontend:asset-detail', asset_id=asset_id)
+    
+    # Use the CQRS command to assign
+    use_case = AssignAssetToSelf()
+    try:
+        result = use_case.execute(request.user, str(asset.asset_id), target_user.id)
+        if result.success:
+            messages.success(request, result.data.get('message', f'Asset assigned to {target_user.username} successfully!'))
+        else:
+            messages.error(request, result.error)
+    except ValueError as e:
+        messages.error(request, str(e))
+    
+    return redirect('frontend:asset-detail', asset_id=asset_id)
+
+
+# Wrapper functions for URL patterns
+def assets(request):
+    """List all assets."""
+    view = AssetsView.as_view()
+    return view(request)
+
+
+def asset_detail(request, asset_id):
+    """Show asset detail."""
+    view = AssetDetailView.as_view()
+    return view(request, asset_id=asset_id)
+
+
+def create_asset(request):
+    """Create a new asset."""
+    view = CreateAssetView.as_view()
+    return view(request)
+
+
+def edit_asset(request, asset_id):
+    """Edit an asset."""
+    view = EditAssetView.as_view()
+    return view(request, asset_id=asset_id)
+
+
+def asset_unassign_self(request, asset_id):
+    """Unassign asset from self."""
+    from django.contrib.auth.decorators import login_required
+    from django.views.decorators.http import require_POST
+    from django.shortcuts import get_object_or_404, redirect
+    from django.contrib import messages
+    from apps.assets.models import Asset
+    
+    asset = get_object_or_404(Asset, id=asset_id)
+    
+    # Check if user has permission (only assigned user or admin)
+    if not (request.user == asset.assigned_to or request.user.role in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']):
+        messages.error(request, 'You do not have permission to unassign this asset.')
+        return redirect('frontend:asset-detail', asset_id=asset_id)
+    
+    # Unassign the asset
+    asset.assigned_to = None
+    asset.save()
+    messages.success(request, 'Asset unassigned successfully.')
+    return redirect('frontend:asset-detail', asset_id=asset_id)
 

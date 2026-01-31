@@ -11,14 +11,13 @@
     </div>
 
     <!-- Create Ticket Button -->
-            {% if permissions.can_create %}
-        <div class="mb-6">
-            <a href="{% url 'frontend:create-ticket' %}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-                + Create New Ticket
-            </a>
-        </div>
-        {% endif %}
-
+    {% if permissions.can_create %}
+    <div class="mb-6">
+        <a href="{% url 'frontend:create-ticket' %}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+            + Create New Ticket
+        </a>
+    </div>
+    {% endif %}
 
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -89,23 +88,23 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-sm">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                                <span class py-1 rounded="px-3-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
                                     {{ ticket.priority|upper }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-600">{% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</td>
                             <td class="px-6 py-4 text-sm">
-                                <a href="/tickets/{{ ticket.id }}/" class="text-blue-600 hover:text-blue-900 mr-4">[ Open ]</a>
+                                <a href="/tickets/{{ ticket.id }}/" class="text-blue-600 hover:text-blue-900 mr-4">Open</a>
+                                
                                 {% if ticket_perms.can_update %}
-<a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
-{% else %}
-<span class="text-gray-400 cursor-not-allowed mr-4">Edit</span>
-{% endif %}
+                                    <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
+                                {% else %}
+                                    <span class="text-gray-400 cursor-not-allowed mr-4" title="No permission to edit">Edit</span>
+                                {% endif %}
                             
                                 {% if ticket_perms.can_delete %}
-<button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
-{% endif %}
-
+                                    <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endwith %}
@@ -134,17 +133,15 @@
                         </div>
                         <div class="flex space-x-2 ml-2">
                             {% if ticket_perms.can_update %}
-<a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
-
-                                <i class="fas fa-edit text-sm"></i>
-                            </a>
+                                <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
+                                    <i class="fas fa-edit text-sm"></i>
+                                </a>
                             {% endif %}
                             {% if ticket_perms.can_delete %}
-<button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 p-1">
-{% endif %}
-
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
+                                <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 p-1">
+                                    <i class="fas fa-trash text-sm"></i>
+                                </button>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="flex justify-between items-center">

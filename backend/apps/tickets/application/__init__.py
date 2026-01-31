@@ -20,12 +20,16 @@ from apps.tickets.application.delete_ticket import (
 )
 from apps.tickets.application.assign_ticket import (
     AssignTicket,
-    AssignTicketToTeam,
+    UnassignTicket,
     AssignTicketResult,
 )
 from apps.tickets.application.close_ticket import (
     CloseTicket,
     CloseTicketResult,
+)
+from apps.tickets.application.assign_ticket_to_self import (
+    AssignTicketToSelf,
+    AssignTicketToSelfResult,
 )
 
 __all__ = [
@@ -36,8 +40,10 @@ __all__ = [
     'DeleteTicket',
     'DeleteTicketResult',
     'AssignTicket',
-    'AssignTicketToTeam',
+    'UnassignTicket',
     'AssignTicketResult',
+    'AssignTicketToSelf',
+    'AssignTicketToSelfResult',
     'CloseTicket',
     'CloseTicketResult',
 ]

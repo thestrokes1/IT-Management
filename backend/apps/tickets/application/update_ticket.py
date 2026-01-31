@@ -3,13 +3,17 @@ Ticket update use case.
 
 Application layer for updating tickets.
 Handles authorization and transaction boundaries.
+Authorization is enforced via domain service with strict RBAC.
 """
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from apps.core.domain.authorization import AuthorizationError
-from apps.tickets.domain.services.ticket_authority import assert_can_update_ticket
+from apps.tickets.domain.services.ticket_authority import (
+    assert_can_edit,
+    can_edit,
+)
 
 
 @dataclass
@@ -35,6 +39,7 @@ class UpdateTicket:
     Business Rules:
     - Authorization check via domain service
     - Supports partial updates
+    - Technician can only edit tickets assigned to them
     
     Input (via execute):
         user: User - User performing the update
@@ -88,7 +93,10 @@ class UpdateTicket:
             return UpdateTicketResult.fail("Ticket not found")
         
         # Authorization check - raises AuthorizationError if not authorized
-        assert_can_update_ticket(user, ticket)
+        try:
+            assert_can_edit(user, ticket)
+        except AuthorizationError as e:
+            return UpdateTicketResult.fail(str(e))
         
         # Update fields
         allowed_fields = {
@@ -126,4 +134,33 @@ class UpdateTicket:
                 'updated_at': ticket.updated_at.isoformat(),
             }
         )
+
+
+class CanEditTicket:
+    """
+    Simple check if user can edit a ticket.
+    
+    Returns:
+        bool: True if user can edit the ticket
+    """
+    
+    def check(self, user: Any, ticket_id: str) -> bool:
+        """
+        Check if user can edit the ticket.
+        
+        Args:
+            user: User attempting to edit
+            ticket_id: UUID of ticket to edit
+            
+        Returns:
+            bool: True if authorized, False otherwise
+        """
+        from apps.tickets.models import Ticket
+        
+        try:
+            ticket = Ticket.objects.get(ticket_id=ticket_id)
+        except Ticket.DoesNotExist:
+            return False
+        
+        return can_edit(user, ticket)
 

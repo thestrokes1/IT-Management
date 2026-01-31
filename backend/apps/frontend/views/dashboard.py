@@ -414,3 +414,10 @@ def dashboard_stats_context(request):
         'can_access_logs': can_access_logs,
     }
 
+
+# Wrapper functions for URL patterns
+def dashboard(request):
+    """Main dashboard view."""
+    view = DashboardView.as_view()
+    return view(request)
+
