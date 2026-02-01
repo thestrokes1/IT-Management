@@ -10,3 +10,18 @@ __pycache__/
 
 # Env
 .env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
