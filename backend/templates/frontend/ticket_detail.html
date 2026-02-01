@@ -1,0 +1,198 @@
+{% extends "frontend/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 sm:py-8">
+    <!-- Back -->
+    <div class="mb-4">
+        <a href="{% url 'frontend:tickets' %}"
+           class="text-blue-600 hover:text-blue-900 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15 19l-7-7 7-7"></path>
+            </svg>
+            {% trans "Back to Tickets" %}
+        </a>
+    </div>
+
+    <!-- Ticket Card -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ ticket.title }}</h1>
+                <p class="text-sm text-gray-500 mt-1">
+                    #{{ ticket.id }} · {% trans "Created by" %} {{ ticket.created_by.username }}
+                </p>
+            </div>
+
+            <span class="px-3 py-1 rounded-full text-sm font-medium
+                {% if ticket.status == 'OPEN' %}bg-blue-100 text-blue-800
+                {% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
+                {% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800
+                {% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-800
+                {% else %}bg-red-100 text-red-800{% endif %}">
+                {{ ticket.status|upper }}
+            </span>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Details -->
+            <div>
+                <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Details" %}</h3>
+                <dl class="space-y-2">
+                    <div class="flex justify-between py-2 border-b">
+                        <dt class="text-gray-600">{% trans "Priority" %}</dt>
+                        <dd class="font-medium">{{ ticket.priority.name|default:"-" }}</dd>
+                    </div>
+
+                    <div class="flex justify-between py-2 border-b">
+                        <dt class="text-gray-600">{% trans "Category" %}</dt>
+                        <dd class="font-medium">{{ ticket.category.name|default:"-" }}</dd>
+                    </div>
+
+                    <!-- Assignment -->
+                    <div class="flex justify-between py-2 border-b items-center">
+                        <dt class="text-gray-600">{% trans "Assignment" %}</dt>
+                        <dd class="font-medium flex items-center gap-3">
+                            {% if ticket.assigned_to %}
+                                <span class="px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm">
+                                    {{ ticket.assigned_to.username }}
+                                </span>
+                            {% else %}
+                                <span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm">
+                                    {% trans "Unassigned" %}
+                                </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+
+                    <div class="flex justify-between py-2 border-b">
+                        <dt class="text-gray-600">{% trans "Created At" %}</dt>
+                        <dd class="font-medium">{{ ticket.created_at|date:"M d, Y H:i" }}</dd>
+                    </div>
+
+                    <div class="flex justify-between py-2 border-b">
+                        <dt class="text-gray-600">{% trans "Updated At" %}</dt>
+                        <dd class="font-medium">{{ ticket.updated_at|date:"M d, Y H:i" }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Description -->
+            <div>
+                <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Description" %}</h3>
+                <p class="text-gray-700 whitespace-pre-wrap">
+                    {{ ticket.description|default:"No description" }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        {% if not is_deleted %}
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div class="flex flex-wrap gap-3">
+                
+                {# ===== Assignment dropdown for SUPERADMIN, MANAGER, IT_ADMIN ===== #}
+                {% if request.user.role in "SUPERADMIN,MANAGER,IT_ADMIN" %}
+                    {% if assignable_users %}
+                    <div class="relative inline-block">
+                        <form method="post" action="{% url 'frontend:ticket_assign_to_user' ticket.id 0 %}" id="ticket-assign-form" style="display:inline;">
+                            {% csrf_token %}
+                            <select name="user_id" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm" onchange="if(this.value){this.form.action='{% url 'frontend:ticket_assign_to_user' ticket.id 0 %}'.replace('0', this.value); this.form.submit();}">
+                                <option value="">{% trans "Assign to..." %}</option>
+                                {% for user in assignable_users %}
+                                <option value="{{ user.id }}">{{ user.username }} ({{ user.role }})</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </div>
+                    {% endif %}
+                {% endif %}
+                
+                {# ===== Self-assign button for TECHNICIAN ===== #}
+                {% if request.user.role == "TECHNICIAN" and permissions.can_self_assign %}
+                <form method="post" action="{% url 'frontend:ticket_assign_self' ticket.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm" onclick="return confirm('{% trans "Assign this ticket to yourself?" %}');">
+                        Assign to me
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if permissions.can_edit %}
+                <a href="{% url 'frontend:edit-ticket' ticket.id %}"
+                   class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
+                    {% trans "[ Edit ]" %}
+                </a>
+                {% endif %}
+
+                {% if permissions.can_resolve %}
+                <a href="{% url 'frontend:resolve-ticket' ticket.id %}"
+                   class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                    {% trans "[ Resolve ]" %}
+                </a>
+                {% endif %}
+
+                {% if permissions.can_reopen %}
+                <a href="{% url 'frontend:reopen-ticket' ticket.id %}"
+                   class="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 text-sm">
+                    {% trans "[ Reopen ]" %}
+                </a>
+                {% endif %}
+
+                {% if permissions.can_cancel %}
+                <a href="{% url 'frontend:cancel-ticket' ticket.id %}"
+                   class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm"
+                   onclick="return confirm('{% trans "Cancel this ticket?" %}');">
+                    {% trans "[ Cancel ]" %}
+                </a>
+                {% endif %}
+
+                {% if permissions.can_delete %}
+                <a href="{% url 'frontend:delete-ticket' ticket.id %}"
+                   class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm"
+                   onclick="return confirm('{% trans "Delete this ticket?" %}');">
+                    {% trans "[ Delete ]" %}
+                </a>
+                {% endif %}
+
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Activity -->
+    <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">{% trans "Activity Timeline" %}</h3>
+
+        {% if activities %}
+            <div class="space-y-4">
+                {% for activity in activities %}
+                <div class="flex gap-4">
+                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span class="text-blue-600 text-sm font-medium">
+                            {{ activity.actor_username|first|upper }}
+                        </span>
+                    </div>
+                    <div class="flex-1 pb-4 border-b border-gray-100">
+                        <div class="flex justify-between">
+                            <p class="text-sm font-medium text-gray-900">
+                                {{ activity.action_label }}
+                            </p>
+                            <span class="text-xs text-gray-500">
+                                {{ activity.created_at|timesince }} ago
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            by {{ activity.actor_username }}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-gray-500 text-sm">{% trans "No activity recorded." %}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

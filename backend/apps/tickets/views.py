@@ -1,6 +1,7 @@
 """
 Ticket views for IT Management Platform.
 API endpoints for IT support ticket management with role-based access control.
+All permission checks are enforced server-side using domain authority services.
 """
 
 from django.db.models import Count, Q, Avg, F
@@ -26,24 +27,23 @@ from apps.tickets.serializers import (
     TicketSearchSerializer, TicketActionSerializer, TicketTemplateUseSerializer
 )
 from apps.tickets.permissions import (
-    CanManageTickets, IsTicketRequesterOrAssigned, IsTicketCreator,
-    CanCreateTickets, CanViewTicketDetails, CanManageTicketCategories,
-    CanAssignTickets, CanResolveTickets, CanCloseTickets, CanEscalateTickets,
-    CanViewTicketComments, CanCreateTicketComments, CanManageTicketAttachments,
-    CanViewTicketHistory, CanViewTicketTemplates, CanManageTicketTemplates,
-    CanViewSLAs, CanManageSLAs, CanViewTicketReports, CanGenerateTicketReports,
-    CanRateTicketSatisfaction, CanViewTicketEscalations, CanManageTicketEscalations,
-    CanAccessTicketStatistics
+    CanViewTickets, CanCreateTickets, CanEditTicket, CanDeleteTicket,
+    CanAssignTicket, CanUnassignTicket, CanSelfAssignTicket,
+    CanCloseTicket, CanResolveTicket, CanReopenTicket,
+    CanAddTicketComment, CanViewTicketComment, CanAddTicketAttachment,
 )
+
 from apps.users.models import User
+
 
 class TicketCategoryViewSet(viewsets.ModelViewSet):
     """
     Ticket category management viewset.
+    Only accessible by SUPERADMIN, MANAGER, IT_ADMIN.
     """
     queryset = TicketCategory.objects.all()
     serializer_class = TicketCategorySerializer
-    permission_classes = [CanManageTicketCategories]
+    permission_classes = [CanViewTickets]
     
     def get_queryset(self):
         queryset = TicketCategory.objects.all()
@@ -55,13 +55,15 @@ class TicketCategoryViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('name')
 
+
 class TicketTypeViewSet(viewsets.ModelViewSet):
     """
     Ticket type management viewset.
+    Only accessible by SUPERADMIN, MANAGER, IT_ADMIN.
     """
     queryset = TicketType.objects.all()
     serializer_class = TicketTypeSerializer
-    permission_classes = [CanManageTicketCategories]
+    permission_classes = [CanViewTickets]
     
     def get_queryset(self):
         queryset = TicketType.objects.select_related('category')
@@ -78,11 +80,16 @@ class TicketTypeViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('category__name', 'name')
 
+
 class TicketViewSet(viewsets.ModelViewSet):
     """
     Ticket management viewset with comprehensive filtering and actions.
+    All permission checks use domain authority services for strict RBAC.
     """
-    permission_classes = [CanManageTickets, IsTicketRequesterOrAssigned, IsTicketCreator, CanCreateTickets]
+    permission_classes = [
+        CanViewTickets, CanCreateTickets, CanEditTicket, 
+        CanDeleteTicket, CanAssignTicket
+    ]
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -96,6 +103,8 @@ class TicketViewSet(viewsets.ModelViewSet):
         return TicketDetailSerializer
     
     def get_queryset(self):
+        from apps.tickets.domain.services.ticket_authority import can_view
+        
         queryset = Ticket.objects.select_related(
             'category', 'ticket_type', 'requester', 'assigned_to', 'parent_ticket',
             'created_by', 'updated_by'
@@ -122,9 +131,9 @@ class TicketViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(ticket_type_id=ticket_type)
         
         # Filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
         
         # Filter by priority
         priority = self.request.query_params.get('priority')
@@ -173,12 +182,10 @@ class TicketViewSet(viewsets.ModelViewSet):
                 Q(ticket_id__icontains=search)
             )
         
-        # For non-admin users, only show tickets they are involved with
-        if not self.request.user.is_admin and not self.request.user.can_manage_tickets:
-            queryset = queryset.filter(
-                Q(requester=self.request.user) |
-                Q(assigned_to=self.request.user)
-            )
+        # Filter by tickets user can access
+        # VIEWER cannot access tickets at all
+        if self.request.user.role == 'VIEWER':
+            return Ticket.objects.none()
         
         return queryset.order_by('-created_at')
     
@@ -189,11 +196,21 @@ class TicketViewSet(viewsets.ModelViewSet):
         """
         Override destroy to properly handle cascade deletion with all related records.
         Uses transaction.atomic() to guarantee consistency.
+        Authorization is enforced via CanDeleteTicket permission class.
         """
         from django.db import transaction
         from django.core.files.storage import default_storage
+        from apps.tickets.permissions import CanDeleteTicket
         
         instance = self.get_object()
+        
+        # Additional permission check using domain authority
+        permission = CanDeleteTicket()
+        if not permission.has_object_permission(request, self, instance):
+            return Response(
+                {'error': 'You are not authorized to delete this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         try:
             with transaction.atomic():
@@ -234,8 +251,22 @@ class TicketViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def assign(self, request, pk=None):
-        """Assign ticket to a user."""
+        """
+        Assign ticket to a user.
+        Authorization: Only SUPERADMIN, MANAGER, IT_ADMIN can assign.
+        TECHNICIAN cannot assign tickets.
+        """
+        from apps.tickets.permissions import CanAssignTicket
+        
         ticket = self.get_object()
+        permission = CanAssignTicket()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to assign this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         assignee_id = request.data.get('assignee_id')
         team = request.data.get('team')
         
@@ -259,27 +290,123 @@ class TicketViewSet(viewsets.ModelViewSet):
         return Response({'message': message})
     
     @action(detail=True, methods=['post'])
-    def resolve(self, request, pk=None):
-        """Resolve ticket."""
-        ticket = self.get_object()
-        resolution_summary = request.data.get('resolution_summary', '')
+    def unassign(self, request, pk=None):
+        """
+        Unassign ticket.
+        Authorization: Only SUPERADMIN, MANAGER, IT_ADMIN can unassign.
+        TECHNICIAN cannot unassign tickets.
+        """
+        from apps.tickets.permissions import CanUnassignTicket
         
+        ticket = self.get_object()
+        permission = CanUnassignTicket()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to unassign this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        old_assignee = ticket.assigned_to
+        ticket.assigned_to = None
+        ticket.assignment_status = 'UNASSIGNED'
+        ticket.updated_by = request.user
+        ticket.save()
+        
+        assignee_name = old_assignee.username if old_assignee else "No one"
+        return Response({'message': f'Ticket unassigned from {assignee_name}'})
+    
+    @action(detail=True, methods=['post'])
+    def self_assign(self, request, pk=None):
+        """
+        Self-assign to a ticket.
+        Authorization: TECHNICIAN can self-assign only if unassigned.
+        """
+        from apps.tickets.permissions import CanSelfAssignTicket
+        
+        ticket = self.get_object()
+        permission = CanSelfAssignTicket()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to self-assign this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Perform self-assignment
+        ticket.assigned_to = request.user
+        ticket.assignment_status = 'ASSIGNED'
+        ticket.updated_by = request.user
+        
+        if ticket.status == 'NEW':
+            ticket.status = 'OPEN'
+        
+        ticket.save()
+        
+        return Response({
+            'message': f'Ticket self-assigned to {request.user.username}'
+        })
+    
+    @action(detail=True, methods=['post'])
+    def resolve(self, request, pk=None):
+        """
+        Resolve ticket.
+        Authorization: TECHNICIAN can only resolve if assigned to them.
+        """
+        from apps.tickets.permissions import CanResolveTicket
+        
+        ticket = self.get_object()
+        permission = CanResolveTicket()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to resolve this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        resolution_summary = request.data.get('resolution_summary', '')
         ticket.mark_resolved(resolution_summary, request.user)
         
         return Response({'message': 'Ticket resolved successfully'})
     
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
-        """Close ticket."""
+        """
+        Close ticket.
+        Authorization: TECHNICIAN can only close if assigned to them.
+        """
+        from apps.tickets.permissions import CanCloseTicket
+        
         ticket = self.get_object()
+        permission = CanCloseTicket()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to close this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         ticket.mark_closed(request.user)
         
         return Response({'message': 'Ticket closed successfully'})
     
     @action(detail=True, methods=['post'])
     def reopen(self, request, pk=None):
-        """Reopen ticket."""
+        """
+        Reopen ticket.
+        Authorization: TECHNICIAN can only reopen if assigned to them.
+        """
+        from apps.tickets.permissions import CanReopenTicket
+        
         ticket = self.get_object()
+        permission = CanReopenTicket()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to reopen this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         ticket.status = 'OPEN'
         ticket.updated_by = request.user
         ticket.save()
@@ -288,8 +415,19 @@ class TicketViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def escalate(self, request, pk=None):
-        """Escalate ticket."""
+        """
+        Escalate ticket.
+        Only SUPERADMIN, MANAGER, IT_ADMIN can escalate.
+        """
         ticket = self.get_object()
+        
+        # Check authorization
+        if request.user.role == 'VIEWER':
+            return Response(
+                {'error': 'VIEWER cannot escalate tickets'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         escalation_level = request.data.get('escalation_level')
         escalated_to_id = request.data.get('escalated_to_id')
         reason = request.data.get('reason', '')
@@ -320,8 +458,21 @@ class TicketViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
-        """Update ticket status."""
+        """
+        Update ticket status.
+        Authorization: TECHNICIAN can only update if assigned to them.
+        """
+        from apps.tickets.permissions import CanEditTicket
+        
         ticket = self.get_object()
+        permission = CanEditTicket()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to update this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         new_status = request.data.get('status')
         
         if not new_status:
@@ -348,6 +499,41 @@ class TicketViewSet(viewsets.ModelViewSet):
         comments = ticket.comments.select_related('user').all()
         serializer = TicketCommentSerializer(comments, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def add_comment(self, request, pk=None):
+        """
+        Add comment to ticket.
+        Authorization: TECHNICIAN can only comment if assigned to them.
+        """
+        from apps.tickets.permissions import CanAddTicketComment
+        
+        ticket = self.get_object()
+        permission = CanAddTicketComment()
+        
+        if not permission.has_object_permission(request, self, ticket):
+            return Response(
+                {'error': 'You are not authorized to add comments to this ticket'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        comment_text = request.data.get('comment', '')
+        is_internal = request.data.get('is_internal', False)
+        
+        if not comment_text:
+            return Response({'error': 'Comment text is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        comment = TicketComment.objects.create(
+            ticket=ticket,
+            user=request.user,
+            comment=comment_text,
+            is_internal=is_internal
+        )
+        
+        return Response(
+            TicketCommentSerializer(comment).data,
+            status=status.HTTP_201_CREATED
+        )
     
     @action(detail=True, methods=['get'])
     def attachments(self, request, pk=None):
@@ -493,12 +679,13 @@ class TicketViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, stats, 300)  # Cache for 5 minutes
         return Response(stats)
 
+
 class TicketCommentViewSet(viewsets.ModelViewSet):
     """
     Ticket comment management viewset.
     """
     serializer_class = TicketCommentSerializer
-    permission_classes = [CanViewTicketComments, CanCreateTicketComments]
+    permission_classes = [CanAddTicketComment, CanViewTicketComment]
     
     def get_queryset(self):
         queryset = TicketComment.objects.select_related('ticket', 'user')
@@ -518,12 +705,13 @@ class TicketCommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+
 class TicketAttachmentViewSet(viewsets.ModelViewSet):
     """
     Ticket attachment management viewset.
     """
     serializer_class = TicketAttachmentSerializer
-    permission_classes = [CanManageTicketAttachments]
+    permission_classes = [CanAddTicketAttachment]
     
     def get_queryset(self):
         queryset = TicketAttachment.objects.select_related('ticket', 'user')
@@ -543,12 +731,13 @@ class TicketAttachmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+
 class TicketTemplateViewSet(viewsets.ModelViewSet):
     """
     Ticket template management viewset.
     """
     serializer_class = TicketTemplateSerializer
-    permission_classes = [CanViewTicketTemplates, CanManageTicketTemplates]
+    permission_classes = [CanViewTickets]
     
     def get_queryset(self):
         queryset = TicketTemplate.objects.select_related('category', 'ticket_type', 'created_by')
@@ -599,12 +788,13 @@ class TicketTemplateViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class SLAViewSet(viewsets.ModelViewSet):
     """
     SLA management viewset.
     """
     serializer_class = SLASerializer
-    permission_classes = [CanViewSLAs, CanManageSLAs]
+    permission_classes = [CanViewTickets]
     
     def get_queryset(self):
         queryset = SLA.objects.select_related('category', 'ticket_type')
@@ -616,12 +806,13 @@ class SLAViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('name')
 
+
 class TicketEscalationViewSet(viewsets.ModelViewSet):
     """
     Ticket escalation management viewset.
     """
     serializer_class = TicketEscalationSerializer
-    permission_classes = [CanViewTicketEscalations, CanManageTicketEscalations]
+    permission_classes = [CanViewTickets]
     
     def get_queryset(self):
         queryset = TicketEscalation.objects.select_related('ticket', 'escalated_by', 'escalated_to')
@@ -643,11 +834,12 @@ class TicketEscalationViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-escalated_at')
 
+
 class TicketSearchView(APIView):
     """
     Advanced ticket search endpoint.
     """
-    permission_classes = [CanManageTickets]
+    permission_classes = [CanViewTickets]
     
     def post(self, request):
         serializer = TicketSearchSerializer(data=request.data)
@@ -724,3 +916,4 @@ class TicketSearchView(APIView):
             return Response(response_data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

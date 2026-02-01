@@ -9,19 +9,37 @@ from django.core.validators import RegexValidator
 from django.utils import timezone
 import uuid
 
+
+class UserRole(models.TextChoices):
+    """
+    User role enum for role-based access control.
+    Ordered from lowest to highest privilege level.
+    """
+    VIEWER = 'VIEWER', 'Viewer'
+    TECHNICIAN = 'TECHNICIAN', 'Technician'
+    MANAGER = 'MANAGER', 'Manager'
+    IT_ADMIN = 'IT_ADMIN', 'IT Administrator'
+    SUPERADMIN = 'SUPERADMIN', 'Super Administrator'
+
+
+# Role level mapping for hierarchy checks
+# Higher number = more privileges
+ROLE_LEVEL = {
+    UserRole.VIEWER: 1,
+    UserRole.TECHNICIAN: 2,
+    UserRole.MANAGER: 3,
+    UserRole.IT_ADMIN: 4,
+    UserRole.SUPERADMIN: 5,
+}
+
+
 class User(AbstractUser):
     """
     Custom user model with extended fields and role-based access control.
     """
     
-    # Role choices
-    ROLE_CHOICES = [
-        ('SUPERADMIN', 'Super Administrator'),
-        ('IT_ADMIN', 'IT Administrator'),
-        ('MANAGER', 'Manager'),
-        ('TECHNICIAN', 'Technician'),
-        ('VIEWER', 'Viewer'),
-    ]
+    # Role choices - using UserRole enum for better type safety
+    ROLE_CHOICES = UserRole.choices
     
     # Status choices
     STATUS_CHOICES = [
@@ -76,44 +94,160 @@ class User(AbstractUser):
         return f"{self.username} ({self.get_role_display()})"
     
     @property
+    def role_level(self):
+        """
+        Get the numeric privilege level for this user's role.
+        Higher number = more privileges.
+        
+        Returns:
+            int: Privilege level (1=VIEWER, 2=TECHNICIAN, 3=MANAGER, 4=IT_ADMIN, 5=SUPERADMIN)
+        """
+        return ROLE_LEVEL.get(self.role, 1)
+    
+    def has_min_role(self, min_level):
+        """
+        Check if user has at least the minimum required role level.
+        
+        Args:
+            min_level: Minimum required level (int) or role name (str)
+            
+        Returns:
+            bool: True if user has minimum required role level
+        """
+        # Handle string role names
+        if isinstance(min_level, str):
+            if min_level in ROLE_LEVEL:
+                min_level = ROLE_LEVEL[min_level]
+            else:
+                # Unknown role name, treat as lowest level
+                min_level = 1
+        
+        return self.role_level >= min_level
+    
+    @property
     def is_admin(self):
-        """Check if user has admin privileges"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN']
+        """Check if user has admin privileges (IT_ADMIN or SUPERADMIN)."""
+        return self.has_min_role(UserRole.IT_ADMIN)
     
     @property
     def is_manager(self):
-        """Check if user has manager privileges"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        """Check if user has manager privileges (MANAGER or above)."""
+        return self.has_min_role(UserRole.MANAGER)
     
     @property
     def is_technician(self):
-        """Check if user has technician privileges"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
+        """Check if user has technician privileges (TECHNICIAN or above)."""
+        return self.has_min_role(UserRole.TECHNICIAN)
+    
+    @property
+    def can_view_dashboard(self):
+        """Check if user can view dashboard - All roles can access."""
+        return self.has_min_role(UserRole.VIEWER)
+    
+    @property
+    def can_access_dashboard(self):
+        """Check if user can access dashboard - All authenticated users can access."""
+        return self.is_authenticated
+    
+    @property
+    def can_access_assets(self):
+        """Check if user can access Assets menu (TECHNICIAN or above)."""
+        return self.has_min_role(UserRole.TECHNICIAN)
+
+    
+    @property
+    def can_access_projects(self):
+        """Check if user can access Projects menu (MANAGER only - IT_ADMIN excluded)."""
+        return self.role == UserRole.MANAGER or self.role == UserRole.SUPERADMIN
+    
+    @property
+    def can_access_tickets(self):
+        """Check if user can access Tickets menu - All roles can access."""
+        return self.has_min_role(UserRole.VIEWER)
+    
+    @property
+    def can_access_users(self):
+        """Check if user can access Users menu (MANAGER or above)."""
+        return self.has_min_role(UserRole.MANAGER)
+    
+    @property
+    def can_access_logs(self):
+        """Check if user can access Logs menu (MANAGER or IT_ADMIN or SUPERADMIN)."""
+        return self.has_min_role(UserRole.MANAGER)
+    
+    @property
+    def can_access_reports(self):
+        """Check if user can access Reports menu (MANAGER only - IT_ADMIN excluded)."""
+        return self.role == UserRole.MANAGER or self.role == UserRole.SUPERADMIN
     
     @property
     def can_manage_users(self):
-        """Check if user can manage other users"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN']
+        """Check if user can manage other users (IT_ADMIN or SUPERADMIN)."""
+        return self.has_min_role(UserRole.IT_ADMIN)
     
     @property
     def can_manage_assets(self):
-        """Check if user can manage assets"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
+        """Check if user can manage assets (TECHNICIAN or above)."""
+        return self.has_min_role(UserRole.TECHNICIAN)
+
     
     @property
     def can_manage_projects(self):
-        """Check if user can manage projects"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
+        """Check if user can manage projects (MANAGER only - IT_ADMIN excluded)."""
+        return self.role == UserRole.MANAGER or self.role == UserRole.SUPERADMIN
     
     @property
     def can_manage_tickets(self):
-        """Check if user can manage tickets"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
+        """Check if user can manage tickets - All roles can access."""
+        return self.has_min_role(UserRole.VIEWER)
     
     @property
     def can_view_logs(self):
-        """Check if user can view audit logs"""
-        return self.role in ['SUPERADMIN', 'IT_ADMIN']
+        """Check if user can view audit logs (MANAGER or IT_ADMIN or SUPERADMIN)."""
+        return self.has_min_role(UserRole.MANAGER)
+    
+    @property
+    def can_view_reports(self):
+        """Check if user can view reports (MANAGER only - IT_ADMIN excluded)."""
+        return self.role == UserRole.MANAGER or self.role == UserRole.SUPERADMIN
+    
+    @property
+    def can_manage_settings(self):
+        """Check if user can manage system settings (IT_ADMIN or SUPERADMIN only)."""
+        return self.has_min_role(UserRole.IT_ADMIN)
+    
+    @property
+    def can_view_audit_logs(self):
+        """Check if user can view audit logs (MANAGER or IT_ADMIN or SUPERADMIN)."""
+        return self.has_min_role(UserRole.MANAGER)
+    
+    @property
+    def can_manage_security(self):
+        """Check if user can manage security settings (IT_ADMIN or SUPERADMIN only)."""
+        return self.has_min_role(UserRole.IT_ADMIN)
+    
+    @property
+    def can_manage_workflows(self):
+        """Check if user can manage ticket/project workflows (MANAGER or above)."""
+        return self.has_min_role(UserRole.MANAGER)
+    
+    @property
+    def can_create_reports(self):
+        """Check if user can create reports (MANAGER only - IT_ADMIN excluded)."""
+        return self.role == UserRole.MANAGER or self.role == UserRole.SUPERADMIN
+    
+    @property
+    def can_export_data(self):
+        """Check if user can export data (MANAGER or above)."""
+        return self.has_min_role(UserRole.MANAGER)
+    
+    @property
+    def can_change_user_role(self):
+        """
+        Only SUPERADMIN can change other users' roles.
+        """
+        return self.role == UserRole.SUPERADMIN
+
     
     def save(self, *args, **kwargs):
         # Set email from username if not provided

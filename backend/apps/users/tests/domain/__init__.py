@@ -1,0 +1,4 @@
+"""
+User domain tests package.
+"""
+

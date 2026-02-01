@@ -106,13 +106,14 @@ class UserDetailSerializer(serializers.ModelSerializer):
 class UserUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating user information.
+    NOTE: role is intentionally excluded.
     """
     profile = UserProfileSerializer(required=False)
     
     class Meta:
         model = User
         fields = [
-            'first_name', 'last_name', 'email', 'phone_number', 'role',
+            'first_name', 'last_name', 'email', 'phone_number',
             'department', 'job_title', 'employee_id', 'status', 'profile'
         ]
     
@@ -132,6 +133,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             profile.save()
         
         return instance
+    
+    def validate(self, attrs):
+        if 'role' in attrs:
+            raise serializers.ValidationError("Role cannot be updated here.")
+        return attrs
+
 
 class ChangePasswordSerializer(serializers.Serializer):
     """
@@ -189,6 +196,13 @@ class UserRoleSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'role', 'is_active']
         read_only_fields = ['id', 'username', 'is_active']
+
+class ChangeUserRoleSerializer(serializers.Serializer):
+    """
+    Serializer for changing a user's role.
+    """
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES)
+
 
 class UserStatisticsSerializer(serializers.Serializer):
     """

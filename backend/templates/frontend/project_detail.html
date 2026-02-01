@@ -1,0 +1,76 @@
+{% extends "frontend/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 sm:py-8">
+    <div class="mb-4">
+        <a href="/projects/" class="text-blue-600 hover:text-blue-900 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            {% trans "Back to Projects" %}
+        </a>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ project.name }}</h1>
+                <p class="text-sm text-gray-500 mt-1">#{{ project.id }} - {% trans "Created by" %} {{ project.created_by.username }}</p>
+            </div>
+            <span class="px-3 py-1 rounded-full text-sm font-medium {% if project.status == 'ACTIVE' %}bg-green-100 text-green-800{% elif project.status == 'PLANNING' %}bg-yellow-100 text-yellow-800{% elif project.status == 'COMPLETED' %}bg-blue-100 text-blue-800{% elif project.status == 'ON_HOLD' %}bg-orange-100 text-orange-800{% else %}bg-red-100 text-red-800{% endif %}">
+                {{ project.status|upper }}
+            </span>
+        </div>
+
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Details" %}</h3>
+                    <dl class="space-y-2">
+                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "Priority" %}</dt><dd class="font-medium">{{ project.priority|default:"-" }}</dd></div>
+                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "Start Date" %}</dt><dd class="font-medium">{{ project.start_date|date:"M d, Y"|default:"-" }}</dd></div>
+                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "End Date" %}</dt><dd class="font-medium">{{ project.end_date|date:"M d, Y"|default:"-" }}</dd></div>
+                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "Created At" %}</dt><dd class="font-medium">{{ project.created_at|date:"M d, Y" }}</dd></div>
+                    </dl>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Description" %}</h3>
+                    <p class="text-gray-700 whitespace-pre-wrap">{{ project.description|default:"No description" }}</p>
+                </div>
+        </div>
+
+        {% if not is_deleted %}
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div class="flex flex-wrap gap-3">
+                {% if permissions.can_update %}
+                <a href="{% url 'frontend:project_edit' project.id %}" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition text-sm">{% trans "[ Edit ]" %}</a>
+                {% endif %}
+                {% if permissions.can_delete %}
+                <a href="{% url 'frontend:project_delete' project.id %}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm" onclick="return confirm('Delete this project?');">{% trans "[ Delete ]" %}</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">{% trans "Activity Timeline" %}</h3>
+        {% if activities %}
+        <div class="space-y-4">
+            {% for activity in activities %}
+            <div class="flex gap-4">
+                <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span class="text-blue-600 text-sm font-medium">{{ activity.actor_username|make_list|first|upper }}</span>
+                </div>
+                <div class="flex-1 pb-4 border-b border-gray-100">
+                    <div class="flex justify-between items-start">
+                        <p class="text-sm font-medium text-gray-900">{{ activity.action_label }}</p>
+                        <span class="text-xs text-gray-500">{{ activity.created_at|timesince }} ago</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">by {{ activity.actor_username }}</p>
+                </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm">{% trans "No activity recorded." %}</p>
+        {% endif %}
+    </div>
+{% endblock %}

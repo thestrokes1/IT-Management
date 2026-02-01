@@ -51,6 +51,12 @@ class Asset(models.Model):
         ('MISSING', 'Missing'),
     ]
     
+    # Assignment status choices
+    ASSIGNMENT_STATUS_CHOICES = [
+        ('UNASSIGNED', 'Unassigned'),
+        ('ASSIGNED', 'Assigned'),
+    ]
+    
     # Asset ID (unique identifier)
     asset_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     
@@ -77,6 +83,9 @@ class Asset(models.Model):
     location = models.CharField(max_length=200, blank=True)
     assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_assets')
     assigned_date = models.DateTimeField(null=True, blank=True)
+    assignment_status = models.CharField(
+        max_length=20, choices=ASSIGNMENT_STATUS_CHOICES, default='UNASSIGNED'
+    )
     
     # Asset details (JSON for flexibility)
     specifications = models.JSONField(default=dict, blank=True)

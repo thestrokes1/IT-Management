@@ -214,6 +214,7 @@
             </div>
 
             <!-- Form Actions -->
+            {% if permissions.can_create %}
             <div class="flex gap-4 pt-4">
                 <button 
                     type="submit" 
@@ -228,6 +229,16 @@
                     Cancel
                 </a>
             </div>
+            {% else %}
+            <div class="flex gap-4 pt-4">
+                <a 
+                    href="{% url 'frontend:users' %}" 
+                    class="flex-1 bg-gray-200 text-gray-900 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium transition text-center"
+                >
+                    Back to Users
+                </a>
+            </div>
+            {% endif %}
         </form>
     </div>
 </div>

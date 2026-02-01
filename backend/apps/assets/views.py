@@ -1,6 +1,7 @@
 """
 Asset views for IT Management Platform.
 API endpoints for asset management with role-based access control.
+All permission checks are enforced server-side using domain authority services.
 """
 
 from django.db.models import Count, Q, Sum, Avg
@@ -26,19 +27,22 @@ from apps.assets.serializers import (
     AssetSearchSerializer
 )
 from apps.assets.permissions import (
-    CanManageAssets, IsAssetOwnerOrReadOnly, CanAssignAssets,
-    CanViewMaintenanceRecords, CanManageMaintenance, CanViewAuditLogs,
-    CanGenerateReports, CanManageCategories
+    CanViewAssets, CanCreateAssets, CanEditAsset, CanDeleteAsset,
+    CanAssignAsset, CanUnassignAsset, CanSelfAssignAsset,
+    CanViewAssetLogs, CanAddAssetMaintenance, CanViewAssetMaintenance,
 )
+
 from apps.users.models import User
+
 
 class AssetCategoryViewSet(viewsets.ModelViewSet):
     """
     Asset category management viewset.
+    Only accessible by SUPERADMIN, MANAGER, IT_ADMIN.
     """
     queryset = AssetCategory.objects.all()
     serializer_class = AssetCategorySerializer
-    permission_classes = [CanManageCategories]
+    permission_classes = [CanViewAssets]
     
     def get_queryset(self):
         queryset = AssetCategory.objects.all()
@@ -50,11 +54,16 @@ class AssetCategoryViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('name')
 
+
 class AssetViewSet(viewsets.ModelViewSet):
     """
     Asset management viewset with comprehensive filtering and actions.
+    All permission checks use domain authority services for strict RBAC.
     """
-    permission_classes = [CanManageAssets, IsAssetOwnerOrReadOnly]
+    permission_classes = [
+        CanViewAssets, CanCreateAssets, CanEditAsset, 
+        CanDeleteAsset, CanAssignAsset
+    ]
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -78,9 +87,9 @@ class AssetViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(asset_type=asset_type)
         
         # Filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
         
         # Filter by category
         category = self.request.query_params.get('category')
@@ -123,6 +132,10 @@ class AssetViewSet(viewsets.ModelViewSet):
                 Q(manufacturer__icontains=search)
             )
         
+        # VIEWER cannot access assets at all
+        if self.request.user.role == 'VIEWER':
+            return Asset.objects.none()
+        
         return queryset.order_by('-created_at')
     
     def perform_create(self, serializer):
@@ -134,11 +147,21 @@ class AssetViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         """
         Override destroy to properly handle signal disconnection and cascade deletion.
+        Authorization is enforced via CanDeleteAsset permission class.
         """
         from django.db.models.signals import pre_delete
         from django.db import transaction
         
         instance = self.get_object()
+        
+        # Additional permission check using domain authority
+        from apps.assets.permissions import CanDeleteAsset
+        permission = CanDeleteAsset()
+        if not permission.has_object_permission(request, self, instance):
+            return Response(
+                {'error': 'You are not authorized to delete this asset'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Temporarily disconnect the pre_delete signal to prevent
         # creating an AssetAuditLog while the asset is being deleted
@@ -173,8 +196,20 @@ class AssetViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def assign(self, request, pk=None):
-        """Assign asset to a user."""
+        """
+        Assign asset to a user.
+        Authorization: Only SUPERADMIN, MANAGER, IT_ADMIN can assign.
+        TECHNICIAN cannot assign assets.
+        """
         asset = self.get_object()
+        permission = CanAssignAsset()
+        
+        if not permission.has_object_permission(request, self, asset):
+            return Response(
+                {'error': 'You are not authorized to assign this asset'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = AssetAssignmentCreateSerializer(data=request.data)
         
         if serializer.is_valid():
@@ -212,40 +247,108 @@ class AssetViewSet(viewsets.ModelViewSet):
                 return Response({'message': 'Asset assigned successfully'})
             
             elif assignment_type == 'UNASSIGNMENT':
-                if not asset.assigned_to:
-                    return Response({
-                        'error': 'Asset is not currently assigned.'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                
-                old_assignee = asset.assigned_to
-                asset.unassign(request.user)
-                
-                # Create assignment record
-                AssetAssignment.objects.create(
-                    asset=asset,
-                    user=old_assignee,
-                    assignment_type='UNASSIGNMENT',
-                    assigned_by=request.user,
-                    notes=notes
-                )
-                
-                # Create audit log
-                AssetAuditLog.objects.create(
-                    asset=asset,
-                    user=request.user,
-                    action='UNASSIGNED',
-                    description=f'Asset unassigned from {old_assignee.username}',
-                    old_values={'assigned_to': old_assignee.username}
-                )
-                
-                return Response({'message': 'Asset unassigned successfully'})
+                return Response({
+                    'error': 'Use /unassign endpoint for unassignment'
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])
-    def change_status(self, request, pk=None):
-        """Change asset status."""
+    def unassign(self, request, pk=None):
+        """
+        Unassign asset from user.
+        Authorization: Only SUPERADMIN, MANAGER, IT_ADMIN can unassign.
+        TECHNICIAN cannot unassign assets.
+        """
         asset = self.get_object()
+        permission = CanUnassignAsset()
+        
+        if not permission.has_object_permission(request, self, asset):
+            return Response(
+                {'error': 'You are not authorized to unassign this asset'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if not asset.assigned_to:
+            return Response({
+                'error': 'Asset is not currently assigned.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        old_assignee = asset.assigned_to
+        asset.unassign(request.user)
+        
+        # Create assignment record
+        AssetAssignment.objects.create(
+            asset=asset,
+            user=old_assignee,
+            assignment_type='UNASSIGNMENT',
+            assigned_by=request.user,
+            notes=request.data.get('notes', '')
+        )
+        
+        # Create audit log
+        AssetAuditLog.objects.create(
+            asset=asset,
+            user=request.user,
+            action='UNASSIGNED',
+            description=f'Asset unassigned from {old_assignee.username}',
+            old_values={'assigned_to': old_assignee.username}
+        )
+        
+        return Response({'message': 'Asset unassigned successfully'})
+    
+    @action(detail=True, methods=['post'])
+    def self_assign(self, request, pk=None):
+        """
+        Self-assign to an asset.
+        Authorization: TECHNICIAN can self-assign only if unassigned.
+        """
+        asset = self.get_object()
+        permission = CanSelfAssignAsset()
+        
+        if not permission.has_object_permission(request, self, asset):
+            return Response(
+                {'error': 'You are not authorized to self-assign this asset'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Perform self-assignment
+        asset.assigned_to = request.user
+        asset.assigned_date = timezone.now()
+        asset.assignment_status = 'ASSIGNED'
+        asset.updated_by = request.user
+        asset.save()
+        
+        # Create audit log
+        AssetAuditLog.objects.create(
+            asset=asset,
+            user=request.user,
+            action='ASSIGNED',
+            description=f'Asset self-assigned to {request.user.username}',
+            new_values={'assigned_to': request.user.username}
+        )
+        
+        return Response({
+            'message': f'Asset self-assigned to {request.user.username}'
+        })
+    
+    @action(detail=True, methods=['post'])
+    def change_status(self, request, pk=None):
+        """
+        Change asset status.
+        Authorization: TECHNICIAN can only edit if assigned to them.
+        """
+        from apps.assets.permissions import CanEditAsset
+        
+        asset = self.get_object()
+        permission = CanEditAsset()
+        
+        if not permission.has_object_permission(request, self, asset):
+            return Response(
+                {'error': 'You are not authorized to edit this asset'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         new_status = request.data.get('status')
         
         if not new_status:
@@ -284,10 +387,47 @@ class AssetViewSet(viewsets.ModelViewSet):
         serializer = AssetMaintenanceSerializer(maintenance_records, many=True)
         return Response(serializer.data)
     
+    @action(detail=True, methods=['post'])
+    def add_maintenance(self, request, pk=None):
+        """
+        Add maintenance record.
+        Authorization: TECHNICIAN can only add if assigned to asset.
+        """
+        asset = self.get_object()
+        permission = CanAddAssetMaintenance()
+        
+        if not permission.has_object_permission(request, self, asset):
+            return Response(
+                {'error': 'You are not authorized to add maintenance to this asset'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = AssetMaintenanceSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            serializer.save(asset=asset, created_by=request.user)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
     @action(detail=True, methods=['get'])
     def audit_logs(self, request, pk=None):
-        """Get asset audit logs."""
+        """
+        Get asset audit logs.
+        Authorization: Only SUPERADMIN, MANAGER, IT_ADMIN can view logs.
+        """
         asset = self.get_object()
+        permission = CanViewAssetLogs()
+        
+        if not permission.has_object_permission(request, self, asset):
+            return Response(
+                {'error': 'You are not authorized to view audit logs for this asset'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         audit_logs = asset.audit_logs.select_related('user').all()
         serializer = AssetAuditLogSerializer(audit_logs, many=True)
         return Response(serializer.data)
@@ -416,11 +556,12 @@ class AssetViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, stats, 300)  # Cache for 5 minutes
         return Response(stats)
 
+
 class HardwareAssetViewSet(viewsets.ModelViewSet):
     """
     Hardware asset management viewset.
     """
-    permission_classes = [CanManageAssets]
+    permission_classes = [CanViewAssets, CanCreateAssets, CanEditAsset]
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -433,11 +574,12 @@ class HardwareAssetViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
+
 class SoftwareAssetViewSet(viewsets.ModelViewSet):
     """
     Software asset management viewset.
     """
-    permission_classes = [CanManageAssets]
+    permission_classes = [CanViewAssets, CanCreateAssets, CanEditAsset]
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -452,8 +594,18 @@ class SoftwareAssetViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def allocate_license(self, request, pk=None):
-        """Allocate a license seat for a user."""
+        """
+        Allocate a license seat for a user.
+        Only SUPERADMIN, MANAGER, IT_ADMIN can allocate licenses.
+        """
         software_asset = self.get_object()
+        
+        if request.user.role == 'VIEWER':
+            return Response(
+                {'error': 'VIEWER cannot allocate licenses'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         user_id = request.data.get('user_id')
         
         if not user_id:
@@ -472,12 +624,13 @@ class SoftwareAssetViewSet(viewsets.ModelViewSet):
         
         return Response({'message': 'License allocated successfully'})
 
+
 class AssetAssignmentViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Asset assignment history viewset.
     """
     serializer_class = AssetAssignmentSerializer
-    permission_classes = [CanManageAssets]
+    permission_classes = [CanViewAssets]
     
     def get_queryset(self):
         queryset = AssetAssignment.objects.select_related('asset', 'user', 'assigned_by')
@@ -499,12 +652,13 @@ class AssetAssignmentViewSet(viewsets.ReadOnlyModelViewSet):
         
         return queryset.order_by('-assigned_date')
 
+
 class AssetMaintenanceViewSet(viewsets.ModelViewSet):
     """
     Asset maintenance management viewset.
     """
     serializer_class = AssetMaintenanceSerializer
-    permission_classes = [CanManageMaintenance]
+    permission_classes = [CanAddAssetMaintenance, CanViewAssetMaintenance]
     
     def get_queryset(self):
         queryset = AssetMaintenance.objects.select_related('asset', 'created_by')
@@ -515,9 +669,9 @@ class AssetMaintenanceViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(asset_id=asset)
         
         # Filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
         
         # Filter by maintenance type
         maintenance_type = self.request.query_params.get('maintenance_type')
@@ -539,12 +693,14 @@ class AssetMaintenanceViewSet(viewsets.ModelViewSet):
         
         return Response({'message': 'Maintenance marked as completed'})
 
+
 class AssetAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Asset audit log viewset.
+    Only accessible by SUPERADMIN, MANAGER, IT_ADMIN.
     """
     serializer_class = AssetAuditLogSerializer
-    permission_classes = [CanViewAuditLogs]
+    permission_classes = [CanViewAssetLogs]
     
     def get_queryset(self):
         queryset = AssetAuditLog.objects.select_related('asset', 'user')
@@ -575,11 +731,12 @@ class AssetAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         
         return queryset.order_by('-timestamp')[:1000]  # Limit to recent 1000 records
 
+
 class AssetSearchView(APIView):
     """
     Advanced asset search endpoint.
     """
-    permission_classes = [CanManageAssets]
+    permission_classes = [CanViewAssets]
     
     def post(self, request):
         serializer = AssetSearchSerializer(data=request.data)
@@ -590,7 +747,7 @@ class AssetSearchView(APIView):
             # Apply filters
             search = serializer.validated_data.get('search')
             asset_type = serializer.validated_data.get('asset_type')
-            status = serializer.validated_data.get('status')
+            status_param = serializer.validated_data.get('status')
             category = serializer.validated_data.get('category')
             assigned_to = serializer.validated_data.get('assigned_to')
             location = serializer.validated_data.get('location')
@@ -609,8 +766,8 @@ class AssetSearchView(APIView):
             if asset_type:
                 queryset = queryset.filter(asset_type=asset_type)
             
-            if status:
-                queryset = queryset.filter(status=status)
+            if status_param:
+                queryset = queryset.filter(status=status_param)
             
             if category:
                 queryset = queryset.filter(category_id=category)
@@ -652,3 +809,4 @@ class AssetSearchView(APIView):
             return Response(response_data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

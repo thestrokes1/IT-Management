@@ -1,6 +1,7 @@
 """
 User views for IT Management Platform.
 API endpoints for user management with role-based access control.
+All permission checks are enforced server-side using domain authority services.
 """
 
 from django.contrib.auth import logout
@@ -17,17 +18,20 @@ from apps.users.models import User, UserProfile, UserSession, LoginAttempt
 from apps.users.serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserListSerializer,
     UserDetailSerializer, UserUpdateSerializer, ChangePasswordSerializer,
-    UserSessionSerializer, LoginAttemptSerializer, UserStatisticsSerializer
+    UserSessionSerializer, LoginAttemptSerializer, UserStatisticsSerializer,
+    ChangeUserRoleSerializer
 )
 from apps.users.permissions import (
-    IsAdminOrReadOnly, IsOwnerOrAdmin, CanManageUsers, IsSelfOrAdmin
+    CanViewUsers, CanCreateUsers, CanEditUser, CanChangeUserRole,
+    CanDeactivateUser, CanActivateUser, CanDeleteUser, IsSelfOrAdmin
 )
+
 
 class UserRegistrationView(APIView):
     """
     User registration endpoint.
     """
-    permission_classes = [CanManageUsers]
+    permission_classes = [CanCreateUsers]
     
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
@@ -43,6 +47,7 @@ class UserRegistrationView(APIView):
             }, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class UserLoginView(TokenObtainPairView):
     """
@@ -103,12 +108,17 @@ class UserLoginView(TokenObtainPairView):
             ip = request.META.get('REMOTE_ADDR')
         return ip
 
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     User management viewset with role-based permissions.
+    All permission checks use domain authority services for strict RBAC.
     """
     queryset = User.objects.all()
-    permission_classes = [CanManageUsers]
+    permission_classes = [
+        CanViewUsers, CanCreateUsers, CanEditUser,
+        CanChangeUserRole, CanDeactivateUser, CanDeleteUser
+    ]
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -128,9 +138,9 @@ class UserViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(role=role)
         
         # Filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
         
         # Filter by department
         department = self.request.query_params.get('department')
@@ -155,6 +165,38 @@ class UserViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
     
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete user account.
+        Only SUPERADMIN can delete users.
+        """
+        instance = self.get_object()
+        
+        # Check permission
+        permission = CanDeleteUser()
+        if not permission.has_object_permission(request, self, instance):
+            return Response(
+                {'error': 'You are not authorized to delete this user'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Cannot delete self
+        if instance == request.user:
+            return Response(
+                {'error': 'You cannot delete your own account'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Perform deletion
+        instance_id = instance.id
+        username = instance.username
+        instance.delete()
+        
+        return Response({
+            'message': f'User {username} deleted successfully',
+            'user_id': instance_id
+        })
+    
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):
         """Change user password."""
@@ -172,24 +214,103 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])
-    def activate(self, request, pk=None):
-        """Activate user account."""
-        user = self.get_object()
-        user.status = 'ACTIVE'
-        user.is_active = True
-        user.save()
+    def change_role(self, request, pk=None):
+        """
+        Change a user's role.
+        Authorization: SUPERADMIN only.
+        """
+        from apps.users.permissions import CanChangeUserRole
         
-        return Response({'message': 'User activated successfully'})
+        target_user = self.get_object()
+        permission = CanChangeUserRole()
+        
+        if not permission.has_object_permission(request, self, target_user):
+            return Response(
+                {'error': 'You are not authorized to change this user\'s role'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = ChangeUserRoleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        new_role = serializer.validated_data['role']
+        old_role = target_user.role
+        
+        # Additional authorization check using domain authority
+        from apps.users.domain.services.user_authority import can_change_role
+        if not can_change_role(request.user, target_user, new_role):
+            return Response(
+                {'error': 'You are not authorized to assign this role'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Cannot change own role
+        if target_user == request.user:
+            return Response(
+                {'error': 'You cannot change your own role'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Perform role change
+        target_user.role = new_role
+        target_user.save()
+        
+        return Response({
+            'message': 'User role updated successfully',
+            'user_id': target_user.id,
+            'username': target_user.username,
+            'old_role': old_role,
+            'new_role': new_role,
+        })
     
     @action(detail=True, methods=['post'])
     def deactivate(self, request, pk=None):
-        """Deactivate user account."""
-        user = self.get_object()
-        user.status = 'INACTIVE'
-        user.is_active = False
-        user.save()
+        """
+        Deactivate user account.
+        Authorization: Can only deactivate TECHNICIAN users as IT_ADMIN.
+        """
+        target_user = self.get_object()
+        permission = CanDeactivateUser()
+        
+        if not permission.has_object_permission(request, self, target_user):
+            return Response(
+                {'error': 'You are not authorized to deactivate this user'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Cannot deactivate self
+        if target_user == request.user:
+            return Response(
+                {'error': 'You cannot deactivate your own account'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        target_user.status = 'INACTIVE'
+        target_user.is_active = False
+        target_user.save()
         
         return Response({'message': 'User deactivated successfully'})
+    
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """
+        Activate user account.
+        Authorization: Can only activate TECHNICIAN users as IT_ADMIN.
+        """
+        target_user = self.get_object()
+        permission = CanActivateUser()
+        
+        if not permission.has_object_permission(request, self, target_user):
+            return Response(
+                {'error': 'You are not authorized to activate this user'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        target_user.status = 'ACTIVE'
+        target_user.is_active = True
+        target_user.save()
+        
+        return Response({'message': 'User activated successfully'})
     
     @action(detail=False, methods=['get'])
     def profile(self, request):
@@ -213,8 +334,12 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def statistics(self, request):
         """Get user statistics."""
-        if not request.user.can_manage_users:
-            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        # Check if user can manage users
+        if request.user.role not in ('SUPERADMIN', 'MANAGER', 'IT_ADMIN'):
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Cache statistics for 5 minutes
         cache_key = f'user_statistics_{request.user.id}'
@@ -249,6 +374,7 @@ class UserViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, stats, 300)  # Cache for 5 minutes
         return Response(stats)
 
+
 class UserSessionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     User sessions viewset for managing active sessions.
@@ -261,12 +387,14 @@ class UserSessionViewSet(viewsets.ReadOnlyModelViewSet):
             return UserSession.objects.all()
         return UserSession.objects.filter(user=self.request.user)
 
+
 class LoginAttemptViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Login attempts viewset for security monitoring.
+    Only SUPERADMIN, MANAGER, IT_ADMIN can view.
     """
     serializer_class = LoginAttemptSerializer
-    permission_classes = [CanManageUsers]
+    permission_classes = [CanViewUsers]
     
     def get_queryset(self):
         queryset = LoginAttempt.objects.all()
@@ -282,6 +410,7 @@ class LoginAttemptViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(successful=successful.lower() == 'true')
         
         return queryset.order_by('-timestamp')[:100]  # Limit to recent 100 attempts
+
 
 class LogoutView(APIView):
     """
@@ -310,3 +439,4 @@ class LogoutView(APIView):
             return Response({'message': 'Logged out successfully'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+

@@ -1,248 +1,247 @@
 """
 Permissions classes for Logs Management.
 Role-based access control for logging and audit operations.
+
+Uses User model properties for consistent permission checking:
+- can_view_logs: SUPERADMIN, MANAGER
+- can_view_audit_logs: SUPERADMIN, MANAGER
+- can_manage_security: SUPERADMIN, IT_ADMIN
+- is_admin: SUPERADMIN, IT_ADMIN
 """
 
 from rest_framework import permissions
-from apps.logs.models import ActivityLog, AuditLog, SystemLog, SecurityEvent, LogAlert
+
 
 class CanViewLogs(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view logs.
-    """
-    
+    """Check if user can view logs (SUPERADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.can_view_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
+        )
+
 
 class CanViewAuditLogs(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view audit logs.
-    """
-    
+    """Check if user can view audit logs (SUPERADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.can_view_audit_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_audit_logs', False)
+        )
+
 
 class CanViewSecurityEvents(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view security events.
-    """
-    
+    """Check if user can view security events (SUPERADMIN, IT_ADMIN)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.can_view_security_events
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_manage_security', False)
+        )
+
 
 class CanManageLogAlerts(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can manage log alerts.
-    """
-    
+    """Check if user can manage log alerts (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, 'is_admin', False)
+                or getattr(request.user, 'can_view_logs', False)
+            )
         )
+
 
 class CanViewLogAlerts(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view log alerts.
-    """
-    
+    """Check if user can view log alerts (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )
+
 
 class CanManageLogReports(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can manage log reports.
-    """
-    
+    """Check if user can manage log reports (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, 'is_admin', False)
+                or getattr(request.user, 'can_view_logs', False)
+            )
         )
+
 
 class CanViewLogReports(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view log reports.
-    """
-    
+    """Check if user can view log reports (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )
+
 
 class CanGenerateLogReports(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can generate log reports.
-    """
-    
+    """Check if user can generate log reports (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )
+
 
 class CanViewSystemLogs(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view system logs.
-    """
-    
+    """Check if user can view system logs (SUPERADMIN, IT_ADMIN)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'is_admin', False)
         )
+
 
 class CanAcknowledgeSecurityEvents(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can acknowledge security events.
-    """
-    
+    """Check if user can acknowledge security events (SUPERADMIN, IT_ADMIN)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_security
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_manage_security', False)
         )
+
 
 class CanResolveSecurityEvents(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can resolve security events.
-    """
-    
+    """Check if user can resolve security events (SUPERADMIN, IT_ADMIN)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_security
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_manage_security', False)
         )
+
 
 class CanManageLogRetention(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can manage log retention policies.
-    """
-    
+    """Check if user can manage log retention (SUPERADMIN only)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.is_admin
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_manage_settings', False)
+        )
+
 
 class CanViewLogStatistics(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view log statistics.
-    """
-    
+    """Check if user can view log statistics (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )
+
 
 class CanExportLogs(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can export logs.
-    """
-    
+    """Check if user can export logs (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_export_data', False)
         )
+
 
 class CanCreateCustomLogs(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can create custom log entries.
-    """
-    
+    """Check if user can create custom logs (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )
+
 
 class CanViewOwnActivityLogs(permissions.BasePermission):
-    """
-    Custom permission to allow users to view their own activity logs.
-    """
-    
+    """Users can view their own activity logs"""
     def has_object_permission(self, request, view, obj):
-        # Users can view their own activity logs
         return obj.user == request.user
 
+
 class CanViewSensitiveAuditLogs(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view sensitive audit logs.
-    """
-    
+    """Check if user can view sensitive audit logs"""
     def has_object_permission(self, request, view, obj):
-        # Admin can view all audit logs
-        if request.user.is_admin:
+        if getattr(request.user, 'is_admin', False):
             return True
-        
-        # Users can view their own audit logs
         if obj.user == request.user:
             return True
-        
-        # Users with audit log management rights can view sensitive logs
-        if request.user.can_view_audit_logs and obj.risk_level in ['LOW', 'MEDIUM']:
+        if (
+            getattr(request.user, 'can_view_audit_logs', False)
+            and obj.risk_level in ['LOW', 'MEDIUM']
+        ):
             return True
-        
-        # Only admins can view high/critical risk audit logs
-        return obj.risk_level in ['LOW', 'MEDIUM']
-
-class CanViewOwnSecurityEvents(permissions.BasePermission):
-    """
-    Custom permission to allow users to view security events affecting them.
-    """
-    
-    def has_object_permission(self, request, view, obj):
-        # Admin can view all security events
-        if request.user.is_admin:
-            return True
-        
-        # Users can view security events affecting them
-        if obj.affected_user == request.user:
-            return True
-        
-        # Security team can view all events
-        if request.user.can_manage_security:
-            return True
-        
         return False
 
+
+class CanViewOwnSecurityEvents(permissions.BasePermission):
+    """Users can view their own security events"""
+    def has_object_permission(self, request, view, obj):
+        if getattr(request.user, 'is_admin', False):
+            return True
+        if obj.affected_user == request.user:
+            return True
+        if getattr(request.user, 'can_manage_security', False):
+            return True
+        return False
+
+
 class CanManageLogCategories(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can manage log categories.
-    """
-    
+    """Check if user can manage log categories (SUPERADMIN, IT_ADMIN)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.is_admin or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'is_admin', False)
         )
+
 
 class CanViewLogInsights(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can view log insights and analytics.
-    """
-    
+    """Check if user can view log insights (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )
+
 
 class CanAccessLogDashboard(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can access the log dashboard.
-    """
-    
+    """Check if user can access log dashboard (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs or request.user.can_view_security_events
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )
 
+
 class CanTriggerLogAlerts(permissions.BasePermission):
-    """
-    Custom permission for system processes to trigger log alerts.
-    """
-    
+    """Check if user can trigger log alerts - all authenticated users"""
     def has_permission(self, request, view):
-        # Allow system processes (no user) to trigger alerts
-        return True
+        return request.user and request.user.is_authenticated
+
 
 class CanViewLogFilters(permissions.BasePermission):
-    """
-    Custom permission to only allow users who can use advanced log filters.
-    """
-    
+    """Check if user can view log filters (SUPERADMIN, IT_ADMIN, MANAGER)"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (
-            request.user.can_view_logs or request.user.can_manage_logs
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'can_view_logs', False)
         )

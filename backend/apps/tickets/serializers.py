@@ -44,20 +44,31 @@ class TicketListSerializer(serializers.ModelSerializer):
     ticket_type_name = serializers.CharField(source='ticket_type.name', read_only=True)
     requester_username = serializers.CharField(source='requester.username', read_only=True)
     assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True)
+    assigned_to_id = serializers.IntegerField(source='assigned_to.id', read_only=True, allow_null=True)
     is_overdue = serializers.BooleanField(read_only=True)
     hours_since_creation = serializers.FloatField(read_only=True)
     hours_to_sla = serializers.FloatField(read_only=True)
+    can_self_assign = serializers.SerializerMethodField()
     
     class Meta:
         model = Ticket
         fields = [
             'id', 'ticket_id', 'title', 'description', 'category_name',
             'ticket_type_name', 'requester_username', 'priority', 'status',
-            'impact', 'urgency', 'assigned_to_username', 'location',
+            'impact', 'urgency', 'assigned_to_username', 'assigned_to_id',
+            'assigned_team', 'assignment_status', 'location',
             'created_at', 'updated_at', 'sla_due_at', 'is_overdue',
-            'hours_since_creation', 'hours_to_sla'
+            'hours_since_creation', 'hours_to_sla', 'can_self_assign'
         ]
         read_only_fields = ['id', 'ticket_id', 'created_at', 'updated_at']
+    
+    def get_can_self_assign(self, obj):
+        """Check if current user can self-assign this ticket."""
+        from apps.tickets.domain.services.ticket_authority import can_self_assign_ticket
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return can_self_assign_ticket(request.user, obj)
+        return False
 
 class TicketDetailSerializer(serializers.ModelSerializer):
     """

@@ -25,17 +25,28 @@ class AssetListSerializer(serializers.ModelSerializer):
     """
     category_name = serializers.CharField(source='category.name', read_only=True)
     assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True)
+    assigned_to_id = serializers.IntegerField(source='assigned_to.id', read_only=True, allow_null=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    can_self_assign = serializers.SerializerMethodField()
     
     class Meta:
         model = Asset
         fields = [
             'id', 'asset_id', 'name', 'description', 'asset_type', 'category_name',
             'serial_number', 'model', 'manufacturer', 'status', 'location',
-            'assigned_to_username', 'assigned_date', 'purchase_date', 'warranty_expiry',
-            'created_at', 'created_by_username'
+            'assigned_to_username', 'assigned_to_id', 'assigned_date', 'assignment_status',
+            'purchase_date', 'warranty_expiry', 'created_at', 'created_by_username',
+            'can_self_assign'
         ]
         read_only_fields = ['id', 'asset_id', 'created_at']
+    
+    def get_can_self_assign(self, obj):
+        """Check if current user can self-assign this asset."""
+        from apps.assets.domain.services.asset_authority import can_self_assign_asset
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return can_self_assign_asset(request.user, obj)
+        return False
 
 class AssetDetailSerializer(serializers.ModelSerializer):
     """

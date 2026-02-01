@@ -32,6 +32,12 @@ from apps.projects.permissions import (
     CanGenerateProjectReports, CanManageProjectTemplates, CanUseProjectTemplates,
     CanViewProjectAuditLogs
 )
+from apps.projects.domain.services.project_authority import (
+    assert_can_create_project, assert_can_update_project,
+    assert_can_delete_project, assert_can_assign_project_members
+)
+from apps.core.exceptions import PermissionDeniedError
+from apps.core.domain.authorization import AuthorizationError
 from apps.users.models import User
 
 class ProjectCategoryViewSet(viewsets.ModelViewSet):
@@ -137,9 +143,22 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
     
     def perform_create(self, serializer):
+        try:
+            assert_can_create_project(self.request.user)
+        except AuthorizationError:
+            raise PermissionDeniedError(
+                "You do not have permission to create projects"
+            )
         serializer.save(created_by=self.request.user)
     
     def perform_update(self, serializer):
+        project = serializer.instance
+        try:
+            assert_can_update_project(self.request.user, project)
+        except AuthorizationError:
+            raise PermissionDeniedError(
+                "You do not have permission to update this project"
+            )
         serializer.save(updated_by=self.request.user)
     
     def destroy(self, request, *args, **kwargs):
@@ -150,6 +169,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
         from django.db import transaction
         
         instance = self.get_object()
+        
+        # Check authorization before deletion
+        try:
+            assert_can_delete_project(self.request.user, instance)
+        except AuthorizationError:
+            raise PermissionDeniedError(
+                "You do not have permission to delete this project"
+            )
         
         # Temporarily disconnect the pre_delete signal to prevent
         # creating a ProjectAuditLog while the project is being deleted
@@ -199,6 +226,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def add_member(self, request, pk=None):
         """Add a member to the project."""
         project = self.get_object()
+        
+        # Check authorization
+        try:
+            assert_can_assign_project_members(self.request.user, project)
+        except AuthorizationError:
+            raise PermissionDeniedError(
+                "You do not have permission to assign project members"
+            )
+        
         user_id = request.data.get('user_id')
         role = request.data.get('role', 'MEMBER')
         

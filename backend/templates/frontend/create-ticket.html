@@ -30,17 +30,17 @@
             <!-- Basic Information Section -->
             <div class="border-b border-gray-200 pb-8">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">Basic Information</h2>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Title -->
                     <div class="md:col-span-2">
                         <label for="id_title" class="block text-sm font-medium text-gray-700 mb-2">
                             Ticket Title <span class="text-red-500">*</span>
                         </label>
-                        <input 
-                            type="text" 
-                            id="id_title" 
-                            name="title" 
+                        <input
+                            type="text"
+                            id="id_title"
+                            name="title"
                             value="{{ form.title.value|default:'' }}"
                             placeholder="Brief description of your issue"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
@@ -56,8 +56,8 @@
                         <label for="id_category" class="block text-sm font-medium text-gray-700 mb-2">
                             Category <span class="text-red-500">*</span>
                         </label>
-                        <select 
-                            id="id_category" 
+                        <select
+                            id="id_category"
                             name="category"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                             required
@@ -79,8 +79,8 @@
                         <label for="id_ticket_type" class="block text-sm font-medium text-gray-700 mb-2">
                             Ticket Type
                         </label>
-                        <select 
-                            id="id_ticket_type" 
+                        <select
+                            id="id_ticket_type"
                             name="ticket_type"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                         >
@@ -98,8 +98,8 @@
                         <label for="id_priority" class="block text-sm font-medium text-gray-700 mb-2">
                             Priority <span class="text-red-500">*</span>
                         </label>
-                        <select 
-                            id="id_priority" 
+                        <select
+                            id="id_priority"
                             name="priority"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                             required
@@ -121,13 +121,13 @@
             <!-- Description Section -->
             <div class="border-b border-gray-200 pb-8">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">Description</h2>
-                
+
                 <div>
                     <label for="id_description" class="block text-sm font-medium text-gray-700 mb-2">
                         Detailed Description <span class="text-red-500">*</span>
                     </label>
-                    <textarea 
-                        id="id_description" 
+                    <textarea
+                        id="id_description"
                         name="description"
                         rows="6"
                         placeholder="Please provide detailed information about your issue..."
@@ -143,15 +143,15 @@
             <!-- Additional Information Section -->
             <div class="border-b border-gray-200 pb-8">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">Additional Information</h2>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Impact -->
                     <div>
                         <label for="id_impact" class="block text-sm font-medium text-gray-700 mb-2">
                             Impact Level
                         </label>
-                        <select 
-                            id="id_impact" 
+                        <select
+                            id="id_impact"
                             name="impact"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                         >
@@ -168,8 +168,8 @@
                         <label for="id_urgency" class="block text-sm font-medium text-gray-700 mb-2">
                             Urgency Level
                         </label>
-                        <select 
-                            id="id_urgency" 
+                        <select
+                            id="id_urgency"
                             name="urgency"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                         >
@@ -182,32 +182,44 @@
                     </div>
 
                     <!-- Assigned To (optional) -->
+                    {% if assign_config.visible %}
                     <div>
                         <label for="id_assigned_to" class="block text-sm font-medium text-gray-700 mb-2">
                             Assign To
                         </label>
-                        <select 
-                            id="id_assigned_to" 
+                        <select
+                            id="id_assigned_to"
                             name="assigned_to"
+                            {% if assign_config.readonly %}disabled{% endif %}
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                         >
                             <option value="">Unassigned</option>
                             {% for user in available_users %}
-                                <option value="{{ user.id }}" {% if form.assigned_to.value|stringformat:"s" == user.id|stringformat:"s" %}selected{% endif %}>
+                                <option value="{{ user.id }}"
+                                    {% if assign_config.default_user_id %}
+                                        {% if user.id == assign_config.default_user_id %}selected{% endif %}
+                                    {% else %}
+                                        {% if form.assigned_to.value|stringformat:"s" == user.id|stringformat:"s" %}selected{% endif %}
+                                    {% endif %}
+                                >
                                     {{ user.username }} ({{ user.get_role_display }})
                                 </option>
                             {% endfor %}
                         </select>
+                        {% if assign_config.readonly %}
+                        <input type="hidden" name="assigned_to" value="{{ assign_config.default_user_id }}">
+                        {% endif %}
                     </div>
+                    {% endif %}
 
                     <!-- Due Date (optional) -->
                     <div>
                         <label for="id_due_date" class="block text-sm font-medium text-gray-700 mb-2">
                             Due Date
                         </label>
-                        <input 
-                            type="date" 
-                            id="id_due_date" 
+                        <input
+                            type="date"
+                            id="id_due_date"
                             name="due_date"
                             value="{{ form.due_date.value|default:'' }}"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
@@ -222,14 +234,17 @@
                     <i class="fas fa-arrow-left mr-2"></i>
                     Cancel
                 </a>
-                
-                <button 
-                    type="submit" 
-                    class="inline-flex items-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition"
-                >
-                    <i class="fas fa-check mr-2"></i>
-                    Create Ticket
-                </button>
+
+                {% if permissions.can_create %}
+<button
+    type="submit"
+    class="inline-flex items-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition"
+>
+    <i class="fas fa-check mr-2"></i>
+    Create Ticket
+</button>
+{% endif %}
+
             </div>
         </form>
     </div>
@@ -255,3 +270,4 @@
     </div>
 </div>
 {% endblock %}
+

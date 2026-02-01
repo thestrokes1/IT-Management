@@ -9,23 +9,39 @@
 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4 sm:gap-0">
     <div>
         <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p class="text-xs sm:text-sm text-gray-600 mt-1">Welcome back, {{ user.username }}! Here's what's happening with your IT infrastructure.</p>
+        <p class="text-xs sm:text-sm text-gray-600 mt-1">
+            Welcome back, {{ user.username }}! 
+            {% if user_role == 'SUPERADMIN' %}
+                You have full access to all management features.
+            {% elif user_role == 'IT_ADMIN' %}
+                You have administrative access to IT resources.
+            {% elif user_role == 'MANAGER' %}
+                You can manage projects, users, and view reports.
+            {% elif user_role == 'TECHNICIAN' %}
+                You can access tickets and assigned assets.
+            {% else %}
+                You can view and manage tickets.
+            {% endif %}
+        </p>
     </div>
     <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
         <button onclick="refreshDashboard()" class="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
             <i class="fas fa-sync-alt mr-2"></i>
             Refresh
         </button>
+        {% if can_access_reports %}
         <button onclick="exportDashboard()" class="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition">
             <i class="fas fa-download mr-2"></i>
             Export
         </button>
+        {% endif %}
     </div>
 </div>
 
-<!-- Stats Overview -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6">
-    <!-- Users Card -->
+<!-- Stats Overview - 5 Columns for Role-based visibility -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6 mb-6">
+    <!-- Users Card - Only visible to SUPERADMIN, IT_ADMIN, MANAGER -->
+    {% if can_access_users %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
@@ -45,8 +61,33 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
-    <!-- Assets Card -->
+    <!-- Open Assets Card - Only visible to SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN -->
+    {% if can_access_assets %}
+    <div class="bg-white rounded-lg shadow-sm border border-orange-200 hover:shadow-md transition-shadow">
+        <div class="p-4 sm:p-6">
+            <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex-shrink-0">
+                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-orange-600 text-lg sm:text-xl"></i>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm font-medium text-gray-500">Open Assets</p>
+                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ open_assets_count|default:0 }}</p>
+                    <p class="text-xs sm:text-sm text-orange-600">
+                        <i class="fas fa-wrench mr-1"></i>
+                        Needs attention
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Active Assets Card - Only visible to SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN -->
+    {% if can_access_assets %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
@@ -66,8 +107,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
-    <!-- Projects Card -->
+    <!-- Projects Card - Only visible to SUPERADMIN, MANAGER -->
+    {% if can_access_projects %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
@@ -87,8 +130,9 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
-    <!-- Tickets Card -->
+    <!-- Tickets Card - Visible to ALL roles -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
@@ -118,7 +162,9 @@
             <div class="p-4 sm:p-6 border-b border-gray-200">
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
                     <h3 class="text-base sm:text-lg font-medium text-gray-900">Recent Activity (Last 10)</h3>
+                    {% if can_access_logs %}
                     <a href="{% url 'frontend:logs' %}" class="text-xs sm:text-sm text-primary-600 hover:text-primary-700 font-medium">View all →</a>
+                    {% endif %}
                 </div>
             </div>
             <div class="p-4 sm:p-6">
@@ -178,13 +224,14 @@
 
     <!-- Quick Actions & Alerts -->
     <div class="space-y-4 sm:space-y-6">
-        <!-- Quick Actions -->
+        <!-- Quick Actions - All roles can create tickets -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200">
             <div class="p-4 sm:p-6 border-b border-gray-200">
                 <h3 class="text-base sm:text-lg font-medium text-gray-900">Quick Actions</h3>
             </div>
             <div class="p-4 sm:p-6">
                 <div class="space-y-2 sm:space-y-3">
+                    <!-- Create Ticket - Available to ALL roles -->
                     <a href="{% url 'frontend:create-ticket' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
                         <div class="text-center">
                             <i class="fas fa-ticket-alt text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
@@ -192,24 +239,41 @@
                         </div>
                     </a>
                     
-<a href="{% url 'frontend:create-project' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
+                    <!-- Create Project - Only SUPERADMIN, MANAGER -->
+                    {% if can_access_projects %}
+                    <a href="{% url 'frontend:create-project' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors group">
                         <div class="text-center">
-                            <i class="fas fa-project-diagram text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
-                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-primary-700">New Project</p>
+                            <i class="fas fa-project-diagram text-gray-400 group-hover:text-purple-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
+                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-purple-700">New Project</p>
                         </div>
                     </a>
+                    {% endif %}
                     
-                    <a href="{% url 'frontend:create-asset' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
+                    <!-- Add Asset - Only SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN -->
+                    {% if can_access_assets %}
+                    <a href="{% url 'frontend:create-asset' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors group">
                         <div class="text-center">
-                            <i class="fas fa-desktop text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
-                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-primary-700">Add Asset</p>
+                            <i class="fas fa-desktop text-gray-400 group-hover:text-green-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
+                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-green-700">Add Asset</p>
                         </div>
                     </a>
+                    {% endif %}
+                    
+                    <!-- Generate Report - Only SUPERADMIN, MANAGER -->
+                    {% if can_access_reports %}
+                    <a href="{% url 'frontend:reports' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors group">
+                        <div class="text-center">
+                            <i class="fas fa-chart-bar text-gray-400 group-hover:text-indigo-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
+                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-indigo-700">Generate Report</p>
+                        </div>
+                    </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- System Alerts -->
+        <!-- System Alerts - Only for admin roles -->
+        {% if user_role in 'SUPERADMIN' or user_role in 'IT_ADMIN' or user_role in 'MANAGER' %}
         <div class="bg-white rounded-lg shadow-sm border border-gray-200">
             <div class="p-4 sm:p-6 border-b border-gray-200">
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
@@ -251,12 +315,15 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 
-<!-- Charts Section -->
+<!-- Charts Section - Only visible to roles with reports access -->
+{% if can_access_reports %}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Asset Status Chart -->
+    {% if can_access_assets %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-6 border-b border-gray-200">
             <h3 class="text-lg font-medium text-gray-900">Asset Status Overview</h3>
@@ -271,8 +338,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Project Timeline -->
+    {% if can_access_projects %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-6 border-b border-gray-200">
             <h3 class="text-lg font-medium text-gray-900">Project Timeline</h3>
@@ -311,10 +380,12 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
+{% endif %}
 
-<!-- Recent Tickets -->
-<div class="bg-white rounded-lg shadow-sm border border-gray-200">
+<!-- Recent Tickets - Visible to ALL roles -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="p-6 border-b border-gray-200">
         <div class="flex items-center justify-between">
             <h3 class="text-lg font-medium text-gray-900">Recent Tickets</h3>
@@ -332,68 +403,122 @@
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                <!-- Sample ticket data - would be replaced with real data -->
+                {% for ticket in recent_tickets %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">Network connectivity issues</div>
-                        <div class="text-sm text-gray-500">Unable to connect to VPN</div>
+                        <div class="text-sm font-medium text-gray-900">{{ ticket.title }}</div>
+                        {% if ticket.description %}
+                        <div class="text-sm text-gray-500 truncate max-w-xs">{{ ticket.description }}</div>
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            In Progress
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                            {% if ticket.status == 'NEW' %}bg-gray-100 text-gray-800
+                            {% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800
+                            {% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
+                            {% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800
+                            {% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-600
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ ticket.get_status_display|default:ticket.status }}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            High
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                            {% if ticket.priority == 'HIGH' %}bg-red-100 text-red-800
+                            {% elif ticket.priority == 'MEDIUM' %}bg-yellow-100 text-yellow-800
+                            {% elif ticket.priority == 'LOW' %}bg-green-100 text-green-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ ticket.get_priority_display|default:ticket.priority }}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        2 hours ago
+                        {% if ticket.created_at %}
+                        {{ ticket.created_at|timesince }} ago
+                        {% else %}
+                        Unknown
+                        {% endif %}
                     </td>
                 </tr>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">Software installation request</div>
-                        <div class="text-sm text-gray-500">Need Adobe Creative Suite installed</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Open
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Low
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        5 hours ago
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                        <i class="fas fa-ticket-alt text-3xl mb-3 text-gray-300"></i>
+                        <p>No recent tickets found</p>
                     </td>
                 </tr>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">Hardware upgrade request</div>
-                        <div class="text-sm text-gray-500">Need additional RAM for workstation</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            New
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Medium
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        1 day ago
-                    </td>
-                </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- Recent Assets - Only visible to roles with asset access -->
+{% if can_access_assets %}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-medium text-gray-900">Recent Assets</h3>
+            <a href="{% url 'frontend:assets' %}" class="text-sm text-primary-600 hover:text-primary-700">View all</a>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for asset in recent_assets %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ asset.name }}</div>
+                        {% if asset.asset_tag %}
+                        <div class="text-sm text-gray-500">{{ asset.asset_tag }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                            {% if asset.status == 'ACTIVE' %}bg-green-100 text-green-800
+                            {% elif asset.status == 'MAINTENANCE' %}bg-orange-100 text-orange-800
+                            {% elif asset.status == 'INACTIVE' %}bg-gray-100 text-gray-800
+                            {% elif asset.status == 'RETIRED' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ asset.get_status_display|default:asset.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if asset.category %}
+                        <span class="text-sm text-gray-900">{{ asset.category.name }}</span>
+                        {% else %}
+                        <span class="text-sm text-gray-500">Uncategorized</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {% if asset.created_at %}
+                        {{ asset.created_at|timesince }} ago
+                        {% else %}
+                        Unknown
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                        <i class="fas fa-desktop text-3xl mb-3 text-gray-300"></i>
+                        <p>No recent assets found</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block extra_js %}

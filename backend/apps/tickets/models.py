@@ -98,6 +98,12 @@ class Ticket(models.Model):
         ('URGENT', 'Urgent'),
     ]
     
+    # Assignment status choices
+    ASSIGNMENT_STATUS_CHOICES = [
+        ('UNASSIGNED', 'Unassigned'),
+        ('ASSIGNED', 'Assigned'),
+    ]
+    
     # Ticket ID (unique identifier)
     ticket_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     
@@ -123,6 +129,9 @@ class Ticket(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tickets_assigned'
     )
     assigned_team = models.CharField(max_length=100, blank=True)
+    assignment_status = models.CharField(
+        max_length=20, choices=ASSIGNMENT_STATUS_CHOICES, default='UNASSIGNED'
+    )
     
     # Timeline
     created_at = models.DateTimeField(auto_now_add=True)
@@ -326,6 +335,54 @@ class TicketHistory(models.Model):
     
     def __str__(self):
         return f"Ticket {self.ticket.ticket_id} - {self.field_name} changed"
+
+
+class TicketStatusHistory(models.Model):
+    """
+    Immutable status change history for tickets.
+    
+    Records every status transition with:
+    - ticket: Reference to the ticket
+    - from_status: Previous status before the change
+    - to_status: New status after the change
+    - changed_by: User who made the change
+    - changed_at: Timestamp of the change (auto_now_add)
+    
+    Rules:
+    - Write only when status changes
+    - Immutable records (no updates or deletes)
+    - Created inside the same transaction as ticket update
+    """
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='status_history')
+    from_status = models.CharField(max_length=20, choices=Ticket.STATUS_CHOICES)
+    to_status = models.CharField(max_length=20, choices=Ticket.STATUS_CHOICES)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ticket_status_changes')
+    changed_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'ticket_status_history'
+        verbose_name = 'Ticket Status History'
+        verbose_name_plural = 'Ticket Status Histories'
+        ordering = ['-changed_at']
+        indexes = [
+            models.Index(fields=['ticket', 'changed_at']),
+            models.Index(fields=['changed_by', 'changed_at']),
+        ]
+        # Ensure no updates or deletes at application level
+        # (Django doesn't enforce this, but the model represents immutable records)
+    
+    def __str__(self):
+        return f"Ticket {self.ticket.ticket_id}: {self.from_status} -> {self.to_status} by {self.changed_by}"
+    
+    def save(self, *args, **kwargs):
+        """Override save to prevent updates to immutable records."""
+        if self.pk and TicketStatusHistory.objects.filter(pk=self.pk).exists():
+            raise ValueError("TicketStatusHistory records are immutable and cannot be updated")
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        """Override delete to prevent deletion of immutable records."""
+        raise ValueError("TicketStatusHistory records are immutable and cannot be deleted")
 
 class TicketTemplate(models.Model):
     """
