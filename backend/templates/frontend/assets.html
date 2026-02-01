@@ -167,28 +167,40 @@ function deleteAsset(assetId, assetName) {
 
 function executeDelete(assetId) {
     console.log('Delete confirmed for asset:', assetId);
+    
+    // Get CSRF token from form, cookie, or template
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] ||
+                     '{{ csrf_token }}';
     console.log('CSRF Token:', csrfToken ? 'found' : 'not found');
     
-    fetch('/assets/api/' + assetId + '/', {
-        method: 'DELETE',
+    // Use the correct frontend URL pattern
+    fetch('/delete-asset/' + assetId + '/', {
+        method: 'POST',
         headers: {
-            'X-CSRFToken': csrfToken || '{{ csrf_token }}'
+            'X-CSRFToken': csrfToken || '',
+            'Accept': 'application/json',
         }
     })
     .then(response => {
         console.log('Response status:', response.status);
-        if (response.ok) {
-            return response.json();
+        
+        // Check content type to determine if it's JSON or HTML
+        const contentType = response.headers.get('content-type');
+        const isJson = contentType && contentType.includes('application/json');
+        
+        if (isJson) {
+            return response.json().then(data => ({ ok: response.ok, data }));
+        } else {
+            // If not JSON, treat as error
+            return response.text().then(text => {
+                throw new Error('Server returned HTML instead of JSON. Possible causes: not logged in, CSRF error, or server error.');
+            });
         }
-        return response.text().then(text => {
-            throw new Error(text || 'HTTP ' + response.status);
-        });
     })
-    .then(data => {
-        console.log('Response data:', data);
-        if (data.success) {
+    .then(result => {
+        console.log('Response data:', result);
+        if (result.ok && result.data && result.data.success) {
             showToast('Asset deleted successfully', 'success');
             const row = document.querySelector('.asset-row[data-id="' + assetId + '"]');
             if (row) {
@@ -205,12 +217,13 @@ function executeDelete(assetId) {
                 setTimeout(() => location.reload(), 1500);
             }
         } else {
-            showToast('Error: ' + (data.error || 'Failed to delete asset'), 'error');
+            const errorMsg = result.data?.error || 'Failed to delete asset';
+            showToast('Error: ' + errorMsg, 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showToast('Error deleting asset: ' + error, 'error');
+        showToast('Error deleting asset: ' + error.message, 'error');
     });
 }
 

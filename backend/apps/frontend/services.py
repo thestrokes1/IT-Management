@@ -722,9 +722,46 @@ class TicketService(EventPublisher):
     
     @classmethod
     def delete_ticket(cls, ticket_id: int) -> bool:
-        """Delete a ticket."""
+        """
+        Delete a ticket and all related records.
+        
+        Uses raw SQL to bypass Django signals that might cause FK issues.
+        
+        Args:
+            ticket_id: Ticket ID to delete
+            
+        Returns:
+            True if successful
+            
+        Raises:
+            NotFoundError: If ticket not found
+        """
+        from django.db import connection
+        from apps.tickets.models import Ticket
+        
         ticket = cls._get_ticket_or_raise(ticket_id)
-        ticket.delete()
+        ticket_db_id = ticket.id
+        
+        # Use raw SQL to avoid signal interference
+        with connection.cursor() as cursor:
+            # Delete related records first
+            cursor.execute("DELETE FROM ticket_attachments WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_comments WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_history WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_escalations WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_satisfaction WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_status_history WHERE ticket_id = %s", [ticket_db_id])
+            
+            # Clear related tickets (many-to-many)
+            cursor.execute("DELETE FROM tickets_related_tickets WHERE from_ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM tickets_related_tickets WHERE to_ticket_id = %s", [ticket_db_id])
+            
+            # Update child tickets
+            cursor.execute("UPDATE tickets SET parent_ticket_id = NULL WHERE parent_ticket_id = %s", [ticket_db_id])
+            
+            # Finally delete the ticket itself
+            cursor.execute("DELETE FROM tickets WHERE id = %s", [ticket_db_id])
+        
         return True
     
     @classmethod
@@ -938,7 +975,31 @@ class AssetService(EventPublisher):
     
     @classmethod
     def delete_asset(cls, request, asset_id: int) -> bool:
-        """Delete an asset."""
+        """
+        Delete an asset and all related records.
+        
+        Uses raw SQL to bypass Django signals that might cause FK issues.
+        Handles foreign key constraints by deleting related records first,
+        including subclasses (HardwareAsset, SoftwareAsset).
+        
+        Args:
+            request: HTTP request object
+            asset_id: Asset ID to delete
+            
+        Returns:
+            True if successful
+            
+        Raises:
+            NotFoundError: If asset not found
+            PermissionDeniedError: If user lacks permission
+        """
+        from django.db import connection
+        from django.db.models import Q
+        from apps.assets.models import (
+            Asset, AssetAssignment, AssetMaintenance, AssetAuditLog,
+            HardwareAsset, SoftwareAsset
+        )
+        
         asset = cls._get_asset_or_raise(asset_id)
         
         # Check authorization using domain authority
@@ -946,7 +1007,23 @@ class AssetService(EventPublisher):
         if not can_delete_asset(request.user, asset):
             raise PermissionDeniedError("You are not allowed to delete this asset.")
         
-        asset.delete()
+        asset_db_id = asset.id
+        
+        # Use raw SQL to avoid signal interference
+        with connection.cursor() as cursor:
+            # Delete related records first
+            cursor.execute("DELETE FROM asset_assignments WHERE asset_id = %s", [asset_db_id])
+            cursor.execute("DELETE FROM asset_maintenance WHERE asset_id = %s", [asset_db_id])
+            cursor.execute("DELETE FROM asset_audit_logs WHERE asset_id = %s", [asset_db_id])
+            
+            # Delete subclasses first (HardwareAsset, SoftwareAsset)
+            # These use asset_ptr_id as the FK
+            cursor.execute("DELETE FROM hardware_assets WHERE asset_ptr_id = %s", [asset_db_id])
+            cursor.execute("DELETE FROM software_assets WHERE asset_ptr_id = %s", [asset_db_id])
+            
+            # Finally delete the asset itself
+            cursor.execute("DELETE FROM assets WHERE id = %s", [asset_db_id])
+        
         return True
 
 
