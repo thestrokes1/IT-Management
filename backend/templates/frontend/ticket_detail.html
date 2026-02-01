@@ -109,12 +109,22 @@
                     {% endif %}
                 {% endif %}
                 
-                {# ===== Self-assign button for TECHNICIAN ===== #}
+{# ===== Self-assign button for TECHNICIAN ===== #}
                 {% if request.user.role == "TECHNICIAN" and permissions.can_self_assign %}
                 <form method="post" action="{% url 'frontend:ticket_assign_self' ticket.id %}">
                     {% csrf_token %}
                     <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm" onclick="return confirm('{% trans "Assign this ticket to yourself?" %}');">
                         Assign to me
+                    </button>
+                </form>
+                {% endif %}
+
+                {# ===== Unassign button for assigned user ===== #}
+                {% if permissions.assigned_to_me and permissions.can_unassign %}
+                <form method="post" action="{% url 'frontend:ticket_unassign_self' ticket.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm" onclick="return confirm('{% trans "Unassign this ticket from yourself?" %}');">
+                        Cancel assignment
                     </button>
                 </form>
                 {% endif %}

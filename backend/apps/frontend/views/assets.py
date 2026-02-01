@@ -274,7 +274,7 @@ def delete_asset(request, asset_id):
         assert_can_delete_asset(request.user, asset)
         
         # Use Service for write operation
-        AssetService.delete_asset(asset_id)
+        AssetService.delete_asset(request, asset_id)
         
         return JsonResponse({'success': True, 'message': f'Asset deleted successfully.'})
     
@@ -315,13 +315,13 @@ def asset_crud(request, asset_id):
                     'error': 'You do not have permission to delete assets. Only ADMIN or SUPERADMIN roles can delete assets.'
                 }, status=403)
             
-            # Get asset for confirmation
+# Get asset for confirmation
             asset = AssetQuery.get_by_id(asset_id)
             if asset is None:
                 return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
             
-            # Use Service for delete operation
-            AssetService.delete_asset(asset_id)
+            # Use Service for delete operation - pass request as first argument
+            AssetService.delete_asset(request, asset_id)
             
             return JsonResponse({'success': True, 'message': 'Asset deleted successfully.'})
         

@@ -120,18 +120,130 @@ class TicketDetailView(LoginRequiredMixin, View):
 class CreateTicketView(LoginRequiredMixin, View):
     """Create a new ticket."""
     def get(self, request):
+        # Get categories and ticket types for the form
+        from apps.tickets.models import TicketCategory, TicketType
+        from apps.users.models import User
+        
+        categories = TicketCategory.objects.filter(is_active=True).order_by('name')
+        ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
+        
         # Get list permissions for create check
         list_perms = get_list_permissions(request.user)
+        
         return render(request, "frontend/create-ticket.html", {
             "permissions": list_perms,
+            "categories": categories,
+            "ticket_types": ticket_types,
+            "available_users": User.objects.filter(is_active=True).order_by('username'),
+            "assign_config": {
+                "visible": True,
+                "readonly": False,
+                "default_user_id": None,
+            },
         })
 
     def post(self, request):
+        from apps.tickets.models import Ticket, TicketCategory, TicketType
+        from django.utils import timezone
+        from datetime import datetime
+        
+        # Get form data
+        title = request.POST.get("title", "").strip()
+        description = request.POST.get("description", "").strip()
+        category_id = request.POST.get("category", "")
+        ticket_type_id = request.POST.get("ticket_type", "")
+        priority = request.POST.get("priority", "MEDIUM")
+        impact = request.POST.get("impact", "MEDIUM")
+        urgency = request.POST.get("urgency", "MEDIUM")
+        assigned_to_id = request.POST.get("assigned_to", "")
+        due_date_str = request.POST.get("due_date", "")
+        
+        # Validate required fields
+        errors = []
+        if not title:
+            errors.append("Title is required")
+        if not description:
+            errors.append("Description is required")
+        if not category_id:
+            errors.append("Category is required")
+        if not priority:
+            errors.append("Priority is required")
+        
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            # Re-render form with entered data
+            categories = TicketCategory.objects.filter(is_active=True).order_by('name')
+            ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
+            return render(request, "frontend/create-ticket.html", {
+                "permissions": {"can_create": True},
+                "categories": categories,
+                "ticket_types": ticket_types,
+                "available_users": User.objects.filter(is_active=True).order_by('username'),
+                "form": {
+                    "title": {"value": title},
+                    "description": {"value": description},
+                    "priority": {"value": priority},
+                    "impact": {"value": impact},
+                    "urgency": {"value": urgency},
+                    "category": {"value": category_id},
+                    "ticket_type": {"value": ticket_type_id},
+                    "assigned_to": {"value": assigned_to_id},
+                    "due_date": {"value": due_date_str},
+                },
+                "assign_config": {
+                    "visible": True,
+                    "readonly": False,
+                    "default_user_id": None,
+                },
+            })
+        
+        # Get related objects
+        try:
+            category = TicketCategory.objects.get(id=category_id)
+        except TicketCategory.DoesNotExist:
+            messages.error(request, "Invalid category")
+            return redirect("frontend:create-ticket")
+        
+        ticket_type = None
+        if ticket_type_id:
+            try:
+                ticket_type = TicketType.objects.get(id=ticket_type_id)
+            except TicketType.DoesNotExist:
+                pass
+        
+        assigned_to = None
+        if assigned_to_id:
+            try:
+                assigned_to = User.objects.get(id=assigned_to_id)
+            except User.DoesNotExist:
+                pass
+        
+        # Parse due date
+        sla_due_at = None
+        if due_date_str:
+            try:
+                sla_due_at = datetime.strptime(due_date_str, '%Y-%m-%d')
+            except ValueError:
+                pass
+        
+        # Create ticket
         ticket = Ticket.objects.create(
-            title=request.POST.get("title", ""),
-            description=request.POST.get("description", ""),
+            title=title,
+            description=description,
+            category=category,
+            ticket_type=ticket_type,
+            priority=priority,
+            impact=impact,
+            urgency=urgency,
+            assigned_to=assigned_to,
+            sla_due_at=sla_due_at,
+            requester=request.user,
             created_by=request.user,
+            status='NEW',
         )
+        
+        messages.success(request, f"Ticket '{ticket.title}' created successfully!")
         return redirect("frontend:tickets")
 
 
@@ -231,47 +343,69 @@ def cancel_ticket(request, ticket_id):
 
 
 @login_required
-@require_http_methods(["POST", "DELETE"])
+@require_http_methods(["POST"])
 def delete_ticket(request, ticket_id):
     """
     Delete a ticket.
-    Uses CQRS command with authority enforcement.
+    Uses TicketService with raw SQL to bypass signal issues.
     """
-    # Check if user is authenticated
-    if not request.user.is_authenticated:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
-        return redirect('frontend:login')
+    from django.db import connection
+    from apps.tickets.models import Ticket
+    from apps.tickets.domain.services.ticket_authority import can_delete as can_delete_ticket
     
+    # Get ticket for authorization check
     try:
-        # Get ticket for authorization check
-        ticket = get_object_or_404(Ticket, id=ticket_id)
-        
-        # Use CQRS command with authority enforcement
-        delete_use_case = DeleteTicket()
-        result = delete_use_case.execute(
-            user=request.user,
-            ticket_id=str(ticket.ticket_id),
-        )
-        
-        if result.success:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': True, 'message': 'Ticket deleted successfully.'})
-            messages.success(request, f"Ticket #{ticket_id} has been deleted.")
-        else:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'error': result.error}, status=403)
-            messages.error(request, result.error)
-    
-    except AuthorizationError as e:
+        ticket = Ticket.objects.get(id=ticket_id)
+    except Ticket.DoesNotExist:
+        error_msg = f"Ticket with id {ticket_id} not found."
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'error': str(e)}, status=403)
-        messages.error(request, str(e))
+            return JsonResponse({'error': error_msg}, status=404)
+        messages.error(request, error_msg)
+        return redirect("frontend:tickets")
+    
+    # Check permission using domain authority
+    if not can_delete_ticket(request.user, ticket):
+        error_msg = "You do not have permission to delete this ticket."
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': error_msg}, status=403)
+        messages.error(request, error_msg)
+        return redirect("frontend:tickets")
+    
+    ticket_db_id = ticket.id
+    
+    # Use raw SQL to avoid signal interference
+    try:
+        with connection.cursor() as cursor:
+            # Delete related records first
+            cursor.execute("DELETE FROM ticket_attachments WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_comments WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_history WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_escalations WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_satisfaction WHERE ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM ticket_status_history WHERE ticket_id = %s", [ticket_db_id])
+            
+            # Clear related tickets (many-to-many)
+            cursor.execute("DELETE FROM tickets_related_tickets WHERE from_ticket_id = %s", [ticket_db_id])
+            cursor.execute("DELETE FROM tickets_related_tickets WHERE to_ticket_id = %s", [ticket_db_id])
+            
+            # Update child tickets
+            cursor.execute("UPDATE tickets SET parent_ticket_id = NULL WHERE parent_ticket_id = %s", [ticket_db_id])
+            
+            # Finally delete the ticket itself
+            cursor.execute("DELETE FROM tickets WHERE id = %s", [ticket_db_id])
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        error_msg = f'Error deleting ticket: {str(e)}'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'error': f'Error deleting ticket: {str(e)}'}, status=500)
-        messages.error(request, f"Error deleting ticket: {str(e)}")
+            return JsonResponse({'error': error_msg}, status=500)
+        messages.error(request, error_msg)
+        return redirect("frontend:tickets")
     
+    success_msg = f"Ticket #{ticket_id} has been deleted."
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'message': success_msg})
+    messages.success(request, success_msg)
     return redirect("frontend:tickets")
 
 
@@ -369,6 +503,53 @@ def ticket_assign_to_user(request, ticket_id, user_id):
     except ValueError as e:
         messages.error(request, str(e))
     
+    return redirect('frontend:ticket-detail', ticket_id=ticket_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def ticket_unassign_self(request, ticket_id):
+    """
+    Unassign ticket from self.
+    
+    Uses domain authority for permission check.
+    Only the assigned user or admin roles can unassign.
+    """
+    from django.shortcuts import get_object_or_404, redirect
+    from django.contrib import messages
+    from apps.tickets.models import Ticket
+    from apps.tickets.domain.services.ticket_authority import (
+        can_unassign_self as can_unassign_self_ticket,
+    )
+    
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    
+    # Check if user has permission (only assigned user or admin)
+    if not can_unassign_self_ticket(request.user, ticket):
+        messages.error(request, 'You do not have permission to unassign this ticket.')
+        return redirect('frontend:ticket-detail', ticket_id=ticket_id)
+    
+    # Store old assignee for event
+    old_assignee = ticket.assigned_to
+    old_assignee_name = old_assignee.username if old_assignee else "Unassigned"
+    
+    # Perform unassignment
+    ticket.assigned_to = None
+    ticket.assignment_status = 'UNASSIGNED'
+    ticket.updated_by = request.user
+    ticket.save()
+    
+    # Emit domain event
+    from apps.tickets.domain.events import emit_ticket_unassigned
+    emit_ticket_unassigned(
+        ticket_id=ticket.id,
+        ticket_title=ticket.title,
+        actor=request.user,
+        unassigned_user_id=old_assignee.id if old_assignee else None,
+        unassigned_username=old_assignee_name,
+    )
+    
+    messages.success(request, f'Ticket unassigned from {old_assignee_name}.')
     return redirect('frontend:ticket-detail', ticket_id=ticket_id)
 
 
