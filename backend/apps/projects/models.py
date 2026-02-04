@@ -1,6 +1,31 @@
 """
 Project models for IT Management Platform.
 Project and task management with comprehensive tracking and assignment.
+
+ARCHITECTURAL NOTE:
+==================
+Project model mutations (create, update, delete, status changes, membership changes)
+MUST ONLY occur in CQRS commands within apps/projects/application/*:
+
+    - CreateProject.execute()  - Create new project
+    - UpdateProject.execute()  - Update project details
+    - DeleteProject.execute()  - Delete project
+    - ChangeProjectStatus.execute() - Change project status
+    - ManageProjectMembers.execute() - Add/remove team members
+
+DO NOT perform direct model mutations in:
+    - Views (apps/frontend/views/projects.py)
+    - Services (apps/frontend/services.py)
+    - Queries (apps/projects/queries/*.py)
+    - Serializers (apps/projects/serializers.py)
+    - Signals (apps/projects/signals.py)
+
+This ensures:
+    - Authorization is centralized in domain authority (project_authority.py)
+    - Business logic is encapsulated in commands
+    - Domain events are emitted consistently
+    - Write patterns are auditable
+    - No duplicate authorization checks
 """
 
 from django.db import models

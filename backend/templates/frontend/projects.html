@@ -137,8 +137,8 @@ function deleteProject(projectId, projectName) {
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
                              document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
             
-            fetch('/projects/api/' + projectId + '/', {
-                method: 'DELETE',
+            fetch('/delete-project/' + projectId + '/', {
+                method: 'POST',
                 headers: {
                     'X-CSRFToken': csrfToken || '{{ csrf_token }}'
                 }

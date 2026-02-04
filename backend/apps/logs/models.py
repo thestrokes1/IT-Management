@@ -35,7 +35,12 @@ class LogCategory(models.Model):
 
 class ActivityLog(models.Model):
     """
-    General user activity logging.
+    Activity log model for the IT Management Platform.
+
+    Architectural rules:
+    - `timestamp` is the canonical and ONLY time field for activity logging.
+    - The `created_at` field must NEVER be added to this model.
+    - All ordering, filtering, and display logic MUST use `timestamp`.
     """
     # Log level choices
     LEVEL_CHOICES = [
@@ -102,7 +107,15 @@ class ActivityLog(models.Model):
     tags = models.JSONField(default=list, blank=True)
     
     # Timestamps
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp = models.DateTimeField(
+    auto_now_add=True,
+    db_index=True,
+    help_text=(
+        "Primary timestamp for activity logging. "
+        "Used for dashboard ordering, display, and all temporal queries."
+    ),
+)
+
     
     class Meta:
         db_table = 'activity_logs'
@@ -196,7 +209,15 @@ class AuditLog(models.Model):
     extra_data = models.JSONField(default=dict, blank=True)
     
     # Timestamp
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp = models.DateTimeField(
+    auto_now_add=True,
+    db_index=True,
+    help_text=(
+        "Primary timestamp for activity logging. "
+        "Used for dashboard ordering, display, and all temporal queries."
+    ),
+)
+
     
     class Meta:
         db_table = 'audit_logs'
@@ -273,7 +294,15 @@ class SystemLog(models.Model):
     extra_data = models.JSONField(default=dict, blank=True)
     
     # Timestamp
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp = models.DateTimeField(
+    auto_now_add=True,
+    db_index=True,
+    help_text=(
+        "Primary timestamp for activity logging. "
+        "Used for dashboard ordering, display, and all temporal queries."
+    ),
+)
+
     
     class Meta:
         db_table = 'system_logs'

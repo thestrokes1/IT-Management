@@ -1,8 +1,8 @@
 """
 Project views for IT Management Platform.
 Contains all project-related views (list, create, edit, delete).
-Uses CQRS pattern: Queries return DTOs, Services raise domain exceptions.
-Uses permission_mapper for consistent UI permission flags.
+Uses CQRS pattern: Commands handle business logic and authorization.
+Views are thin - they only parse requests and call commands.
 """
 
 from django.shortcuts import render, redirect
@@ -14,13 +14,11 @@ from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
 from apps.frontend.mixins import CanManageProjectsMixin
-from apps.frontend.services import ProjectService
 from apps.projects.queries import ProjectQuery
-from apps.core.exceptions import DomainException, PermissionDeniedError
-from apps.core.exception_mapper import ExceptionMapper, SafeTemplateView
-from apps.projects.policies import ProjectPolicy
+from apps.core.exceptions import NotFoundError, PermissionDeniedError
+from apps.core.exception_mapper import SafeTemplateView
+from apps.core.domain.authorization import AuthorizationError
 from apps.projects.domain.services.project_authority import (
-    get_project_permissions, 
     can_create_project,
 )
 from apps.frontend.permissions_mapper import (
@@ -28,9 +26,15 @@ from apps.frontend.permissions_mapper import (
     build_projects_permissions_map,
     get_list_permissions,
 )
+# Import new CQRS commands
+from apps.projects.application import (
+    CreateProject,
+    UpdateProject,
+    DeleteProject,
+)
 
 
-class ProjectsView(LoginRequiredMixin, SafeTemplateView):
+class ProjectsView(LoginRequiredMixin, TemplateView):
     """
     Projects management web interface.
     Uses ProjectQuery for read operations (returns DTOs).
@@ -111,28 +115,40 @@ class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplate
         return context
     
     def post(self, request, *args, **kwargs):
-        """Handle project creation using Service."""
+        """Handle project creation using CQRS command."""
         try:
-            # Use Service for write operation
-            project = ProjectService.create_project(
-                request=request,
+            # Use CQRS command for creation (handles authorization internally)
+            result = CreateProject().execute(
+                user=request.user,
                 name=request.POST.get('name', '').strip(),
                 description=request.POST.get('description', '').strip(),
                 category_id=request.POST.get('category', ''),
                 status=request.POST.get('status', 'PLANNING'),
                 priority=request.POST.get('priority', 'MEDIUM'),
-                start_date=request.POST.get('start_date', ''),
-                end_date=request.POST.get('end_date', ''),
-                budget=request.POST.get('budget', ''),
-                owner_id=request.POST.get('project_manager', ''),
-                team_members=request.POST.getlist('team_members', [])
+                start_date=request.POST.get('start_date', '') or None,
+                end_date=request.POST.get('end_date', '') or None,
+                budget=request.POST.get('budget', '0'),
+                owner_id=request.POST.get('project_manager', '') or None,
+                team_members=request.POST.getlist('team_members', []),
             )
             
-            messages.success(request, f'Project "{project.name}" created successfully!')
-            return redirect('frontend:projects')
+            if result.success:
+                project_name = result.data.get('name', 'Project') if result.data else 'Project'
+                messages.success(request, f'Project "{project_name}" created successfully!')
+                return redirect('frontend:projects')
+            else:
+                messages.error(request, result.error)
+                context = self.get_context_data()
+                context['form'] = request.POST
+                return render(request, self.template_name, context)
         
-        except DomainException:
-            raise
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'Error creating project: {str(e)}')
+            context = self.get_context_data()
+            context['form'] = request.POST
+            return render(request, self.template_name, context)
 
 
 class EditProjectView(SafeTemplateView):
@@ -146,14 +162,16 @@ class EditProjectView(SafeTemplateView):
     redirect_url = 'frontend:projects'
     
     def dispatch(self, request, *args, **kwargs):
-        """Check edit permission at dispatch time."""
+        """Check edit permission using domain authority."""
+        from apps.projects.domain.services.project_authority import assert_can_edit
+        from apps.core.exceptions import NotFoundError
+        
         project_id = kwargs.get('project_id')
         
         # Get project for permission check
         project = ProjectQuery.get_by_id(project_id)
         
         if project is None:
-            from apps.core.exceptions import NotFoundError
             raise NotFoundError(
                 resource_type="Project",
                 resource_id=project_id
@@ -162,14 +180,12 @@ class EditProjectView(SafeTemplateView):
         # Store project in view for later use
         self._project = project
         
-        # Check edit permission using Policy
-        policy = ProjectPolicy()
-        project_dict = project.to_dict() if hasattr(project, 'to_dict') else project
-        auth_result = policy.can_edit(request.user, project_dict)
-        
-        if not auth_result.allowed:
+        # Check edit permission using domain authority (assert_can_edit raises AuthorizationError)
+        try:
+            assert_can_edit(request.user, project)
+        except AuthorizationError as e:
             raise PermissionDeniedError(
-                message=auth_result.reason,
+                message=str(e),
                 details={'action': 'edit', 'resource_type': 'project'}
             )
         
@@ -210,40 +226,51 @@ class EditProjectView(SafeTemplateView):
         return context
     
     def post(self, request, *args, **kwargs):
-        """Handle project edit using Service."""
+        """Handle project edit using CQRS command."""
         try:
             project_id = self.kwargs.get('project_id')
             
-            # Use Service for write operation
-            project = ProjectService.update_project(
-                request=request,
+            # Use CQRS command for update (handles authorization internally)
+            result = UpdateProject().execute(
+                user=request.user,
                 project_id=project_id,
                 name=request.POST.get('name', '').strip(),
                 description=request.POST.get('description', '').strip(),
                 category_id=request.POST.get('category', ''),
                 status=request.POST.get('status', 'PLANNING'),
                 priority=request.POST.get('priority', 'MEDIUM'),
-                start_date=request.POST.get('start_date', ''),
-                end_date=request.POST.get('end_date', ''),
-                budget=request.POST.get('budget', ''),
-                owner_id=request.POST.get('project_manager', ''),
-                team_members=request.POST.getlist('team_members', [])
+                start_date=request.POST.get('start_date', '') or None,
+                end_date=request.POST.get('end_date', '') or None,
+                budget=request.POST.get('budget', '0'),
+                owner_id=request.POST.get('project_manager', '') or None,
+                team_members=request.POST.getlist('team_members', []),
             )
             
-            messages.success(request, f'Project "{project.name}" updated successfully!')
-            return redirect('frontend:projects')
+            if result.success:
+                project_name = result.data.get('name', 'Project') if result.data else 'Project'
+                messages.success(request, f'Project "{project_name}" updated successfully!')
+                return redirect('frontend:projects')
+            else:
+                messages.error(request, result.error)
+                context = self.get_context_data()
+                context['form'] = request.POST
+                return render(request, self.template_name, context)
         
-        except DomainException:
-            raise
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'Error updating project: {str(e)}')
+            context = self.get_context_data()
+            context['form'] = request.POST
+            return render(request, self.template_name, context)
 
 
 @login_required(login_url='frontend:login')
 @require_http_methods(["DELETE", "POST"])
 def delete_project(request, project_id):
     """
-    Delete a project.
-    Uses ProjectService for write operation.
-    Uses ProjectPolicy for authorization.
+    Delete a project using CQRS command.
+    Authorization is handled inside the DeleteProject command.
     """
     # Check if user is authenticated
     if not request.user.is_authenticated:
@@ -252,26 +279,16 @@ def delete_project(request, project_id):
         return redirect('frontend:login')
     
     try:
-        # Get project for authorization check
-        project_dto = ProjectQuery.get_by_id(project_id)
+        # Use CQRS command for deletion (handles authorization internally)
+        result = DeleteProject().execute(
+            user=request.user,
+            project_id=project_id,
+        )
         
-        if project_dto is None:
-            return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
-        
-        # Convert to dict for permission check
-        project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
-        
-        # Check permission using Policy
-        policy = ProjectPolicy()
-        policy.can_delete(request.user, project_dict).require('delete', 'project')
-        
-        # Use Service for write operation
-        ProjectService.delete_project(project_id, user=request.user)
-        
-        return JsonResponse({'success': True, 'message': f'Project deleted successfully.'})
-    
-    except DomainException as e:
-        return ExceptionMapper.to_json_response(e, request)
+        if result.success:
+            return JsonResponse({'success': True, 'message': result.data.get('message', 'Project deleted successfully.')})
+        else:
+            return JsonResponse({'error': result.error}, status=403)
     
     except Exception as e:
         import traceback
@@ -283,53 +300,45 @@ def delete_project(request, project_id):
 @require_http_methods(["DELETE", "PATCH"])
 def project_crud(request, project_id):
     """
-    Handle project CRUD operations (DELETE and PATCH).
-    Uses ProjectService for write operations.
-    Uses ProjectPolicy for authorization.
+    Handle project CRUD operations using CQRS commands.
+    Authorization is handled inside the commands.
     """
     try:
         if request.method == 'DELETE':
-            # Check permission using Policy
-            project_dto = ProjectQuery.get_by_id(project_id)
-            if project_dto is None:
-                return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
+            # Use CQRS command for deletion
+            result = DeleteProject().execute(
+                user=request.user,
+                project_id=project_id,
+            )
             
-            project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
-            
-            policy = ProjectPolicy()
-            policy.can_delete(request.user, project_dict).require('delete', 'project')
-            
-            # Use Service for delete operation
-            ProjectService.delete_project(project_id, user=request.user)
-            
-            return JsonResponse({'success': True, 'message': 'Project deleted successfully.'})
+            if result.success:
+                return JsonResponse({'success': True, 'message': 'Project deleted successfully.'})
+            else:
+                return JsonResponse({'error': result.error}, status=403)
         
         elif request.method == 'PATCH':
             import json
             data = json.loads(request.body)
             
-            # Get project for authorization check
-            project_dto = ProjectQuery.get_by_id(project_id)
-            if project_dto is None:
-                return JsonResponse({'error': f'Project with id {project_id} not found.'}, status=404)
-            
-            project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
-            
-            # Check permission using Policy
-            policy = ProjectPolicy()
-            policy.can_edit(request.user, project_dict).require('edit', 'project')
-            
-            # Use Service for partial update
-            project = ProjectService.update_project(
-                request=request,
+            # Use CQRS command for update
+            result = UpdateProject().execute(
+                user=request.user,
                 project_id=project_id,
-                **{k: v for k, v in data.items() if k in ['name', 'description', 'status', 'priority', 'start_date', 'end_date', 'budget', 'owner_id']}
+                name=data.get('name'),
+                description=data.get('description'),
+                category_id=data.get('category_id') or data.get('category'),
+                status=data.get('status'),
+                priority=data.get('priority'),
+                start_date=data.get('start_date'),
+                end_date=data.get('end_date'),
+                budget=data.get('budget'),
+                owner_id=data.get('owner_id'),
             )
             
-            return JsonResponse({'success': True, 'message': f'Project "{project.name}" updated successfully.'})
-    
-    except DomainException as e:
-        return ExceptionMapper.to_json_response(e, request)
+            if result.success:
+                return JsonResponse({'success': True, 'message': result.data.get('message')})
+            else:
+                return JsonResponse({'error': result.error}, status=403)
     
     except Exception as e:
         import traceback

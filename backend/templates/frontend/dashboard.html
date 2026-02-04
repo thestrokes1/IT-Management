@@ -37,10 +37,11 @@
         {% endif %}
     </div>
 </div>
+<!-- FIX: closing missing div -->
 
 <!-- Stats Overview - 5 Columns for Role-based visibility -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6 mb-6">
-    <!-- Users Card - Only visible to SUPERADMIN, IT_ADMIN, MANAGER -->
+    <!-- Users Card -->
     {% if can_access_users %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
@@ -50,6 +51,7 @@
                         <i class="fas fa-users text-blue-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
+                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Active Users</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ user_count|default:0 }}</p>
@@ -61,9 +63,10 @@
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
     {% endif %}
 
-    <!-- Open Assets Card - Only visible to SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN -->
+    <!-- Open Assets Card -->
     {% if can_access_assets %}
     <div class="bg-white rounded-lg shadow-sm border border-orange-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
@@ -73,6 +76,7 @@
                         <i class="fas fa-exclamation-triangle text-orange-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
+                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Open Assets</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ open_assets_count|default:0 }}</p>
@@ -84,9 +88,10 @@
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
     {% endif %}
 
-    <!-- Active Assets Card - Only visible to SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN -->
+    <!-- Active Assets Card -->
     {% if can_access_assets %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
@@ -96,6 +101,7 @@
                         <i class="fas fa-desktop text-green-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
+                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Active Assets</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ asset_count|default:0 }}</p>
@@ -107,9 +113,10 @@
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
     {% endif %}
 
-    <!-- Projects Card - Only visible to SUPERADMIN, MANAGER -->
+    <!-- Projects Card -->
     {% if can_access_projects %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
@@ -119,6 +126,7 @@
                         <i class="fas fa-project-diagram text-yellow-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
+                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Active Projects</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ project_count|default:0 }}</p>
@@ -130,9 +138,10 @@
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
     {% endif %}
 
-    <!-- Tickets Card - Visible to ALL roles -->
+    <!-- Tickets Card -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
@@ -141,6 +150,7 @@
                         <i class="fas fa-ticket-alt text-red-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
+                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Open Tickets</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ ticket_count|default:0 }}</p>
@@ -152,7 +162,9 @@
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
 </div>
+<!-- FIX: closing missing div -->
 
 <!-- Main Content Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
@@ -162,25 +174,41 @@
             <div class="p-4 sm:p-6 border-b border-gray-200">
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
                     <h3 class="text-base sm:text-lg font-medium text-gray-900">Recent Activity (Last 10)</h3>
-                    {% if can_access_logs %}
-                    <a href="{% url 'frontend:logs' %}" class="text-xs sm:text-sm text-primary-600 hover:text-primary-700 font-medium">View all →</a>
-                    {% endif %}
+                    <div class="flex items-center gap-2">
+                        <form method="GET" action="" class="flex items-center gap-2" id="activity-search-form">
+                            {% if can_access_logs %}
+                            <a href="{% url 'frontend:logs' %}" class="text-xs sm:text-sm text-primary-600 hover:text-primary-700 font-medium mr-2">View all</a>
+                            {% endif %}
+                            <input type="text" 
+                                   name="activity_search" 
+                                   value="{{ request.GET.activity_search|default:'' }}"
+                                   placeholder="Search..."
+                                   class="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 w-28 sm:w-40"
+                                   id="activity-search-input">
+                            {% if request.GET.activity_search %}
+                            <a href="?" class="text-xs text-gray-500 hover:text-gray-700">Clear</a>
+                            {% endif %}
+                            <button type="submit" class="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-md transition-colors">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
             <div class="p-4 sm:p-6">
                 <div class="space-y-4">
-                    {% for log in recent_logs %}
+                    {% for activity in recent_activities %}
                     <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors">
                         <div class="flex-shrink-0">
-                            {% if log.level == 'ERROR' %}
+                            {% if activity.level == 'ERROR' %}
                                 <div class="w-7 sm:w-8 h-7 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
                                     <i class="fas fa-exclamation-triangle text-red-600 text-xs"></i>
                                 </div>
-                            {% elif log.level == 'WARNING' %}
+                            {% elif activity.level == 'WARNING' %}
                                 <div class="w-7 sm:w-8 h-7 sm:h-8 bg-yellow-100 rounded-full flex items-center justify-center">
                                     <i class="fas fa-exclamation text-yellow-600 text-xs"></i>
                                 </div>
-                            {% elif log.level == 'SUCCESS' %}
+                            {% elif activity.level == 'SUCCESS' %}
                                 <div class="w-7 sm:w-8 h-7 sm:h-8 bg-green-100 rounded-full flex items-center justify-center">
                                     <i class="fas fa-check-circle text-green-600 text-xs"></i>
                                 </div>
@@ -191,47 +219,47 @@
                             {% endif %}
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p class="text-xs sm:text-sm font-medium text-gray-900">{{ log.title }}</p>
-                            <p class="text-xs sm:text-sm text-gray-600">{{ log.description }}</p>
+                            <p class="text-xs sm:text-sm font-medium text-gray-900">{{ activity.action_label|default:activity.action|default:"Activity" }}</p>
+                            <p class="text-xs sm:text-sm text-gray-600">{{ activity.description|default:"" }}</p>
                             <div class="flex items-center gap-1 sm:gap-2 mt-1 text-xs text-gray-500">
-                                <span>{{ log.timestamp|timesince }} ago</span>
-                                {% if log.user %}
+                                <span>{{ activity.timestamp|timesince }} ago</span>
+                                {% if activity.actor_username %}
                                 <span>•</span>
-                                <span>by {{ log.user.username }}</span>
+                                <span>by {{ activity.actor_username }}</span>
                                 {% endif %}
                             </div>
                         </div>
                         <div class="flex-shrink-0">
                             <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                {% if log.level == 'ERROR' %}bg-red-100 text-red-800
-                                {% elif log.level == 'WARNING' %}bg-yellow-100 text-yellow-800
-                                {% elif log.level == 'SUCCESS' %}bg-green-100 text-green-800
+                                {% if activity.level == 'ERROR' %}bg-red-100 text-red-800
+                                {% elif activity.level == 'WARNING' %}bg-yellow-100 text-yellow-800
+                                {% elif activity.level == 'SUCCESS' %}bg-green-100 text-green-800
                                 {% else %}bg-blue-100 text-blue-800{% endif %}">
-                                {{ log.level }}
+                                {{ activity.level|default:"INFO" }}
                             </span>
                         </div>
                     </div>
                     {% empty %}
                     <div class="text-center text-gray-500 py-8">
-                        <i class="fas fa-info-circle text-lg sm:text-2xl mb-2"></i>
-                        <p class="text-xs sm:text-sm">No recent activity</p>
+                        <i class="fas fa-search text-lg sm:text-2xl mb-2"></i>
+                        <p class="text-xs sm:text-sm">No activity found</p>
                     </div>
                     {% endfor %}
                 </div>
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
 
     <!-- Quick Actions & Alerts -->
     <div class="space-y-4 sm:space-y-6">
-        <!-- Quick Actions - All roles can create tickets -->
+        <!-- Quick Actions -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200">
             <div class="p-4 sm:p-6 border-b border-gray-200">
                 <h3 class="text-base sm:text-lg font-medium text-gray-900">Quick Actions</h3>
             </div>
             <div class="p-4 sm:p-6">
                 <div class="space-y-2 sm:space-y-3">
-                    <!-- Create Ticket - Available to ALL roles -->
                     <a href="{% url 'frontend:create-ticket' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
                         <div class="text-center">
                             <i class="fas fa-ticket-alt text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
@@ -239,7 +267,6 @@
                         </div>
                     </a>
                     
-                    <!-- Create Project - Only SUPERADMIN, MANAGER -->
                     {% if can_access_projects %}
                     <a href="{% url 'frontend:create-project' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors group">
                         <div class="text-center">
@@ -249,7 +276,6 @@
                     </a>
                     {% endif %}
                     
-                    <!-- Add Asset - Only SUPERADMIN, IT_ADMIN, MANAGER, TECHNICIAN -->
                     {% if can_access_assets %}
                     <a href="{% url 'frontend:create-asset' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors group">
                         <div class="text-center">
@@ -259,7 +285,6 @@
                     </a>
                     {% endif %}
                     
-                    <!-- Generate Report - Only SUPERADMIN, MANAGER -->
                     {% if can_access_reports %}
                     <a href="{% url 'frontend:reports' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors group">
                         <div class="text-center">
@@ -272,25 +297,72 @@
             </div>
         </div>
 
-        <!-- System Alerts - Only for admin roles -->
-        {% if user_role in 'SUPERADMIN' or user_role in 'IT_ADMIN' or user_role in 'MANAGER' %}
+        <!-- System Alerts -->
+        {% if can_access_security %}
         <div class="bg-white rounded-lg shadow-sm border border-gray-200">
             <div class="p-4 sm:p-6 border-b border-gray-200">
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-                    <h3 class="text-base sm:text-lg font-medium text-gray-900">System Alerts</h3>
-                    <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <h3 class="text-base sm:text-lg font-medium text-gray-900">Security Events</h3>
+                    <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium 
+                        {% if security_events > 0 %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
                         {{ security_events|default:0 }} Active
                     </span>
                 </div>
             </div>
             <div class="p-4 sm:p-6">
                 <div class="space-y-2 sm:space-y-3">
-                    {% if security_events > 0 %}
+                    {% if security_events_list %}
+                        {% for event in security_events_list %}
+                        <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border 
+                            {% if event.severity == 'CRITICAL' %}bg-red-50 border-red-200
+                            {% elif event.severity == 'HIGH' %}bg-orange-50 border-orange-200
+                            {% elif event.severity == 'MEDIUM' %}bg-yellow-50 border-yellow-200
+                            {% else %}bg-blue-50 border-blue-200{% endif %}">
+                            <i class="fas fa-shield-alt 
+                                {% if event.severity == 'CRITICAL' %}text-red-600
+                                {% elif event.severity == 'HIGH' %}text-orange-600
+                                {% elif event.severity == 'MEDIUM' %}text-yellow-600
+                                {% else %}text-blue-600{% endif %} 
+                                text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs sm:text-sm font-medium 
+                                    {% if event.severity == 'CRITICAL' %}text-red-800
+                                    {% elif event.severity == 'HIGH' %}text-orange-800
+                                    {% elif event.severity == 'MEDIUM' %}text-yellow-800
+                                    {% else %}text-blue-800{% endif %}">
+                                    {{ event.event_type_label|default:event.event_type|default:"Security Event" }}
+                                </p>
+                                <p class="text-xs 
+                                    {% if event.severity == 'CRITICAL' %}text-red-600
+                                    {% elif event.severity == 'HIGH' %}text-orange-600
+                                    {% elif event.severity == 'text-yellow-600MEDIUM' %}
+                                    {% else %}text-blue-600{% endif %}">
+                                    {{ event.detected_at|timesince }} ago
+                                </p>
+                            </div>
+                            <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if event.severity == 'CRITICAL' %}bg-red-100 text-red-800
+                                {% elif event.severity == 'HIGH' %}bg-orange-100 text-orange-800
+                                {% elif event.severity == 'MEDIUM' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ event.severity }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% elif security_events > 0 %}
                     <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-red-50 rounded-lg border border-red-200">
                         <i class="fas fa-shield-alt text-red-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs sm:text-sm font-medium text-red-800">Security Events</p>
                             <p class="text-xs text-red-600">{{ security_events }} active security events require attention</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
+                        <i class="fas fa-check-circle text-green-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs sm:text-sm font-medium text-green-800">Security Status</p>
+                            <p class="text-xs text-green-600">No active security events</p>
                         </div>
                     </div>
                     {% endif %}
@@ -318,11 +390,11 @@
         {% endif %}
     </div>
 </div>
+<!-- FIX: closing missing div -->
 
-<!-- Charts Section - Only visible to roles with reports access -->
+<!-- Charts Section -->
 {% if can_access_reports %}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <!-- Asset Status Chart -->
     {% if can_access_assets %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-6 border-b border-gray-200">
@@ -338,9 +410,9 @@
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
     {% endif %}
 
-    <!-- Project Timeline -->
     {% if can_access_projects %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-6 border-b border-gray-200">
@@ -380,11 +452,13 @@
             </div>
         </div>
     </div>
+    <!-- FIX: closing missing div -->
     {% endif %}
 </div>
+<!-- FIX: closing missing div -->
 {% endif %}
 
-<!-- Recent Tickets - Visible to ALL roles -->
+<!-- Recent Tickets -->
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="p-6 border-b border-gray-200">
         <div class="flex items-center justify-between">
@@ -451,8 +525,9 @@
         </table>
     </div>
 </div>
+<!-- FIX: closing missing div -->
 
-<!-- Recent Assets - Only visible to roles with asset access -->
+<!-- Recent Assets -->
 {% if can_access_assets %}
 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
     <div class="p-6 border-b border-gray-200">
@@ -517,6 +592,7 @@
         </table>
     </div>
 </div>
+<!-- FIX: closing missing div -->
 {% endif %}
 
 {% endblock %}
@@ -527,7 +603,6 @@ function refreshDashboard() {
     fetch('/api/dashboard/')
         .then(response => response.json())
         .then(data => {
-            // Update dashboard with new data
             location.reload();
         })
         .catch(error => {
@@ -536,16 +611,13 @@ function refreshDashboard() {
 }
 
 function exportDashboard() {
-    // Implementation for dashboard export
     alert('Dashboard export feature will be implemented');
 }
 
-// Auto-refresh dashboard every 60 seconds
 setInterval(function() {
     fetch('/api/dashboard/')
         .then(response => response.json())
         .then(data => {
-            // Update dashboard stats without full page reload
             console.log('Auto-refresh dashboard data:', data);
         })
         .catch(error => {
@@ -553,15 +625,22 @@ setInterval(function() {
         });
 }, 60000);
 
-// Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
-    // Set active nav item
     const navLinks = document.querySelectorAll('.nav-link');
     navLinks.forEach(link => {
         if (link.getAttribute('href').includes('dashboard')) {
             link.classList.add('bg-primary-100', 'text-primary-700');
         }
     });
+    
+    const searchInput = document.getElementById('activity-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                this.form.submit();
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

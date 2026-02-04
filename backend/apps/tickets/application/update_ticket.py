@@ -9,6 +9,8 @@ Authorization is enforced via domain service with strict RBAC.
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from django.db import transaction
+
 from apps.core.domain.authorization import AuthorizationError
 from apps.tickets.domain.services.ticket_authority import (
     assert_can_edit,
@@ -64,6 +66,7 @@ class UpdateTicket:
             print(f"Error: {result.error}")
     """
     
+    @transaction.atomic
     def execute(
         self,
         user: Any,
@@ -126,6 +129,9 @@ class UpdateTicket:
         ticket.updated_by = user
         ticket.save()
         
+        # Activity logging - runs after transaction commits, never breaks command
+        transaction.on_commit(lambda: self._log_ticket_updated(ticket, user))
+        
         return UpdateTicketResult.ok(
             data={
                 'ticket_id': str(ticket.ticket_id),
@@ -134,6 +140,20 @@ class UpdateTicket:
                 'updated_at': ticket.updated_at.isoformat(),
             }
         )
+    
+    def _log_ticket_updated(self, ticket, user):
+        """Log ticket update activity."""
+        try:
+            from apps.logs.services.activity_service import ActivityService
+            ActivityService().log_ticket_action(
+                action='UPDATE',
+                ticket=ticket,
+                actor=user,
+                request=None,
+                description=f"Updated ticket #{ticket.id}: {ticket.title}"
+            )
+        except Exception:
+            pass  # Logging must never break the command
 
 
 class CanEditTicket:
@@ -163,4 +183,3 @@ class CanEditTicket:
             return False
         
         return can_edit(user, ticket)
-

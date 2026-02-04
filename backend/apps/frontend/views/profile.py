@@ -43,6 +43,11 @@ class ProfileView(LoginRequiredMixin, TemplateView):
 class LogsView(LoginRequiredMixin, TemplateView):
     """
     Logs management web interface.
+    
+    Server-side filtering:
+    - Reads GET parameters (search, username, action, start_date, end_date, hour_from, hour_to)
+    - Uses ActivityService.get_activity_logs() to apply filters with RBAC
+    - Recent Activity table displays ONLY filtered results
     """
     template_name = 'frontend/logs.html'
     login_url = 'frontend:login'
@@ -51,14 +56,79 @@ class LogsView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         try:
             from django.contrib.auth import get_user_model
+            from apps.logs.services.activity_service import ActivityService
+            from datetime import datetime
+            
             User = get_user_model()
-            recent_logs = ActivityLog.objects.select_related('user', 'category').order_by('-timestamp')[:100]
+            service = ActivityService()
+            request = self.request
+            
+            # =====================================================================
+            # Read GET parameters for filtering
+            # =====================================================================
+            search = request.GET.get('search', '').strip()
+            username = request.GET.get('username', '').strip()
+            action = request.GET.get('action', '').strip()
+            
+            # Date range parameters
+            start_date_str = request.GET.get('start_date', '').strip()
+            end_date_str = request.GET.get('end_date', '').strip()
+            
+            # Hour range parameters
+            hour_from = request.GET.get('hour_from', '').strip()
+            hour_to = request.GET.get('hour_to', '').strip()
+            
+            # Parse dates
+            start_date = None
+            end_date = None
+            if start_date_str:
+                try:
+                    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            
+            # Log debug info
+            print(f"\n[LOGS_VIEW] Filter parameters received:")
+            print(f"  search: '{search}'")
+            print(f"  username: '{username}'")
+            print(f"  action: '{action}'")
+            print(f"  start_date: '{start_date_str}' -> {start_date}")
+            print(f"  end_date: '{end_date_str}' -> {end_date}")
+            print(f"  hour_from: '{hour_from}'")
+            print(f"  hour_to: '{hour_to}'")
+            
+            # =====================================================================
+            # Call ActivityService with filters (includes RBAC)
+            # =====================================================================
+            recent_logs = service.get_activity_logs(
+                user=request.user,
+                search=search if search else None,
+                username=username if username else None,
+                action=action if action else None,
+                start_date=start_date,
+                end_date=end_date,
+                hour_from=hour_from if hour_from else None,
+                hour_to=hour_to if hour_to else None,
+                limit=100  # Get up to 100 filtered results
+            )
+            
+            print(f"[LOGS_VIEW] Filtered logs count: {recent_logs.count()}")
+            
             security_events = SecurityEvent.objects.select_related('affected_user').order_by('-detected_at')[:50]
             all_users = User.objects.all().order_by('username')
-        except:
+        except Exception as e:
+            import traceback
+            print(f"[LOGS_VIEW] Error: {e}")
+            traceback.print_exc()
             recent_logs = []
             security_events = []
             all_users = []
+        
         context.update({
             'recent_logs': recent_logs,
             'security_events': security_events,

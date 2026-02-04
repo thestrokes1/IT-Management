@@ -212,6 +212,7 @@ function deleteTicket(ticketId, ticketTitle) {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': csrfToken || '',
+                    'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',
                 }
             })

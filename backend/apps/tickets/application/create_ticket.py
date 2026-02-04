@@ -8,6 +8,8 @@ Handles authorization, idempotency, and transaction boundaries.
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from django.db import transaction
+
 from apps.core.domain.authorization import AuthorizationError
 from apps.tickets.domain.services.ticket_authority import can_create_ticket
 
@@ -57,6 +59,7 @@ class CreateTicket:
             print(f"Error: {result.error}")
     """
     
+    @transaction.atomic
     def execute(
         self,
         actor: Any,
@@ -95,6 +98,9 @@ class CreateTicket:
             created_by=actor,
         )
         
+        # Activity logging - runs after transaction commits, never breaks command
+        transaction.on_commit(lambda: self._log_ticket_created(ticket, actor))
+        
         return CreateTicketResult.ok(
             data={
                 'ticket_id': str(ticket.ticket_id),
@@ -103,4 +109,12 @@ class CreateTicket:
                 'created_at': ticket.created_at.isoformat(),
             }
         )
+    
+    def _log_ticket_created(self, ticket, actor):
+        """Log ticket creation activity."""
+        try:
+            from apps.logs.services.activity_service import ActivityService
+            ActivityService().log_ticket_created(ticket, actor, None)
+        except Exception:
+            pass  # Logging must never break the command
 

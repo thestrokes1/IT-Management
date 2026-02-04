@@ -1,6 +1,7 @@
 """
 Dashboard views for IT Management Platform.
 Contains DashboardView and related API endpoints.
+Enhanced with activity logging and security event services.
 """
 
 from django.shortcuts import render, redirect
@@ -22,6 +23,9 @@ try:
     from apps.projects.models import Project
     from apps.tickets.models import Ticket, TicketComment
     from apps.logs.models import ActivityLog, SecurityEvent, SystemLog
+    # Import new services for enhanced dashboard
+    from apps.logs.services.activity_service import ActivityService
+    from apps.logs.services.security_service import SecurityEventService
 except ImportError:
     User = None
     Asset = None
@@ -30,12 +34,16 @@ except ImportError:
     ActivityLog = None
     SecurityEvent = None
     SystemLog = None
+    ActivityService = None
+    SecurityEventService = None
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     """
     Main dashboard view showing overview of all modules.
     Role-based filtering applied based on user permissions.
+    
+    Enhanced with activity logging and security event display.
     """
     template_name = 'frontend/dashboard.html'
     login_url = 'frontend:login'
@@ -44,29 +52,87 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         user_role = getattr(user, 'role', 'VIEWER')
-        
+        activity_search = self.request.GET.get('activity_search', '').strip()
+
         # Determine what the user can access based on role
         can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
         can_access_projects = user_role in ['SUPERADMIN', 'MANAGER']
         can_access_users = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
         can_access_logs = user_role in ['SUPERADMIN', 'MANAGER']
         can_access_reports = user_role in ['SUPERADMIN', 'MANAGER']
+        can_access_security = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
         
-        # Get recent activity (filtered based on user permissions)
-        try:
-            if user_role in ['SUPERADMIN', 'MANAGER']:
-                # Admins and Managers see all activity
-                recent_logs = ActivityLog.objects.select_related('user', 'category').order_by('-timestamp')[:10]
-            elif user_role in ['IT_ADMIN']:
-                # IT Admins see all activity except logs
-                recent_logs = ActivityLog.objects.select_related('user', 'category').order_by('-timestamp')[:10]
-            else:
-                # Technicians and Viewers see only ticket-related activity
-                recent_logs = ActivityLog.objects.select_related('user', 'category').filter(
-                    category__in=['ticket', 'asset']
-                ).order_by('-timestamp')[:10]
-        except:
-            recent_logs = []
+        # Initialize services if available
+        activity_service = ActivityService() if ActivityService else None
+        security_service = SecurityEventService(user) if SecurityEventService else None
+
+        # Get recent activity using ActivityService (NORMALIZED FOR TEMPLATE)
+        recent_activities = []
+
+        if activity_service:
+            try:
+                # Apply the same search filter to recent activity as used in logs
+                recent_logs = activity_service.get_activity_logs(
+                    user=user,
+                    search=activity_search or None,
+                    limit=10,
+                )
+
+                # 🔑 NORMALIZATION LAYER - converts ActivityLog to template-friendly dict
+                recent_activities = [
+                    {
+                        'id': log.id,
+                        'timestamp': log.timestamp,
+                        'actor_username': log.user.username if log.user else 'System',
+                        'action': log.action,
+                        'action_label': log.title or log.action.replace('_', ' ').title(),
+                        'target_type': log.model_name or '',
+                        'target_name': log.object_repr or '',
+                        'description': log.description,
+                        'level': log.level,
+                    }
+                    for log in recent_logs
+                ]
+
+            except Exception as e:
+                print("Dashboard ActivityService error:", e)
+                recent_activities = []
+        
+        # Get security events using new service
+        security_events = []
+        security_summary = {}
+        if security_service and can_access_security:
+            try:
+                security_events = security_service.get_events_for_dashboard(user, limit=5)
+                security_summary = security_service.get_security_summary(user)
+            except Exception:
+                security_events = []
+                security_summary = {}
+        
+        # Fallback to direct query if service fails
+        if not security_events and can_access_security:
+            try:
+                security_events_qs = SecurityEvent.objects.filter(
+                    status__in=['OPEN', 'INVESTIGATING']
+                ).select_related('affected_user', 'assigned_to').order_by('-detected_at')[:5]
+                security_events = [
+                    {
+                        'event_id': str(e.event_id),
+                        'detected_at': e.detected_at,
+                        'event_type': e.event_type,
+                        'event_type_label': e.event_type.replace('_', ' ').title(),
+                        'severity': e.severity,
+                        'status': e.status,
+                        'title': e.title,
+                        'description': e.description,
+                        'affected_user': e.affected_user.username if e.affected_user else None,
+                        'source_ip': e.source_ip,
+                        'assigned_to': e.assigned_to.username if e.assigned_to else None,
+                    }
+                    for e in security_events_qs
+                ]
+            except:
+                security_events = []
         
         # Get dashboard statistics based on role
         stats = {
@@ -92,11 +158,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             stats['user_count'] = User.objects.filter(is_active=True).count() if User else 0
         
         # Security events and system errors for admin roles
-        if user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']:
+        if can_access_security:
             stats['security_events'] = SecurityEvent.objects.filter(status__in=['OPEN', 'INVESTIGATING']).count() if SecurityEvent else 0
             stats['system_errors'] = SystemLog.objects.filter(level__in=['ERROR', 'CRITICAL']).count() if SystemLog else 0
         
-                # Get recent tickets
+        # Get recent tickets
         try:
             recent_tickets = Ticket.objects.select_related('category', 'assigned_to', 'requester').order_by('-created_at')[:10]
         except:
@@ -115,7 +181,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             open_assets_count = 0
 
         context.update({
-            'recent_logs': recent_logs,
+            'recent_activities': recent_activities,
             'recent_tickets': recent_tickets,
             'recent_assets': recent_assets,
             'open_assets_count': open_assets_count,
@@ -127,7 +193,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'system_errors': stats['system_errors'],
             'can_access_logs': can_access_logs,
             'can_access_reports': can_access_reports,
+            'can_access_security': can_access_security,
             'user_role': user_role,
+            # Security event data
+            'security_events_list': security_events,
+            'security_summary': security_summary,
         })
         
         return context

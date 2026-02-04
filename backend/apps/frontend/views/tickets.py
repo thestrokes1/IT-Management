@@ -142,8 +142,9 @@ class CreateTicketView(LoginRequiredMixin, View):
             },
         })
 
-    def post(self, request):
+def post(self, request):
         from apps.tickets.models import Ticket, TicketCategory, TicketType
+        from apps.tickets.application.create_ticket import CreateTicket
         from django.utils import timezone
         from datetime import datetime
         
@@ -198,53 +199,55 @@ class CreateTicketView(LoginRequiredMixin, View):
                 },
             })
         
-        # Get related objects
+        # Use CQRS command for ticket creation (includes activity logging)
+        create_use_case = CreateTicket()
         try:
-            category = TicketCategory.objects.get(id=category_id)
-        except TicketCategory.DoesNotExist:
-            messages.error(request, "Invalid category")
-            return redirect("frontend:create-ticket")
+            result = create_use_case.execute(
+                actor=request.user,
+                ticket_data={
+                    'title': title,
+                    'description': description,
+                    'category_id': category_id,
+                    'ticket_type_id': ticket_type_id if ticket_type_id else None,
+                    'priority': priority,
+                    'impact': impact,
+                    'urgency': urgency,
+                }
+            )
+            
+            if result.success:
+                messages.success(request, f"Ticket '{title}' created successfully!")
+                return redirect("frontend:tickets")
+            else:
+                messages.error(request, result.error)
+        except Exception as e:
+            messages.error(request, f"Error creating ticket: {str(e)}")
         
-        ticket_type = None
-        if ticket_type_id:
-            try:
-                ticket_type = TicketType.objects.get(id=ticket_type_id)
-            except TicketType.DoesNotExist:
-                pass
-        
-        assigned_to = None
-        if assigned_to_id:
-            try:
-                assigned_to = User.objects.get(id=assigned_to_id)
-            except User.DoesNotExist:
-                pass
-        
-        # Parse due date
-        sla_due_at = None
-        if due_date_str:
-            try:
-                sla_due_at = datetime.strptime(due_date_str, '%Y-%m-%d')
-            except ValueError:
-                pass
-        
-        # Create ticket
-        ticket = Ticket.objects.create(
-            title=title,
-            description=description,
-            category=category,
-            ticket_type=ticket_type,
-            priority=priority,
-            impact=impact,
-            urgency=urgency,
-            assigned_to=assigned_to,
-            sla_due_at=sla_due_at,
-            requester=request.user,
-            created_by=request.user,
-            status='NEW',
-        )
-        
-        messages.success(request, f"Ticket '{ticket.title}' created successfully!")
-        return redirect("frontend:tickets")
+        # If we get here, re-render form with errors
+        categories = TicketCategory.objects.filter(is_active=True).order_by('name')
+        ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
+        return render(request, "frontend/create-ticket.html", {
+            "permissions": {"can_create": True},
+            "categories": categories,
+            "ticket_types": ticket_types,
+            "available_users": User.objects.filter(is_active=True).order_by('username'),
+            "form": {
+                "title": {"value": title},
+                "description": {"value": description},
+                "priority": {"value": priority},
+                "impact": {"value": impact},
+                "urgency": {"value": urgency},
+                "category": {"value": category_id},
+                "ticket_type": {"value": ticket_type_id},
+                "assigned_to": {"value": assigned_to_id},
+                "due_date": {"value": due_date_str},
+            },
+            "assign_config": {
+                "visible": True,
+                "readonly": False,
+                "default_user_id": None,
+            },
+        })
 
 
 class EditTicketView(LoginRequiredMixin, View):

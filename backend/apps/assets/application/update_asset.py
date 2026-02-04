@@ -9,6 +9,8 @@ Authorization is enforced via domain service with strict RBAC.
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from django.db import transaction
+
 from apps.core.domain.authorization import AuthorizationError
 from apps.assets.domain.services.asset_authority import (
     assert_can_edit,
@@ -64,6 +66,7 @@ class UpdateAsset:
             print(f"Error: {result.error}")
     """
     
+    @transaction.atomic
     def execute(
         self,
         user: Any,
@@ -120,6 +123,9 @@ class UpdateAsset:
         asset.updated_by = user
         asset.save()
         
+        # Activity logging - runs after transaction commits, never breaks command
+        transaction.on_commit(lambda: self._log_asset_updated(asset, user))
+        
         # Emit domain event
         from apps.assets.domain.events import emit_asset_updated
         emit_asset_updated(
@@ -137,6 +143,20 @@ class UpdateAsset:
                 'updated_at': asset.updated_at.isoformat() if asset.updated_at else None,
             }
         )
+    
+    def _log_asset_updated(self, asset, user):
+        """Log asset update activity."""
+        try:
+            from apps.logs.services.activity_service import ActivityService
+            ActivityService().log_asset_action(
+                action='UPDATE',
+                asset=asset,
+                actor=user,
+                request=None,
+                description=f"Updated asset: {asset.name}"
+            )
+        except Exception:
+            pass  # Logging must never break the command
 
 
 class CanEditAsset:
