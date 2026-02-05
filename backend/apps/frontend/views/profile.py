@@ -52,6 +52,10 @@ class LogsView(LoginRequiredMixin, TemplateView):
     template_name = 'frontend/logs.html'
     login_url = 'frontend:login'
     
+    def _clean(self, value):
+        """Normalize GET parameter: empty strings become None."""
+        return value.strip() if hasattr(value, 'strip') else value
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         try:
@@ -64,60 +68,65 @@ class LogsView(LoginRequiredMixin, TemplateView):
             request = self.request
             
             # =====================================================================
-            # Read GET parameters for filtering
+            # Read and normalize GET parameters for filtering
             # =====================================================================
-            search = request.GET.get('search', '').strip()
-            username = request.GET.get('username', '').strip()
-            action = request.GET.get('action', '').strip()
+            raw_search = request.GET.get('search', '')
+            raw_username = request.GET.get('username', '')
+            raw_action = request.GET.get('action', '')
+            raw_start_date = request.GET.get('start_date', '')
+            raw_end_date = request.GET.get('end_date', '')
+            raw_hour_from = request.GET.get('hour_from', '')
+            raw_hour_to = request.GET.get('hour_to', '')
             
-            # Date range parameters
-            start_date_str = request.GET.get('start_date', '').strip()
-            end_date_str = request.GET.get('end_date', '').strip()
-            
-            # Hour range parameters
-            hour_from = request.GET.get('hour_from', '').strip()
-            hour_to = request.GET.get('hour_to', '').strip()
+            # Normalize: empty strings become None
+            search = self._clean(raw_search) or None
+            username = self._clean(raw_username) or None
+            action = self._clean(raw_action) or None
+            hour_from = self._clean(raw_hour_from) or None
+            hour_to = self._clean(raw_hour_to) or None
             
             # Parse dates
             start_date = None
             end_date = None
-            if start_date_str:
+            if raw_start_date:
                 try:
-                    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_date = datetime.strptime(raw_start_date, '%Y-%m-%d').date()
                 except ValueError:
                     pass
-            if end_date_str:
+            if raw_end_date:
                 try:
-                    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_date = datetime.strptime(raw_end_date, '%Y-%m-%d').date()
                 except ValueError:
                     pass
             
-            # Log debug info
-            print(f"\n[LOGS_VIEW] Filter parameters received:")
-            print(f"  search: '{search}'")
-            print(f"  username: '{username}'")
-            print(f"  action: '{action}'")
-            print(f"  start_date: '{start_date_str}' -> {start_date}")
-            print(f"  end_date: '{end_date_str}' -> {end_date}")
-            print(f"  hour_from: '{hour_from}'")
-            print(f"  hour_to: '{hour_to}'")
+            # =====================================================================
+            # DEBUG: Log normalized filters
+            # =====================================================================
+            print(f"\n[LOGS_VIEW] Normalized filters:")
+            print(f"  search: {repr(search)}")
+            print(f"  username: {repr(username)}")
+            print(f"  action: {repr(action)}")
+            print(f"  start_date: {repr(start_date)}")
+            print(f"  end_date: {repr(end_date)}")
+            print(f"  hour_from: {repr(hour_from)}")
+            print(f"  hour_to: {repr(hour_to)}")
             
             # =====================================================================
             # Call ActivityService with filters (includes RBAC)
             # =====================================================================
             recent_logs = service.get_activity_logs(
                 user=request.user,
-                search=search if search else None,
-                username=username if username else None,
-                action=action if action else None,
+                search=search,
+                username=username,
+                action=action,
                 start_date=start_date,
                 end_date=end_date,
-                hour_from=hour_from if hour_from else None,
-                hour_to=hour_to if hour_to else None,
-                limit=100  # Get up to 100 filtered results
+                hour_from=hour_from,
+                hour_to=hour_to,
+                limit=100
             )
             
-            print(f"[LOGS_VIEW] Filtered logs count: {recent_logs.count()}")
+            print(f"[LOGS_VIEW] Final logs count: {recent_logs.count()}")
             
             security_events = SecurityEvent.objects.select_related('affected_user').order_by('-detected_at')[:50]
             all_users = User.objects.all().order_by('username')

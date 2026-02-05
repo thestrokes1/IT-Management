@@ -110,10 +110,39 @@ class TicketDetailView(LoginRequiredMixin, View):
         else:
             assignable_users = User.objects.none()
         
+        # Get activity timeline for this ticket
+        from apps.logs.models import ActivityLog
+        from apps.logs.services.activity_service import ActivityService
+        
+        activities = []
+        try:
+            # Fetch activities related to this ticket
+            activities = ActivityLog.objects.filter(
+                Q(model_name='ticket') & Q(object_id=ticket.id)
+            ).select_related('user').order_by('-timestamp')[:50]
+            
+            # Format activities for template using ActivityService
+            service = ActivityService()
+            activities = [
+                {
+                    'actor_username': activity.user.username if activity.user else 'System',
+                    'actor_role': activity.user.role if activity.user else 'SYSTEM',
+                    'action': activity.action,
+                    'action_label': service._get_action_label(activity.action),
+                    'description': activity.description,
+                    'created_at': activity.timestamp,
+                    'metadata': activity.extra_data or {},
+                }
+                for activity in activities
+            ]
+        except Exception:
+            activities = []
+        
         return render(request, "frontend/ticket_detail.html", {
             "ticket": ticket,
             "permissions": permissions,
             "assignable_users": assignable_users,
+            "activities": activities,
         })
 
 
@@ -142,11 +171,12 @@ class CreateTicketView(LoginRequiredMixin, View):
             },
         })
 
-def post(self, request):
+    def post(self, request):
         from apps.tickets.models import Ticket, TicketCategory, TicketType
         from apps.tickets.application.create_ticket import CreateTicket
         from django.utils import timezone
         from datetime import datetime
+        from apps.users.models import User
         
         # Get form data
         title = request.POST.get("title", "").strip()
@@ -473,13 +503,13 @@ def ticket_assign_self(request, ticket_id):
 @login_required
 @require_http_methods(["POST"])
 def ticket_assign_to_user(request, ticket_id, user_id):
-    """Handle assignment of a ticket to a specific user."""
-    from apps.tickets.application.assign_ticket_to_self import AssignTicketToSelf
-    from django.shortcuts import get_object_or_404
-    from apps.tickets.models import Ticket
-    from apps.users.models import User
+    """
+    Assign a ticket to a specific user.
+    For IT_ADMIN, MANAGER, SUPERADMIN to assign to any user.
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
     
-    # Get ticket
     ticket = get_object_or_404(Ticket, id=ticket_id)
     
     # Get target user
@@ -489,23 +519,35 @@ def ticket_assign_to_user(request, ticket_id, user_id):
         messages.error(request, 'User not found.')
         return redirect('frontend:ticket-detail', ticket_id=ticket_id)
     
-    # Check permission using domain authority (can_assign)
+    # Check permission using domain authority
     from apps.tickets.domain.services.ticket_authority import can_assign as can_assign_ticket
     if not can_assign_ticket(request.user, ticket, target_user):
         messages.error(request, 'You do not have permission to assign this ticket.')
         return redirect('frontend:ticket-detail', ticket_id=ticket_id)
     
-    # Use the CQRS command to assign
-    use_case = AssignTicketToSelf()
-    try:
-        result = use_case.execute(request.user, str(ticket.ticket_id), target_user.id)
-        if result.success:
-            messages.success(request, result.data.get('message', f'Ticket assigned to {target_user.username} successfully!'))
-        else:
-            messages.error(request, result.error)
-    except ValueError as e:
-        messages.error(request, str(e))
+    # Store old assignee for logging
+    old_assignee = ticket.assigned_to
+    old_assignee_name = old_assignee.username if old_assignee else None
     
+    # Perform the assignment directly
+    ticket.assigned_to = target_user
+    ticket.assignment_status = 'ASSIGNED'
+    ticket.updated_by = request.user
+    ticket.save()
+    
+    # Emit domain event for activity logging
+    from apps.tickets.domain.events import emit_ticket_assigned
+    emit_ticket_assigned(
+        ticket_id=ticket.id,
+        ticket_title=ticket.title,
+        actor=request.user,
+        assignee_id=target_user.id,
+        assignee_username=target_user.username,
+        previous_assignee_id=old_assignee.id if old_assignee else None,
+        previous_assignee_username=old_assignee_name,
+    )
+    
+    messages.success(request, f'Ticket assigned to {target_user.username} successfully!')
     return redirect('frontend:ticket-detail', ticket_id=ticket_id)
 
 

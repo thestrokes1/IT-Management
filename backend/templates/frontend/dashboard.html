@@ -43,7 +43,7 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6 mb-6">
     <!-- Users Card -->
     {% if can_access_users %}
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <a href="{% url 'frontend:users' %}" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
                 <div class="flex-shrink-0">
@@ -51,7 +51,6 @@
                         <i class="fas fa-users text-blue-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
-                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Active Users</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ user_count|default:0 }}</p>
@@ -62,13 +61,12 @@
                 </div>
             </div>
         </div>
-    </div>
-    <!-- FIX: closing missing div -->
+    </a>
     {% endif %}
 
     <!-- Open Assets Card -->
     {% if can_access_assets %}
-    <div class="bg-white rounded-lg shadow-sm border border-orange-200 hover:shadow-md transition-shadow">
+    <a href="{% url 'frontend:assets' %}?status=maintenance" class="bg-white rounded-lg shadow-sm border border-orange-200 hover:shadow-md transition-shadow block">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
                 <div class="flex-shrink-0">
@@ -76,7 +74,6 @@
                         <i class="fas fa-exclamation-triangle text-orange-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
-                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Open Assets</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ open_assets_count|default:0 }}</p>
@@ -87,13 +84,12 @@
                 </div>
             </div>
         </div>
-    </div>
-    <!-- FIX: closing missing div -->
+    </a>
     {% endif %}
 
     <!-- Active Assets Card -->
     {% if can_access_assets %}
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <a href="{% url 'frontend:assets' %}?status=active" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
                 <div class="flex-shrink-0">
@@ -101,7 +97,6 @@
                         <i class="fas fa-desktop text-green-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
-                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Active Assets</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ asset_count|default:0 }}</p>
@@ -112,13 +107,12 @@
                 </div>
             </div>
         </div>
-    </div>
-    <!-- FIX: closing missing div -->
+    </a>
     {% endif %}
 
     <!-- Projects Card -->
     {% if can_access_projects %}
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <a href="{% url 'frontend:projects' %}" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
                 <div class="flex-shrink-0">
@@ -126,7 +120,6 @@
                         <i class="fas fa-project-diagram text-yellow-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
-                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Active Projects</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ project_count|default:0 }}</p>
@@ -137,12 +130,11 @@
                 </div>
             </div>
         </div>
-    </div>
-    <!-- FIX: closing missing div -->
+    </a>
     {% endif %}
 
     <!-- Tickets Card -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <a href="{% url 'frontend:tickets' %}?status=open" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
         <div class="p-4 sm:p-6">
             <div class="flex items-center gap-3 sm:gap-4">
                 <div class="flex-shrink-0">
@@ -150,7 +142,6 @@
                         <i class="fas fa-ticket-alt text-red-600 text-lg sm:text-xl"></i>
                     </div>
                 </div>
-                <!-- FIX: closing missing div -->
                 <div class="flex-1 min-w-0">
                     <p class="text-xs sm:text-sm font-medium text-gray-500">Open Tickets</p>
                     <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ ticket_count|default:0 }}</p>
@@ -161,8 +152,7 @@
                 </div>
             </div>
         </div>
-    </div>
-    <!-- FIX: closing missing div -->
+    </a>
 </div>
 <!-- FIX: closing missing div -->
 
@@ -195,10 +185,14 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 sm:p-6">
+<div class="p-4 sm:p-6">
                 <div class="space-y-4">
                     {% for activity in recent_activities %}
+                    {% if activity.target_type and activity.target_id %}
+                    <a href="{% if activity.target_type == 'ticket' %}{% url 'frontend:ticket-detail' activity.target_id %}{% elif activity.target_type == 'asset' %}{% url 'frontend:asset-detail' activity.target_id %}{% elif activity.target_type == 'project' %}{% url 'frontend:project-detail' activity.target_id %}{% elif activity.target_type == 'user' %}{% url 'frontend:user-detail' activity.target_id %}{% else %}{% url 'frontend:logs' %}{% endif %}" class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors block">
+                    {% else %}
                     <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                    {% endif %}
                         <div class="flex-shrink-0">
                             {% if activity.level == 'ERROR' %}
                                 <div class="w-7 sm:w-8 h-7 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
@@ -238,7 +232,11 @@
                                 {{ activity.level|default:"INFO" }}
                             </span>
                         </div>
+                    {% if activity.target_type and activity.target_id %}
+                    </a>
+                    {% else %}
                     </div>
+                    {% endif %}
                     {% empty %}
                     <div class="text-center text-gray-500 py-8">
                         <i class="fas fa-search text-lg sm:text-2xl mb-2"></i>
@@ -478,7 +476,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for ticket in recent_tickets %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='{% url 'frontend:ticket-detail' ticket.id %}'">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">{{ ticket.title }}</div>
                         {% if ticket.description %}
@@ -548,7 +546,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for asset in recent_assets %}
-                <tr class="hover:bg-gray-50">
+<tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='{% url 'frontend:asset-detail' asset.id %}'">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">{{ asset.name }}</div>
                         {% if asset.asset_tag %}

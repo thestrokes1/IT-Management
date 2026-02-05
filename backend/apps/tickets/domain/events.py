@@ -60,6 +60,8 @@ class TicketAssigned(TicketEvent):
     assignee_username: str = ""
     assigner_id: Optional[int] = None
     assigner_username: str = ""
+    previous_assignee_id: Optional[int] = None
+    previous_assignee_username: str = ""
     
     def __post_init__(self):
         super().__post_init__()
@@ -68,6 +70,8 @@ class TicketAssigned(TicketEvent):
             'assignee_username': self.assignee_username,
             'assigner_id': self.assigner_id,
             'assigner_username': self.assigner_username,
+            'previous_assignee_id': self.previous_assignee_id,
+            'previous_assignee_username': self.previous_assignee_username,
         }
 
 
@@ -172,6 +176,8 @@ class TicketEventHandlers:
                 'title': event.ticket_title,
                 'assignee_id': event.assignee_id,
                 'assignee_username': event.assignee_username,
+                'previous_assignee_id': event.previous_assignee_id,
+                'previous_assignee_username': event.previous_assignee_username,
             }
         )
     
@@ -289,7 +295,9 @@ def emit_ticket_assigned(
     assignee_id: Optional[int],
     assignee_username: str,
     assigner_id: Optional[int] = None,
-    assigner_username: str = ""
+    assigner_username: str = "",
+    previous_assignee_id: Optional[int] = None,
+    previous_assignee_username: str = ""
 ) -> None:
     """Emit a ticket assigned event."""
     event = TicketAssigned(
@@ -300,6 +308,8 @@ def emit_ticket_assigned(
         assignee_username=assignee_username,
         assigner_id=assigner_id or (actor.id if actor else None),
         assigner_username=assigner_username or (actor.username if actor else ""),
+        previous_assignee_id=previous_assignee_id,
+        previous_assignee_username=previous_assignee_username,
     )
     EventDispatcher().dispatch(event)
 

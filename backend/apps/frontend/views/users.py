@@ -154,20 +154,44 @@ class EditUserView(LoginRequiredMixin, TemplateView):
 
     def post(self, request, *args, **kwargs):
         user = self.edit_user
-
-        user.email = request.POST.get('email', user.email)
-        user.first_name = request.POST.get('first_name', user.first_name)
-        user.last_name = request.POST.get('last_name', user.last_name)
-
+        
+        # Track which fields actually changed
+        changed_fields = []
+        
+        # Check each field for changes
+        new_email = request.POST.get('email', user.email)
+        if user.email != new_email:
+            user.email = new_email
+            changed_fields.append('email')
+        
+        new_first_name = request.POST.get('first_name', user.first_name)
+        if user.first_name != new_first_name:
+            user.first_name = new_first_name
+            changed_fields.append('first_name')
+        
+        new_last_name = request.POST.get('last_name', user.last_name)
+        if user.last_name != new_last_name:
+            user.last_name = new_last_name
+            changed_fields.append('last_name')
+        
         if request.user.can_manage_users:
-            user.is_active = request.POST.get('is_active') == 'on'
-
+            new_is_active = request.POST.get('is_active') == 'on'
+            if user.is_active != new_is_active:
+                user.is_active = new_is_active
+                changed_fields.append('is_active')
+        
         password = request.POST.get('password')
         if password:
             user.set_password(password)
-
-        user.save()
-        messages.success(request, 'User updated.')
+            changed_fields.append('password')
+        
+        # Only save if something actually changed
+        if changed_fields:
+            user.save(update_fields=changed_fields)
+            messages.success(request, 'User updated.')
+        else:
+            messages.info(request, 'No changes were made.')
+        
         return redirect('frontend:users')
 
 
