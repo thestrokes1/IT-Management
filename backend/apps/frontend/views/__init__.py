@@ -90,5 +90,7 @@ from .profile import (
     profile,
     logs,
     reports,
+    export_reports,
+    profile_reopen_ticket,
 )
 

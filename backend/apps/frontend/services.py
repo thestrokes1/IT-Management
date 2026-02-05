@@ -356,6 +356,21 @@ class AssetService(EventPublisher):
         if not name or not name.strip():
             raise ValidationError(message="Name is required", field='name')
         
+        # PRE-SAVE VALIDATION: Check for duplicate serial_number
+        # This prevents IntegrityError crashes and provides a friendly error message
+        # Only validate if serial_number is provided (it's an optional field)
+        if serial_number and serial_number.strip():
+            from apps.assets.models import Asset
+            existing_asset = Asset.objects.filter(
+                serial_number__iexact=serial_number.strip()
+            ).first()
+            if existing_asset:
+                raise ValidationError(
+                    message=f"An asset with serial number '{serial_number}' already exists. "
+                           f"Please choose a different serial number.",
+                    field='serial_number'
+                )
+        
         # Get category
         try:
             category = AssetCategory.objects.get(id=category_id) if category_id else None

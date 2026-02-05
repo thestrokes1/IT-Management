@@ -5,5 +5,6 @@ default_app_config = 'apps.frontend.apps.FrontendConfig'
 from . import menu_tags
 from . import menu_permissions
 from . import dict_extras
+from . import custom_filters
 
 

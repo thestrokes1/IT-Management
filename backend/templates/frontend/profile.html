@@ -60,7 +60,7 @@
                     
                     <!-- Badges -->
                     <div class="flex flex-wrap gap-2 mt-4 justify-center sm:justify-start">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {% if user.role == 'ADMIN' %}bg-red-100 text-red-800{% elif user.role == 'MANAGER' %}bg-blue-100 text-blue-800{% elif user.role == 'TECHNICIAN' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {% if user.role == 'SUPERADMIN' %}bg-purple-100 text-purple-800{% elif user.role == 'IT_ADMIN' %}bg-red-100 text-red-800{% elif user.role == 'MANAGER' %}bg-blue-100 text-blue-800{% elif user.role == 'TECHNICIAN' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
                             <i class="fas fa-user-shield mr-1.5"></i>{{ user.get_role_display|default:"User"|upper }}
                         </span>
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {% if user.is_active %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
@@ -80,15 +80,28 @@
 
     <!-- Quick Stats Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <!-- Created Tickets -->
+        <!-- Total Tickets -->
         <div class="bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition-shadow border-l-4 border-blue-500">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Created</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.created_count }}</p>
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Tickets</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.total }}</p>
                 </div>
                 <div class="bg-blue-100 p-3 rounded-full">
-                    <i class="fas fa-plus-circle text-blue-600 text-xl"></i>
+                    <i class="fas fa-ticket-alt text-blue-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Created Tickets -->
+        <div class="bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition-shadow border-l-4 border-green-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Created</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.created }}</p>
+                </div>
+                <div class="bg-green-100 p-3 rounded-full">
+                    <i class="fas fa-plus-circle text-green-600 text-xl"></i>
                 </div>
             </div>
         </div>
@@ -98,7 +111,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Assigned</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.assigned_count }}</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.assigned }}</p>
                 </div>
                 <div class="bg-yellow-100 p-3 rounded-full">
                     <i class="fas fa-user-check text-yellow-600 text-xl"></i>
@@ -107,27 +120,14 @@
         </div>
         
         <!-- Resolved Tickets -->
-        <div class="bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition-shadow border-l-4 border-green-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Resolved</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.resolved_count }}</p>
-                </div>
-                <div class="bg-green-100 p-3 rounded-full">
-                    <i class="fas fa-check-double text-green-600 text-xl"></i>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Can Reopen -->
         <div class="bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition-shadow border-l-4 border-purple-500">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Can Reopen</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.can_reopen_count }}</p>
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Resolved</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.resolved }}</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-full">
-                    <i class="fas fa-sync text-purple-600 text-xl"></i>
+                    <i class="fas fa-check-double text-purple-600 text-xl"></i>
                 </div>
             </div>
         </div>
@@ -139,16 +139,48 @@
         <!-- My Ticket History Section -->
         <div class="xl:col-span-2 bg-white rounded-xl shadow-md overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                         <h2 class="text-lg font-semibold text-gray-900 flex items-center">
                             <i class="fas fa-history mr-2 text-primary-600"></i>My Ticket History
                         </h2>
                         <p class="text-sm text-gray-500 mt-0.5">Tickets you created or were assigned to you</p>
                     </div>
-                    <a href="{% url 'frontend:tickets' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center transition-colors">
-                        View All <i class="fas fa-arrow-right ml-1"></i>
-                    </a>
+                    
+                    <!-- Filter Form -->
+                    <form method="GET" class="flex flex-wrap gap-2 items-center">
+                        {% if current_filters.status %}
+                        <input type="hidden" name="status" value="{{ current_filters.status }}">
+                        {% endif %}
+                        {% if current_filters.priority %}
+                        <input type="hidden" name="priority" value="{{ current_filters.priority }}">
+                        {% endif %}
+                        
+                        <select name="status" onchange="this.form.submit()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">All Statuses</option>
+                            {% for status in available_filters.statuses %}
+                            <option value="{{ status }}" {% if current_filters.status == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <select name="priority" onchange="this.form.submit()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">All Priorities</option>
+                            {% for priority in available_filters.priorities %}
+                            <option value="{{ priority }}" {% if current_filters.priority == priority %}selected{% endif %}>{{ priority }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        {% if current_filters.status or current_filters.priority %}
+                        <a href="{% url 'frontend:profile' %}" class="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 font-medium">
+                            <i class="fas fa-times mr-1"></i>Clear
+                        </a>
+                        {% endif %}
+                    </form>
+                </div>
+                
+                <!-- Results count -->
+                <div class="mt-2 text-sm text-gray-500">
+                    Showing {{ my_tickets|length }} of {{ ticket_pagination.total_count }} tickets
                 </div>
             </div>
             
@@ -162,6 +194,7 @@
                             <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-600">Priority</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-600">Last Updated</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-600">Actions</th>
                         </tr>
                     </thead>
@@ -169,18 +202,28 @@
                         {% for ticket in my_tickets %}
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-4 py-3 font-medium text-gray-900">#{{ ticket.id }}</td>
-                            <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title="{{ ticket.title }}">{{ ticket.title }}</td>
+                            <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title="{{ ticket.title }}">
+                                {{ ticket.title }}
+                            </td>
                             <td class="px-4 py-3">
-                                <span class="px-2.5 py-1 rounded-full text-xs font-medium {% if ticket.status == 'OPEN' %}bg-blue-100 text-blue-800{% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800{% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800{% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-800{% else %}bg-red-100 text-red-800{% endif %}">
-                                    {{ ticket.status }}
+                                <span class="px-2.5 py-1 rounded-full text-xs font-medium {% if ticket.status == 'OPEN' %}bg-blue-100 text-blue-800{% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800{% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800{% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-800{% elif ticket.status == 'NEW' %}bg-indigo-100 text-indigo-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ ticket.status_display }}
                                 </span>
                             </td>
                             <td class="px-4 py-3">
-                                <span class="px-2.5 py-1 rounded-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {{ ticket.priority }}
+                                <span class="px-2.5 py-1 rounded-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% elif ticket.priority == 'LOW' %}bg-gray-100 text-gray-800{% else %}bg-purple-100 text-purple-800{% endif %}">
+                                    {{ ticket.priority_display }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ ticket.created_at|date:"M d, Y" }}</td>
+                            <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
+                                {{ ticket.created_at|date:"M d, Y H:i" }}
+                            </td>
+                            <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
+                                {{ ticket.updated_at|date:"M d, Y H:i" }}
+                                {% if ticket.updated_by and ticket.updated_by.username %}
+                                <span class="text-xs text-gray-400 block">{{ ticket.updated_by.username }}</span>
+                                {% endif %}
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex gap-2">
                                     <a href="/tickets/{{ ticket.id }}/" class="inline-flex items-center px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded transition-colors">
@@ -188,9 +231,9 @@
                                     </a>
                                     {% if ticket.status == 'RESOLVED' or ticket.status == 'CLOSED' %}
                                         {% if can_reopen_ticket %}
-                                            <a href="{% url 'frontend:profile_reopen_ticket' ticket.id %}" class="inline-flex items-center px-2.5 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-xs font-medium rounded transition-colors" onclick="return confirm('Reopen this ticket?');">
-                                                <i class="fas fa-sync mr-1"></i> Reopen
-                                            </a>
+                                        <a href="{% url 'frontend:profile_reopen_ticket' ticket.id %}" class="inline-flex items-center px-2.5 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-xs font-medium rounded transition-colors" onclick="return confirm('Reopen this ticket?');">
+                                            <i class="fas fa-sync mr-1"></i> Reopen
+                                        </a>
                                         {% endif %}
                                     {% endif %}
                                 </div>
@@ -200,12 +243,53 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- Pagination -->
+            {% if ticket_pagination.total_pages > 1 %}
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-gray-500">
+                        Page {{ ticket_pagination.page }} of {{ ticket_pagination.total_pages }}
+                    </div>
+                    <div class="flex gap-2">
+                        {% if ticket_pagination.has_previous %}
+                        <a href="?page={{ ticket_pagination.page|add:"-1" }}&status={{ current_filters.status|default:"" }}&priority={{ current_filters.priority|default:"" }}" 
+                           class="px-3 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-chevron-left mr-1"></i> Previous
+                        </a>
+                        {% else %}
+                        <span class="px-3 py-1 text-sm bg-gray-100 text-gray-400 border border-gray-200 rounded-lg cursor-not-allowed">
+                            <i class="fas fa-chevron-left mr-1"></i> Previous
+                        </span>
+                        {% endif %}
+                        
+                        {% if ticket_pagination.has_next %}
+                        <a href="?page={{ ticket_pagination.page|add:"1" }}&status={{ current_filters.status|default:"" }}&priority={{ current_filters.priority|default:"" }}" 
+                           class="px-3 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                            Next <i class="fas fa-chevron-right ml-1"></i>
+                        </a>
+                        {% else %}
+                        <span class="px-3 py-1 text-sm bg-gray-100 text-gray-400 border border-gray-200 rounded-lg cursor-not-allowed">
+                            Next <i class="fas fa-chevron-right ml-1"></i>
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
             {% else %}
             <div class="px-6 py-12 text-center">
                 <div class="bg-gray-50 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
                     <i class="fas fa-ticket-alt text-3xl text-gray-300"></i>
                 </div>
-                <p class="text-gray-500 font-medium">No tickets found in your history.</p>
+                <p class="text-gray-500 font-medium">
+                    {% if current_filters.status or current_filters.priority %}
+                    No tickets match your filters.
+                    {% else %}
+                    No tickets found in your history.
+                    {% endif %}
+                </p>
                 <a href="{% url 'frontend:create-ticket' %}" class="inline-flex items-center mt-4 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors">
                     <i class="fas fa-plus mr-2"></i>Create your first ticket
                 </a>

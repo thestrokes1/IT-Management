@@ -76,3 +76,37 @@ def get_item(dictionary, key):
     # This is safer than dictionary[key] which would raise KeyError
     return dictionary.get(key)
 
+
+@register.filter
+def divide(value, arg):
+    """
+    Divide value by arg.
+    
+    Usage:
+        {{ total|divide:count }}
+    """
+    try:
+        value = float(value)
+        arg = float(arg)
+        if arg == 0:
+            return 0
+        return value / arg
+    except (ValueError, TypeError):
+        return 0
+
+
+@register.filter
+def multiply(value, arg):
+    """
+    Multiply value by arg.
+    
+    Usage:
+        {{ percent|multiply:100 }}
+    """
+    try:
+        value = float(value)
+        arg = float(arg)
+        return value * arg
+    except (ValueError, TypeError):
+        return 0
+

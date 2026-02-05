@@ -134,6 +134,19 @@
                 </select>
             </div>
 
+            <!-- NEW: Role Filter -->
+            <div class="filter-item">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <select name="actor_role" class="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
+                    <option value="">All Roles</option>
+                    <option value="SUPERADMIN" {% if request.GET.actor_role == 'SUPERADMIN' %}selected{% endif %}>Super Admin</option>
+                    <option value="IT_ADMIN" {% if request.GET.actor_role == 'IT_ADMIN' %}selected{% endif %}>IT Admin</option>
+                    <option value="MANAGER" {% if request.GET.actor_role == 'MANAGER' %}selected{% endif %}>Manager</option>
+                    <option value="TECHNICIAN" {% if request.GET.actor_role == 'TECHNICIAN' %}selected{% endif %}>Technician</option>
+                    <option value="VIEWER" {% if request.GET.actor_role == 'VIEWER' %}selected{% endif %}>Viewer</option>
+                </select>
+            </div>
+
             <div class="filter-item">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Action</label>
                 <select name="action" class="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
@@ -193,6 +206,7 @@
                         <tr>
                             <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">Real Time - Argentina</th>
                             <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">User</th>
+                            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">Role</th>
                             <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">Action</th>
                             <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">Category</th>
                             <th class="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-900">Description</th>
@@ -206,6 +220,16 @@
                                     Real time - Argentina - {{ log.timestamp|date:"b d, Y H:i" }}
                                 </td>
                                 <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-900 text-xs sm:text-sm font-medium">{{ log.user.username }}</td>
+                                <td class="px-3 sm:px-6 py-2 sm:py-4">
+                                    <span class="px-2 py-1 rounded-full text-xs font-medium 
+                                        {% if log.extra_data.actor_role == 'SUPERADMIN' or log.user.role == 'SUPERADMIN' %}bg-purple-100 text-purple-800
+                                        {% elif log.extra_data.actor_role == 'IT_ADMIN' or log.user.role == 'IT_ADMIN' %}bg-red-100 text-red-800
+                                        {% elif log.extra_data.actor_role == 'MANAGER' or log.user.role == 'MANAGER' %}bg-orange-100 text-orange-800
+                                        {% elif log.extra_data.actor_role == 'TECHNICIAN' or log.user.role == 'TECHNICIAN' %}bg-blue-100 text-blue-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ log.extra_data.actor_role|default:log.user.role|default:"VIEWER" }}
+                                    </span>
+                                </td>
                                 <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 text-xs sm:text-sm">
                                     {% if log.title|lower|slice:":8" == "assigned" %}
                                         Updated At {{ log.timestamp|date:"b d, Y H:i" }}
@@ -223,7 +247,7 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="5" class="px-3 sm:px-6 py-8 text-center text-gray-500 text-xs sm:text-sm">No activity logs found.</td>
+                                <td colspan="6" class="px-3 sm:px-6 py-8 text-center text-gray-500 text-xs sm:text-sm">No activity logs found.</td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -237,7 +261,16 @@
                     <div class="border-b border-gray-200 p-4 log-row" data-type="ACTIVITY">
                         <div class="flex justify-between items-start mb-2">
                             <div class="flex-1">
-                                <div class="font-medium text-gray-900">{{ log.user.username }}</div>
+                                <div class="font-medium text-gray-900">{{ log.user.username }}
+                                    <span class="px-1 py-0.5 rounded text-xs font-medium ml-1
+                                        {% if log.extra_data.actor_role == 'SUPERADMIN' or log.user.role == 'SUPERADMIN' %}bg-purple-100 text-purple-800
+                                        {% elif log.extra_data.actor_role == 'IT_ADMIN' or log.user.role == 'IT_ADMIN' %}bg-red-100 text-red-800
+                                        {% elif log.extra_data.actor_role == 'MANAGER' or log.user.role == 'MANAGER' %}bg-orange-100 text-orange-800
+                                        {% elif log.extra_data.actor_role == 'TECHNICIAN' or log.user.role == 'TECHNICIAN' %}bg-blue-100 text-blue-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ log.extra_data.actor_role|default:log.user.role|default:"VIEWER" }}
+                                    </span>
+                                </div>
                                 <div class="text-sm text-gray-600">Real time - Argentina - {{ log.timestamp|date:"b d, Y H:i" }}</div>
                             </div>
                             <div class="text-xs text-gray-500">{{ log.timestamp|date:"M d, H:i" }}</div>
@@ -331,14 +364,6 @@
             </div>
         </div>
     </div>
-
-    <!-- API Access -->
-    <div class="bg-blue-50 rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">API Access</h3>
-        <p class="text-gray-600 mb-4">Access logs via REST API:</p>
-        <code class="bg-gray-100 p-3 rounded text-sm text-gray-800 block mb-2">GET /api/logs/</code>
-        <code class="bg-gray-100 p-3 rounded text-sm text-gray-800">GET /api/security/events/</code>
-    </div>
 </div>
 
 <!-- Toast Notification Container -->
@@ -350,6 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const searchInput = document.getElementById('searchLogs');
     const userFilter = document.getElementById('userFilter');
+    const roleFilter = document.getElementById('roleFilter');
     const typeFilter = document.getElementById('typeFilter');
     const dateRangeInput = document.getElementById('dateRange');
     const hourFromInput = document.getElementById('hourFrom');
@@ -373,12 +399,8 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         altInput: true,
         altFormat: 'F j, Y',
-        // Remove date restrictions to allow historical selection
-        // minDate: 'today',
-        // maxDate: 'today',
-        maxDate: new Date().fp_incr(365), // Allow future dates up to 1 year
+        maxDate: new Date().fp_incr(365),
         onOpen: function(selectedDates, dateStr, instance) {
-            // Show loading indicator
             document.body.style.cursor = 'progress';
         },
         onClose: function(selectedDates, dateStr, instance) {
@@ -397,6 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function filterLogs() {
         const searchTerm = searchInput.value.toLowerCase().trim();
         const selectedUser = userFilter.value.toLowerCase();
+        const selectedRole = roleFilter.value.toLowerCase();
         const selectedType = typeFilter.value;
         const dateRange = dateRangeInput.value;
         const hourFrom = hourFromInput.value;
@@ -423,17 +446,21 @@ document.addEventListener('DOMContentLoaded', function() {
             // Handle both table rows and card elements
             let timestampText = '';
             let userCell = '';
+            let roleCell = '';
 
             if (row.tagName === 'TR') {
                 // Desktop table row
                 timestampText = row.querySelector('td').textContent.trim();
                 userCell = row.querySelectorAll('td')[1]?.textContent.trim().toLowerCase() || '';
+                roleCell = row.querySelectorAll('td')[2]?.textContent.trim().toLowerCase() || '';
             } else {
                 // Mobile card
                 const timestampElement = row.querySelector('.text-xs.text-gray-500');
                 timestampText = timestampElement ? timestampElement.textContent.trim() : '';
                 const userElement = row.querySelector('.font-medium.text-gray-900');
                 userCell = userElement ? userElement.textContent.trim().toLowerCase() : '';
+                const roleElement = row.querySelector('.font-medium.text-gray-900 span');
+                roleCell = roleElement ? roleElement.textContent.trim().toLowerCase() : '';
             }
 
             // Parse timestamp from the row (format: YYYY-MM-DD HH:MM or M d, H:i)
@@ -462,6 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let matchesSearch = !searchTerm || text.includes(searchTerm);
             let matchesUser = !selectedUser || userCell.includes(selectedUser);
+            let matchesRole = !selectedRole || roleCell.includes(selectedRole);
             let matchesType = !selectedType || rowType.includes(selectedType);
             let matchesDate = true;
             let matchesHour = true;
@@ -479,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (hourTo && rowHour > hourTo) matchesHour = false;
             }
 
-            const shouldShow = matchesSearch && matchesUser && matchesType && matchesDate && matchesHour;
+            const shouldShow = matchesSearch && matchesUser && matchesRole && matchesType && matchesDate && matchesHour;
             row.style.display = shouldShow ? '' : 'none';
 
             if (shouldShow) {
@@ -531,8 +559,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-
-
     // Export functionality
     function exportLogs() {
         const visibleRows = Array.from(logRows).filter(row => row.style.display !== 'none');
@@ -561,7 +587,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Generate CSV content
     function generateCSV(rows) {
-        const headers = ['Timestamp', 'User', 'Type', 'Details'];
+        const headers = ['Timestamp', 'User', 'Role', 'Type', 'Details'];
         const csvRows = [headers.join(',')];
         
         rows.forEach(row => {
@@ -622,6 +648,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     userFilter.addEventListener('change', filterLogs);
+    roleFilter.addEventListener('change', filterLogs);
     typeFilter.addEventListener('change', filterLogs);
     hourFromInput.addEventListener('change', filterLogs);
     hourToInput.addEventListener('change', filterLogs);

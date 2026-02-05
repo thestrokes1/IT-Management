@@ -200,6 +200,14 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # Logging Configuration
+# =============================================================================
+# Clean Logging Architecture:
+# - Console shows WARNING+ only (clean development output)
+# - File logs INFO+ for audit trail
+# - logs.service logger is gated behind LOGS_DEBUG flag
+# - No print() statements in service layer
+# =============================================================================
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -211,6 +219,18 @@ LOGGING = {
         'simple': {
             'format': '{levelname} {message}',
             'style': '{',
+        },
+        'audit': {
+            'format': '[AUDIT] {levelname} {asctime} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
         },
     },
     'handlers': {
@@ -225,34 +245,65 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'audit_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs/activity.log',
+            'formatter': 'audit',
+        },
     },
     'root': {
         'handlers': ['console', 'file'],
         'level': 'INFO',
     },
     'loggers': {
+        # Django itself - minimal noise
         'django': {
             'handlers': ['console', 'file'],
-            'level': 'WARNING',  # Reduce Django logging to WARNING
+            'level': 'WARNING',
             'propagate': False,
         },
+        # Database queries - file only, WARNING+
         'django.db.backends': {
             'handlers': ['file'],
             'level': 'WARNING',
             'propagate': False,
         },
+        # Migrations - file only, WARNING+
         'django.db.migrations': {
             'handlers': ['file'],
             'level': 'WARNING',
             'propagate': False,
         },
+        # Translation - file only, WARNING+
         'django.utils.translation': {
             'handlers': ['file'],
             'level': 'WARNING',
             'propagate': False,
         },
+        # Main app logger - INFO to console
         'it_management_platform': {
             'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # =====================================================================
+        # Activity/Logs Service Logger
+        # =====================================================================
+        # Gate ALL debug logs behind LOGS_DEBUG flag
+        # Use: logger.debug() for filters, counts, SQL details
+        # Use: logger.info() for business events (written to audit file)
+        # Use: logger.warning() for RBAC denials, security events
+        # Use: logger.error() for failures
+        # =====================================================================
+        'logs.service': {
+            'handlers': ['console', 'file', 'audit_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        # Security events logger - always INFO+
+        'logs.security': {
+            'handlers': ['console', 'file', 'audit_file'],
             'level': 'INFO',
             'propagate': False,
         },
@@ -262,3 +313,11 @@ LOGGING = {
 # Create logs directory if it doesn't exist
 LOGS_DIR = BASE_DIR / 'logs'
 LOGS_DIR.mkdir(exist_ok=True)
+
+# =============================================================================
+# Activity/Logs Debug Settings
+# =============================================================================
+# Enable verbose debug logging for the ActivityService.
+# When True, logs filter parameters and queryset counts.
+# ALWAYS False in production for security and performance.
+LOGS_DEBUG = False  # Set to True only for debugging

@@ -22,6 +22,7 @@ from apps.assets.domain.services.asset_authority import (
     assert_can_delete_asset,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.core.exceptions import ValidationError
 from apps.frontend.permissions_mapper import (
     build_asset_ui_permissions,
     build_assets_permissions_map,
@@ -127,6 +128,13 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
             
             messages.success(request, f'Asset "{asset.name}" created successfully!')
             return redirect('frontend:assets')
+        
+        except ValidationError as e:
+            # Handle validation errors (like duplicate serial_number)
+            messages.error(request, str(e.message))
+            context = self.get_context_data()
+            context['form'] = request.POST
+            return render(request, self.template_name, context)
         
         except Exception as e:
             import traceback

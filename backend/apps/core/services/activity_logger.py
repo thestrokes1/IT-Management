@@ -26,6 +26,7 @@ Usage:
     )
 """
 
+import logging
 from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -33,8 +34,22 @@ from typing import Any, Dict, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 import json
+from django.conf import settings
 
 User = get_user_model()
+
+# Named logger for this service
+logger = logging.getLogger("logs.service")
+
+
+def _is_debug_enabled() -> bool:
+    """Check if debug logging is enabled.
+    
+    Returns True only when:
+    - DEBUG=True in settings
+    - LOGS_DEBUG=True in settings
+    """
+    return getattr(settings, 'DEBUG', False) and getattr(settings, 'LOGS_DEBUG', False)
 
 
 # =============================================================================
