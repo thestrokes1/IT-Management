@@ -391,25 +391,30 @@
 <!-- FIX: closing missing div -->
 
 <!-- Charts Section -->
-{% if can_access_reports %}
+{% if can_access_assets %}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    {% if can_access_assets %}
+    <!-- Asset Status Overview -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-6 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Asset Status Overview</h3>
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-medium text-gray-900">Asset Status Overview</h3>
+                <a href="{% url 'frontend:assets' %}" class="text-sm text-primary-600 hover:text-primary-700">View all</a>
+            </div>
         </div>
         <div class="p-6">
-            <div class="h-64 flex items-center justify-center">
+            <div class="h-64 flex items-center justify-center relative">
+                {% if asset_status_counts and asset_status_labels %}
+                <canvas id="assetStatusChart"></canvas>
+                {% else %}
                 <div class="text-center">
                     <i class="fas fa-chart-pie text-4xl text-gray-400 mb-4"></i>
-                    <p class="text-gray-500">Asset status chart will be displayed here</p>
-                    <p class="text-sm text-gray-400">Chart.js integration needed</p>
+                    <p class="text-gray-500">No asset data available</p>
+                    <p class="text-sm text-gray-400">Add assets to see status distribution</p>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
-    <!-- FIX: closing missing div -->
-    {% endif %}
 
     {% if can_access_projects %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -639,7 +644,115 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Initialize Asset Status Chart
+    initAssetStatusChart();
 });
+
+// Asset Status Chart initialization
+function initAssetStatusChart() {
+    const ctx = document.getElementById('assetStatusChart');
+    if (!ctx) return;
+    
+    // Get data from template context
+    const assetStatusCounts = {{ asset_status_counts|default:"{}"|safe }};
+    const assetStatusLabels = {{ asset_status_labels|default:"{}"|safe }};
+    
+    // Prepare chart data - only include statuses with counts > 0
+    const labels = [];
+    const data = [];
+    const backgroundColors = [];
+    const borderColors = [];
+    
+    // Status color mapping
+    const statusColors = {
+        'ACTIVE': { bg: 'rgba(16, 185, 129, 0.8)', border: 'rgba(16, 185, 129, 1)' },      // Green
+        'INACTIVE': { bg: 'rgba(107, 114, 128, 0.8)', border: 'rgba(107, 114, 128, 1)' },  // Gray
+        'IN_REPAIR': { bg: 'rgba(245, 158, 11, 0.8)', border: 'rgba(245, 158, 11, 1)' },    // Amber/Orange
+        'RETIRED': { bg: 'rgba(239, 68, 68, 0.8)', border: 'rgba(239, 68, 68, 1)' },        // Red
+        'DISPOSED': { bg: 'rgba(139, 92, 246, 0.8)', border: 'rgba(139, 92, 246, 1)' },      // Purple
+        'MISSING': { bg: 'rgba(234, 179, 8, 0.8)', border: 'rgba(234, 179, 8, 1)' }         // Yellow
+    };
+    
+    // Build chart data from status counts
+    for (const [status, count] of Object.entries(assetStatusCounts)) {
+        if (count > 0 && assetStatusLabels[status]) {
+            labels.push(assetStatusLabels[status]);
+            data.push(count);
+            
+            const colors = statusColors[status] || { bg: 'rgba(156, 163, 175, 0.8)', border: 'rgba(156, 163, 175, 1)' };
+            backgroundColors.push(colors.bg);
+            borderColors.push(colors.border);
+        }
+    }
+    
+    // Check if we have data to display
+    if (labels.length === 0) {
+        // Hide canvas and show empty state
+        ctx.style.display = 'none';
+        return;
+    }
+    
+    // Create the chart
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 2,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleFont: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            cutout: '60%',
+            animation: {
+                animateScale: true,
+                animateRotate: true,
+                duration: 1000,
+                easing: 'easeOutQuart'
+            }
+        }
+    });
+}
 </script>
 {% endblock %}
 

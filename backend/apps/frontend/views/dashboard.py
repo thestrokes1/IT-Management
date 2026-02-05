@@ -173,12 +173,36 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             try:
                 recent_assets = Asset.objects.select_related('category', 'assigned_to').order_by('-created_at')[:10]
                 open_assets_count = Asset.objects.filter(status__in=['MAINTENANCE', 'INACTIVE']).count()
+                
+                # Calculate asset status distribution for chart
+                asset_status_counts = {
+                    'ACTIVE': Asset.objects.filter(status='ACTIVE').count(),
+                    'INACTIVE': Asset.objects.filter(status='INACTIVE').count(),
+                    'IN_REPAIR': Asset.objects.filter(status='IN_REPAIR').count(),
+                    'RETIRED': Asset.objects.filter(status='RETIRED').count(),
+                    'DISPOSED': Asset.objects.filter(status='DISPOSED').count(),
+                    'MISSING': Asset.objects.filter(status='MISSING').count(),
+                }
+                
+                # Asset status labels for chart display
+                asset_status_labels = {
+                    'ACTIVE': 'Active',
+                    'INACTIVE': 'Inactive',
+                    'IN_REPAIR': 'In Repair',
+                    'RETIRED': 'Retired',
+                    'DISPOSED': 'Disposed',
+                    'MISSING': 'Missing',
+                }
             except:
                 recent_assets = []
                 open_assets_count = 0
+                asset_status_counts = {}
+                asset_status_labels = {}
         else:
             recent_assets = []
             open_assets_count = 0
+            asset_status_counts = {}
+            asset_status_labels = {}
 
         context.update({
             'recent_activities': recent_activities,
@@ -194,10 +218,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'can_access_logs': can_access_logs,
             'can_access_reports': can_access_reports,
             'can_access_security': can_access_security,
+            'can_access_assets': can_access_assets,
+            'can_access_projects': can_access_projects,
+            'can_access_users': can_access_users,
             'user_role': user_role,
             # Security event data
             'security_events_list': security_events,
             'security_summary': security_summary,
+            # Asset status chart data
+            'asset_status_counts': asset_status_counts,
+            'asset_status_labels': asset_status_labels,
         })
         
         return context
