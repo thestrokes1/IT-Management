@@ -22,6 +22,7 @@ from .dashboard import (
     frontend_context,
     dashboard_stats_context,
     dashboard,
+    command_palette_api,
 )
 
 # Ticket views
@@ -94,3 +95,11 @@ from .profile import (
     profile_reopen_ticket,
 )
 
+# Logs views (Enterprise Timeline UI)
+from .logs import (
+    LogsView,
+    logs,
+    logs_api,
+    logs_export,
+    logs_detail,
+)

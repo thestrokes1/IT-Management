@@ -384,6 +384,102 @@ class TicketStatusHistory(models.Model):
         """Override delete to prevent deletion of immutable records."""
         raise ValueError("TicketStatusHistory records are immutable and cannot be deleted")
 
+class TicketNote(models.Model):
+    """
+    Internal staff-only notes for tickets (Phase 3A).
+    
+    Append-only notes with:
+    - ticket: Reference to the ticket
+    - author: User who created the note
+    - text: Note content (plain text, no rich formatting)
+    - created_at: Timestamp of creation (immutable)
+    
+    Rules:
+    - Append-only (no edits, no deletes)
+    - Staff-only: Admin/Manager always, Technician only if assigned
+    - Not visible to clients/requesters
+    - Logged to ActivityLog summary (not full text)
+    """
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='internal_notes')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ticket_notes_created')
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'ticket_notes'
+        verbose_name = 'Ticket Note'
+        verbose_name_plural = 'Ticket Notes'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['ticket', 'created_at']),
+            models.Index(fields=['author', 'created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Note by {self.author.username} on {self.ticket.ticket_id} at {self.created_at}"
+    
+    def save(self, *args, **kwargs):
+        """Override save to allow only initial creation."""
+        if self.pk and TicketNote.objects.filter(pk=self.pk).exists():
+            raise ValueError("TicketNote records are append-only and cannot be updated")
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        """Override delete to prevent deletion of notes."""
+        raise ValueError("TicketNote records are append-only and cannot be deleted")
+
+class TicketReview(models.Model):
+    """
+    Client/Requester ticket reviews (Phase 3C).
+    
+    One-review-per-ticket feedback artifact with:
+    - ticket: Reference to the ticket (unique FK)
+    - author: User who submitted the review (requester only)
+    - rating: 1-5 star rating (optional)
+    - comment: Plain text feedback (max 2000 chars)
+    - created_at: Immutable submission timestamp
+    
+    Rules:
+    - Append-only (no edits, no deletes)
+    - One review per ticket maximum (unique constraint)
+    - Only requester can submit, only after RESOLVED/CLOSED
+    - Not visible to other clients or public users
+    - Visible to internal staff only
+    - Logged to ActivityLog metadata only (not full comment)
+    """
+    ticket = models.OneToOneField(Ticket, on_delete=models.CASCADE, related_name='client_review')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ticket_reviews_submitted')
+    rating = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
+    comment = models.TextField(max_length=2000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'ticket_reviews'
+        verbose_name = 'Ticket Review'
+        verbose_name_plural = 'Ticket Reviews'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['ticket', 'created_at']),
+            models.Index(fields=['author', 'created_at']),
+        ]
+        # Unique constraint: one review per ticket
+        constraints = [
+            models.UniqueConstraint(fields=['ticket'], name='unique_ticket_review')
+        ]
+    
+    def __str__(self):
+        return f"Review by {self.author.username} on {self.ticket.ticket_id} (rating: {self.rating})"
+    
+    def save(self, *args, **kwargs):
+        """Override save to allow only initial creation (append-only)."""
+        if self.pk and TicketReview.objects.filter(pk=self.pk).exists():
+            raise ValueError("TicketReview records are append-only and cannot be updated")
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        """Override delete to prevent deletion of reviews."""
+        raise ValueError("TicketReview records are append-only and cannot be deleted")
+
 class TicketTemplate(models.Model):
     """
     Reusable ticket templates.

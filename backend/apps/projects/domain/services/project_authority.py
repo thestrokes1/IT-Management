@@ -39,7 +39,7 @@ def can_view(user, project) -> bool:
     
     Rules:
     - SUPERADMIN, MANAGER: always allowed (full access)
-    - IT_ADMIN: always allowed (can view projects)
+    - IT_ADMIN: only allowed if self-assigned via ProjectMember (read-only access)
     - TECHNICIAN: always allowed (read-only project access)
     - VIEWER: NOT allowed - VIEWER has no project access
     
@@ -54,7 +54,23 @@ def can_view(user, project) -> bool:
     if user.role == _ROLE_VIEWER:
         return False
     
-    # All other roles can view projects
+    # SUPERADMIN and MANAGER can view all projects
+    if user.role in [_ROLE_SUPERADMIN, _ROLE_MANAGER]:
+        return True
+    
+    # IT_ADMIN can only view if self-assigned via ProjectMember
+    if user.role == _ROLE_IT_ADMIN:
+        try:
+            from apps.projects.models import ProjectMember
+            return ProjectMember.objects.filter(
+                project=project,
+                user=user,
+                is_active=True
+            ).exists()
+        except Exception:
+            return False
+    
+    # TECHNICIAN can view all projects
     return True
 
 
@@ -121,7 +137,7 @@ def can_edit(user, project) -> bool:
 
     Rules:
     - SUPERADMIN, MANAGER: always allowed
-    - IT_ADMIN: always allowed (can edit projects)
+    - IT_ADMIN: NOT allowed (read-only access only)
     - TECHNICIAN: NOT allowed (read-only)
     - VIEWER: NOT allowed
 
@@ -140,7 +156,11 @@ def can_edit(user, project) -> bool:
     if user.role == _ROLE_TECHNICIAN:
         return False
     
-    # SUPERADMIN, MANAGER, IT_ADMIN can edit
+    # IT_ADMIN cannot edit (read-only access only)
+    if user.role == _ROLE_IT_ADMIN:
+        return False
+    
+    # SUPERADMIN, MANAGER can edit
     return True
 
 
@@ -194,7 +214,7 @@ def can_assign(user, project, assignee) -> bool:
 
     Rules:
     - SUPERADMIN, MANAGER: always allowed
-    - IT_ADMIN: always allowed (can assign project members)
+    - IT_ADMIN: NEVER allowed (read-only, cannot assign members)
     - TECHNICIAN: NEVER allowed (cannot assign)
     - VIEWER: NOT allowed
 
@@ -214,8 +234,12 @@ def can_assign(user, project, assignee) -> bool:
     if user.role == _ROLE_TECHNICIAN:
         return False
     
-    # SUPERADMIN, MANAGER, IT_ADMIN can assign
-    return True
+    # IT_ADMIN cannot assign (read-only role for projects)
+    if user.role == _ROLE_IT_ADMIN:
+        return False
+    
+    # Only SUPERADMIN and MANAGER can assign
+    return user.role in [_ROLE_SUPERADMIN, _ROLE_MANAGER]
 
 
 def can_unassign(user, project) -> bool:

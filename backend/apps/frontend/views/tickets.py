@@ -71,10 +71,27 @@ class TicketsView(LoginRequiredMixin, View):
         # Get list-level permissions
         list_permissions = get_list_permissions(request.user)
         
+        # Get page-specific actions using the new template tag
+        from apps.frontend.templatetags.page_actions import get_page_actions
+        page_key = 'tickets'
+        if request.resolver_match:
+            # Determine page key from URL name
+            url_name = request.resolver_match.url_name
+            if 'detail' in url_name:
+                page_key = 'ticket_detail'
+            elif 'create' in url_name:
+                page_key = 'create-ticket'
+            elif 'edit' in url_name:
+                page_key = 'edit-ticket'
+        
+        allowed_actions = get_page_actions(page_key, request.user)
+        
         return render(request, "frontend/tickets.html", {
             "tickets": tickets,
             "permissions_by_ticket": permissions_by_ticket,
             "permissions": list_permissions,
+            "allowed_actions": allowed_actions,
+            "page_key": page_key,
         })
 
 

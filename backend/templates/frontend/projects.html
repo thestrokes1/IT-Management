@@ -81,7 +81,13 @@
                             <td class="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 hidden lg:table-cell">{{ project.start_date|date:"Y-m-d" }}</td>
                             <td class="px-3 sm:px-6 py-2 sm:py-4">
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
-                                    <a href="/projects/{{ project.id }}/" class="text-blue-600 hover:text-blue-900">Open</a>
+                                    {% if project_perms.can_view %}
+                                        <a href="/projects/{{ project.id }}/" class="text-blue-600 hover:text-blue-900">Open</a>
+                                    {% else %}
+                                        <span class="text-gray-400 cursor-not-allowed" title="Not assigned to this project">
+                                            Open
+                                        </span>
+                                    {% endif %}
                                     
                                     {% if project_perms.can_update %}
                                         <a href="{% url 'frontend:edit-project' project.id %}" class="text-blue-600 hover:text-blue-900">

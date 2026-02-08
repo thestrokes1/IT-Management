@@ -236,7 +236,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
-                            {% if ticket.created_by %}
+                            {% if ticket.created_by and ticket.created_by.id %}
                             <a href="{% url 'frontend:user-detail' ticket.created_by.id %}" class="text-blue-600 hover:text-blue-800">
                                 {{ ticket.created_by.username }}
                             </a>
@@ -246,12 +246,16 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ ticket.created_at|date:"M d, Y H:i" }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">
-                            {% if ticket.updated_by %}
+                            {% if ticket.updated_by and ticket.updated_by.id %}
                             <a href="{% url 'frontend:user-detail' ticket.updated_by.id %}" class="text-blue-600 hover:text-blue-800">
                                 {{ ticket.updated_by.username }}
                             </a>
+                            {% elif ticket.created_by and ticket.created_by.id %}
+                            <a href="{% url 'frontend:user-detail' ticket.created_by.id %}" class="text-blue-600 hover:text-blue-800">
+                                {{ ticket.created_by.username }}
+                            </a>
                             {% else %}
-                            {{ ticket.created_by.username|default:"System" }}
+                            System
                             {% endif %}
                         </td>
                     </tr>

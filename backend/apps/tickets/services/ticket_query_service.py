@@ -304,22 +304,24 @@ class TicketQueryService:
         user_tickets_query = Q(created_by=user) | Q(assigned_to=user)
         
         # Get distinct statuses from user's tickets
-        statuses = list(
+        # Remove duplicates using set() to ensure uniqueness, then sort
+        statuses = sorted(set(
             Ticket.objects.filter(user_tickets_query)
             .values_list('status', flat=True)
             .distinct()
-        )
+        ))
         
         # Get distinct priorities from user's tickets
-        priorities = list(
+        # Remove duplicates using set() to ensure uniqueness, then sort
+        priorities = sorted(set(
             Ticket.objects.filter(user_tickets_query)
             .values_list('priority', flat=True)
             .distinct()
-        )
+        ))
         
         return {
-            'statuses': sorted(statuses),
-            'priorities': sorted(priorities),
+            'statuses': statuses,
+            'priorities': priorities,
         }
     
     def _ticket_to_dict(self, ticket: Ticket) -> Dict[str, Any]:

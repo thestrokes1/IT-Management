@@ -45,6 +45,7 @@ from apps.frontend.views import (
     delete_project,
     reports,
     export_reports,
+    command_palette_api,
 )
 
 urlpatterns = [
@@ -101,4 +102,7 @@ urlpatterns = [
 # Reports
     path('reports/', reports, name='reports'),
     path('reports/export/', export_reports, name='export-reports'),
+    
+    # Command Palette API (Ctrl+K)
+    path('api/command-palette/', command_palette_api, name='command-palette-api'),
 ]

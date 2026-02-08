@@ -7,7 +7,7 @@ Menu Access Matrix:
 |-------------|------------|----------|---------|------------|--------|
 | Dashboard   | YES        | YES      | YES     | YES        | YES    |
 | Assets      | YES        | YES      | YES     | YES        | NO     |
-| Projects    | YES        | NO       | YES     | NO         | NO     |
+| Projects    | YES        | YES      | YES     | NO         | NO     |
 | Tickets     | YES        | YES      | YES     | YES        | YES    |
 | Users       | YES        | YES      | YES     | NO         | NO     |
 | Logs        | YES        | YES      | YES     | YES        | NO     |
@@ -23,7 +23,7 @@ register = template.Library()
 MENU_ACCESS = {
     'dashboard': {'SUPERADMIN': True, 'IT_ADMIN': True, 'MANAGER': True, 'TECHNICIAN': True, 'VIEWER': True},
     'assets': {'SUPERADMIN': True, 'IT_ADMIN': True, 'MANAGER': True, 'TECHNICIAN': True, 'VIEWER': False},
-    'projects': {'SUPERADMIN': True, 'IT_ADMIN': False, 'MANAGER': True, 'TECHNICIAN': False, 'VIEWER': False},
+    'projects': {'SUPERADMIN': True, 'IT_ADMIN': True, 'MANAGER': True, 'TECHNICIAN': False, 'VIEWER': False},
     'tickets': {'SUPERADMIN': True, 'IT_ADMIN': True, 'MANAGER': True, 'TECHNICIAN': True, 'VIEWER': True},
     'users': {'SUPERADMIN': True, 'IT_ADMIN': True, 'MANAGER': True, 'TECHNICIAN': False, 'VIEWER': False},
     'logs': {'SUPERADMIN': True, 'IT_ADMIN': True, 'MANAGER': True, 'TECHNICIAN': True, 'VIEWER': False},

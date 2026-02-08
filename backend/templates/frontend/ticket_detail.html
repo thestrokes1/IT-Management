@@ -1,208 +1,955 @@
 {% extends "frontend/base.html" %}
 {% load i18n %}
+{% load custom_filters %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-6 sm:py-8">
-    <!-- Back -->
-    <div class="mb-4">
-        <a href="{% url 'frontend:tickets' %}"
-           class="text-blue-600 hover:text-blue-900 flex items-center gap-2">
+    
+    <!-- Breadcrumb / Back link -->
+    <div class="mb-6">
+        <a href="{% url 'frontend:tickets' %}" 
+           class="text-blue-600 hover:text-blue-900 flex items-center gap-2 text-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M15 19l-7-7 7-7"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
             {% trans "Back to Tickets" %}
         </a>
     </div>
 
-    <!-- Ticket Card -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900">{{ ticket.title }}</h1>
-                <p class="text-sm text-gray-500 mt-1">
-                    #{{ ticket.id }} · {% trans "Created by" %} {{ ticket.created_by.username }}
-                </p>
-            </div>
 
-            <span class="px-3 py-1 rounded-full text-sm font-medium
-                {% if ticket.status == 'OPEN' %}bg-blue-100 text-blue-800
-                {% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
-                {% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800
-                {% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-800
-                {% else %}bg-red-100 text-red-800{% endif %}">
-                {{ ticket.status|upper }}
-            </span>
-        </div>
 
-        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Details -->
-            <div>
-                <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Details" %}</h3>
-                <dl class="space-y-2">
-                    <div class="flex justify-between py-2 border-b">
-                        <dt class="text-gray-600">{% trans "Priority" %}</dt>
-                        <dd class="font-medium">{{ ticket.priority.name|default:"-" }}</dd>
-                    </div>
+    <!-- ========================================================================
+         HEADER SECTION (Sticky-like prominence)
+         ======================================================================== -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6 border-b-4" 
+         style="border-bottom-color: {% if ticket.status == 'OPEN' %}#3B82F6{% elif ticket.status == 'IN_PROGRESS' %}#F59E0B{% elif ticket.status == 'CLOSED' %}#10B981{% elif ticket.status == 'CANCELLED' %}#EF4444{% else %}#6B7280{% endif %}">
+        
+        <div class="px-6 py-6">
+            <!-- Ticket identifier row -->
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex-1">
+                    <!-- Ticket ID (UUID for now, ticket_number will be added later) -->
+                    <p class="text-xs font-mono text-gray-500 mb-2">
+                        Ticket ID: <code class="bg-gray-100 px-2 py-1 rounded">{{ ticket.ticket_id }}</code>
+                    </p>
+                    
+                    <!-- Title -->
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                        {{ ticket.title }}
+                    </h1>
+                    
+                    <!-- Subtitle: Created by, Created at -->
+                    <p class="text-sm text-gray-600">
+                        {% trans "Created by" %} <strong>{{ ticket.requester.username }}</strong>
+                        {% trans "on" %} 
+                        <time datetime="{{ ticket.created_at|date:'c' }}">
+                            {{ ticket.created_at|date:'M d, Y H:i' }}
+                        </time>
+                    </p>
+                </div>
 
-                    <div class="flex justify-between py-2 border-b">
-                        <dt class="text-gray-600">{% trans "Category" %}</dt>
-                        <dd class="font-medium">{{ ticket.category.name|default:"-" }}</dd>
-                    </div>
-
-                    <!-- Assignment -->
-                    <div class="flex justify-between py-2 border-b items-center">
-                        <dt class="text-gray-600">{% trans "Assignment" %}</dt>
-                        <dd class="font-medium flex items-center gap-3">
-                            {% if ticket.assigned_to %}
-                                <span class="px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm">
-                                    {{ ticket.assigned_to.username }}
-                                </span>
-                            {% else %}
-                                <span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm">
-                                    {% trans "Unassigned" %}
-                                </span>
-                            {% endif %}
-                        </dd>
-                    </div>
-
-                    <div class="flex justify-between py-2 border-b">
-                        <dt class="text-gray-600">{% trans "Created At" %}</dt>
-                        <dd class="font-medium">{{ ticket.created_at|date:"M d, Y H:i" }}</dd>
-                    </div>
-
-                    <div class="flex justify-between py-2 border-b">
-                        <dt class="text-gray-600">{% trans "Updated At" %}</dt>
-                        <dd class="font-medium">{{ ticket.updated_at|date:"M d, Y H:i" }}</dd>
-                    </div>
-                </dl>
-            </div>
-
-            <!-- Description -->
-            <div>
-                <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Description" %}</h3>
-                <p class="text-gray-700 whitespace-pre-wrap">
-                    {{ ticket.description|default:"No description" }}
-                </p>
+                <!-- Status and Priority badges (right side of header) -->
+                <div class="flex flex-col gap-2 ml-4">
+                    <!-- Status badge -->
+                    <span class="px-4 py-2 rounded-full text-sm font-semibold inline-block text-center
+                        {% if ticket.status == 'NEW' %}bg-blue-100 text-blue-800
+                        {% elif ticket.status == 'OPEN' %}bg-green-100 text-green-800
+                        {% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
+                        {% elif ticket.status == 'PENDING' %}bg-orange-100 text-orange-800
+                        {% elif ticket.status == 'RESOLVED' %}bg-indigo-100 text-indigo-800
+                        {% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-800
+                        {% elif ticket.status == 'CANCELLED' %}bg-red-100 text-red-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ ticket_status_display|upper }}
+                    </span>
+                    
+                    <!-- Priority badge -->
+                    <span class="px-4 py-2 rounded-full text-sm font-semibold inline-block text-center
+                        {% if ticket.priority == 'LOW' %}bg-blue-50 text-blue-700
+                        {% elif ticket.priority == 'MEDIUM' %}bg-yellow-50 text-yellow-700
+                        {% elif ticket.priority == 'HIGH' %}bg-orange-50 text-orange-700
+                        {% elif ticket.priority == 'CRITICAL' %}bg-red-50 text-red-700
+                        {% elif ticket.priority == 'URGENT' %}bg-red-100 text-red-900 font-bold
+                        {% else %}bg-gray-50 text-gray-700{% endif %}">
+                        {{ ticket_priority_display|upper }}
+                    </span>
+                </div>
             </div>
         </div>
-
-        <!-- Actions -->
-        {% if not is_deleted %}
-        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
-            <div class="flex flex-wrap gap-3">
-                
-                {# ===== Assignment dropdown for SUPERADMIN, MANAGER, IT_ADMIN ===== #}
-                {% if request.user.role in "SUPERADMIN,MANAGER,IT_ADMIN" %}
-                    {% if assignable_users %}
-                    <div class="relative inline-block">
-                        <form method="post" action="{% url 'frontend:ticket_assign_to_user' ticket.id 0 %}" id="ticket-assign-form" style="display:inline;">
-                            {% csrf_token %}
-                            <select name="user_id" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm" onchange="if(this.value){this.form.action='{% url 'frontend:ticket_assign_to_user' ticket.id 0 %}'.replace('0', this.value); this.form.submit();}">
-                                <option value="">{% trans "Assign to..." %}</option>
-                                {% for user in assignable_users %}
-                                <option value="{{ user.id }}">{{ user.username }} ({{ user.role }})</option>
-                                {% endfor %}
-                            </select>
-                        </form>
-                    </div>
-                    {% endif %}
-                {% endif %}
-                
-{# ===== Self-assign button for TECHNICIAN ===== #}
-                {% if request.user.role == "TECHNICIAN" and permissions.can_self_assign %}
-                <form method="post" action="{% url 'frontend:ticket_assign_self' ticket.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm" onclick="return confirm('{% trans "Assign this ticket to yourself?" %}');">
-                        Assign to me
-                    </button>
-                </form>
-                {% endif %}
-
-                {# ===== Unassign button for assigned user ===== #}
-                {% if permissions.assigned_to_me and permissions.can_unassign %}
-                <form method="post" action="{% url 'frontend:ticket_unassign_self' ticket.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm" onclick="return confirm('{% trans "Unassign this ticket from yourself?" %}');">
-                        Cancel assignment
-                    </button>
-                </form>
-                {% endif %}
-
-                {% if permissions.can_edit %}
-                <a href="{% url 'frontend:edit-ticket' ticket.id %}"
-                   class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
-                    {% trans "[ Edit ]" %}
-                </a>
-                {% endif %}
-
-                {% if permissions.can_resolve %}
-                <a href="{% url 'frontend:resolve-ticket' ticket.id %}"
-                   class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                    {% trans "[ Resolve ]" %}
-                </a>
-                {% endif %}
-
-                {% if permissions.can_reopen %}
-                <a href="{% url 'frontend:reopen-ticket' ticket.id %}"
-                   class="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 text-sm">
-                    {% trans "[ Reopen ]" %}
-                </a>
-                {% endif %}
-
-                {% if permissions.can_cancel %}
-                <a href="{% url 'frontend:cancel-ticket' ticket.id %}"
-                   class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm"
-                   onclick="return confirm('{% trans "Cancel this ticket?" %}');">
-                    {% trans "[ Cancel ]" %}
-                </a>
-                {% endif %}
-
-                {% if permissions.can_delete %}
-                <a href="{% url 'frontend:delete-ticket' ticket.id %}"
-                   class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm"
-                   onclick="return confirm('{% trans "Delete this ticket?" %}');">
-                    {% trans "[ Delete ]" %}
-                </a>
-                {% endif %}
-
-            </div>
-        </div>
-        {% endif %}
     </div>
 
-    <!-- Activity -->
-    <div class="mt-6 bg-white rounded-lg shadow-md p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">{% trans "Activity Timeline" %}</h3>
+    <!-- ========================================================================
+         MAIN CONTENT AREA (3-column on desktop, 1-column on mobile)
+         ======================================================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- LEFT COLUMN: Main content (2/3 width on desktop) -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- OVERVIEW METADATA SECTION -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 class="text-lg font-semibold text-gray-900">
+                        {% trans "Overview" %}
+                    </h2>
+                </div>
+                
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Column 1 -->
+                        <div class="space-y-4">
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Category" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket.category.name|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Type" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket.ticket_type.name|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Impact" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket_impact_display|default:"-" }}
+                                </dd>
+                            </div>
 
-        {% if activities %}
-            <div class="space-y-4">
-                {% for activity in activities %}
-                <div class="flex gap-4">
-                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span class="text-blue-600 text-sm font-medium">
-                            {{ activity.actor_username|first|upper }}
+                            <div class="flex justify-between py-3">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Urgency" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket_urgency_display|default:"-" }}
+                                </dd>
+                            </div>
+                        </div>
+
+                        <!-- Column 2 -->
+                        <div class="space-y-4">
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Assigned To" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if ticket.assigned_to %}
+                                        <span class="px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-semibold">
+                                            {{ ticket.assigned_to.username }}
+                                        </span>
+                                    {% else %}
+                                        <span class="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-semibold">
+                                            {% trans "Unassigned" %}
+                                        </span>
+                                    {% endif %}
+                                </dd>
+                            </div>
+
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Created" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    <time datetime="{{ ticket.created_at|date:'c' }}">
+                                        {{ ticket.created_at|date:'M d, Y' }}
+                                    </time>
+                                </dd>
+                            </div>
+
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Updated" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    <time datetime="{{ ticket.updated_at|date:'c' }}">
+                                        {{ ticket.updated_at|date:'M d, Y' }}
+                                    </time>
+                                </dd>
+                            </div>
+
+                            <div class="flex justify-between py-3">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Status" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if ticket.resolved_at %}
+                                        <time datetime="{{ ticket.resolved_at|date:'c' }}">
+                                            {{ ticket.resolved_at|date:'M d, Y H:i' }}
+                                        </time>
+                                    {% elif ticket.closed_at %}
+                                        <time datetime="{{ ticket.closed_at|date:'c' }}">
+                                            {{ ticket.closed_at|date:'M d, Y H:i' }}
+                                        </time>
+                                    {% else %}
+                                        {% trans "Ongoing" %}
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DESCRIPTION SECTION -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 class="text-lg font-semibold text-gray-900">
+                        {% trans "Description" %}
+                    </h2>
+                </div>
+                
+                <div class="p-6">
+                    {% if ticket.description %}
+                        <p class="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                            {{ ticket.description }}
+                        </p>
+                    {% else %}
+                        <p class="text-gray-400 italic">
+                            {% trans "No description provided." %}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Sidebar (1/3 width on desktop, below on mobile) -->
+        <aside class="lg:col-span-1 space-y-6">
+            
+            <!-- SLA STATUS WIDGET -->
+            {% if ticket.sla_due_at %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        ⏱️ {% trans "SLA Status" %}
+                    </h3>
+                </div>
+                
+                <div class="p-4 space-y-3">
+                    <div>
+                        <p class="text-xs font-medium text-gray-600 mb-1">{% trans "Due" %}</p>
+                        <p class="text-sm font-medium text-gray-900">
+                            <time datetime="{{ ticket.sla_due_at|date:'c' }}">
+                                {{ ticket.sla_due_at|date:'M d, Y H:i' }}
+                            </time>
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <p class="text-xs font-medium text-gray-600 mb-1">{% trans "Status" %}</p>
+                        {% if ticket.sla_breached %}
+                            <span class="text-xs font-semibold text-red-700 bg-red-100 px-2 py-1 rounded">
+                                🔴 {% trans "BREACHED" %}
+                            </span>
+                        {% else %}
+                            <span class="text-xs font-semibold text-green-700 bg-green-100 px-2 py-1 rounded">
+                                ✅ {% trans "ON TRACK" %}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- TIMELINE WIDGET -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        📊 {% trans "Timeline" %}
+                    </h3>
+                </div>
+                
+                <div class="p-4 space-y-3 text-sm">
+                    <div class="flex gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #3B82F6; margin-top: 3px;"></span>
+                        <div>
+                            <p class="font-medium text-gray-900">{{ ticket_status_display }}</p>
+                            <p class="text-xs text-gray-500">
+                                <time datetime="{{ ticket.created_at|date:'c' }}">
+                                    {{ ticket.created_at|date:'M d, H:i' }}
+                                </time>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {% if ticket.resolved_at %}
+                    <div class="flex gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #10B981; margin-top: 3px;"></span>
+                        <div>
+                            <p class="font-medium text-gray-900">{% trans "Resolved" %}</p>
+                            <p class="text-xs text-gray-500">
+                                <time datetime="{{ ticket.resolved_at|date:'c' }}">
+                                    {{ ticket.resolved_at|date:'M d, H:i' }}
+                                </time>
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if ticket.closed_at %}
+                    <div class="flex gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #6B7280; margin-top: 3px;"></span>
+                        <div>
+                            <p class="font-medium text-gray-900">{% trans "Closed" %}</p>
+                            <p class="text-xs text-gray-500">
+                                <time datetime="{{ ticket.closed_at|date:'c' }}">
+                                    {{ ticket.closed_at|date:'M d, H:i' }}
+                                </time>
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ASSIGNEE WIDGET -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        👤 {% trans "Assignee" %}
+                    </h3>
+                </div>
+                
+                <div class="p-4">
+                    {% if ticket.assigned_to %}
+                        <div class="text-center">
+                            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-blue-100 flex items-center justify-center text-lg font-semibold text-blue-600">
+                                {{ ticket.assigned_to.username|first|upper }}
+                            </div>
+                            <p class="text-sm font-medium text-gray-900">
+                                {{ ticket.assigned_to.username }}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ ticket.assigned_to.get_role_display }}
+                            </p>
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-gray-500 text-center py-2">
+                            {% trans "Not assigned" %}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ASSIGNMENT CONTROL - Phase 2A Mutation (NEW) -->
+            {% if can_assign %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        ✏️ {% trans "Assign Ticket" %}
+                    </h3>
+                </div>
+                
+                <form method="post" class="p-4" id="assignment-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assign">
+                    
+                    <div class="space-y-4">
+                        <!-- Technician dropdown -->
+                        <div>
+                            <label for="assigned_to" class="block text-sm font-medium text-gray-700 mb-2">
+                                {% trans "Assign to Technician" %} <span class="text-red-500">*</span>
+                            </label>
+                            <select id="assigned_to" name="assigned_to" required 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <option value="">-- {% trans "Select Technician" %} --</option>
+                                {% for tech_id, tech_name in available_technicians %}
+                                    <option value="{{ tech_id }}" 
+                                            {% if ticket.assigned_to.id == tech_id %}selected{% endif %}>
+                                        {{ tech_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Help text for technicians -->
+                        {% if can_self_assign and not can_assign_other %}
+                            <p class="text-xs text-gray-500 px-2">
+                                {% trans "As a Technician, you can only assign tickets to yourself." %}
+                            </p>
+                        {% endif %}
+                        
+                        <!-- Submit button -->
+                        <button type="submit" 
+                                class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors text-sm">
+                            {% trans "Save Assignment" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+            <!-- STATUS CHANGE CONTROL - Phase 2B Mutation (NEW) -->
+            {% if can_change_status and available_status_transitions %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        🔄 {% trans "Change Status" %}
+                    </h3>
+                </div>
+                
+                <form method="post" class="p-4" id="status-change-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="change_status">
+                    
+                    <div class="space-y-4">
+                        <!-- Current status display -->
+                        <div>
+                            <p class="text-xs font-medium text-gray-600 mb-2">{% trans "Current Status" %}</p>
+                            <div class="px-3 py-2 rounded-md bg-gray-100 text-sm font-medium text-gray-900">
+                                {{ ticket_status_display }}
+                            </div>
+                        </div>
+                        
+                        <!-- Status dropdown -->
+                        <div>
+                            <label for="new_status" class="block text-sm font-medium text-gray-700 mb-2">
+                                {% trans "Change to" %} <span class="text-red-500">*</span>
+                            </label>
+                            <select id="new_status" name="new_status" required 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <option value="">-- {% trans "Select New Status" %} --</option>
+                                {% for status_code, status_display in available_status_transitions %}
+                                    <option value="{{ status_code }}">
+                                        {{ status_display }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Help text for technicians -->
+                        {% if user.role == 'TECHNICIAN' %}
+                            <p class="text-xs text-gray-500 px-2">
+                                {% trans "Your status options are limited based on your role." %}
+                            </p>
+                        {% endif %}
+                        
+                        <!-- Submit button -->
+                        <button type="submit" 
+                                class="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-md transition-colors text-sm">
+                            {% trans "Update Status" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+            
+            <!-- PRIORITY CHANGE CONTROL - Phase 2C Mutation (NEW) -->
+            {% if can_change_priority %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        🔺 {% trans "Change Priority" %}
+                    </h3>
+                </div>
+                
+                <form method="post" class="p-4" id="priority-change-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="change_priority">
+                    
+                    <div class="space-y-4">
+                        <!-- Current priority display -->
+                        <div>
+                            <p class="text-xs font-medium text-gray-600 mb-2">{% trans "Current Priority" %}</p>
+                            <div class="px-3 py-2 rounded-md bg-gray-100 text-sm font-medium text-gray-900">
+                                {{ ticket_priority_display }}
+                            </div>
+                        </div>
+                        
+                        <!-- Priority dropdown -->
+                        <div>
+                            <label for="new_priority" class="block text-sm font-medium text-gray-700 mb-2">
+                                {% trans "Change to" %} <span class="text-red-500">*</span>
+                            </label>
+                            <select id="new_priority" name="new_priority" required 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <option value="">-- {% trans "Select New Priority" %} --</option>
+                                {% for priority_code, priority_display in available_priorities %}
+                                    <option value="{{ priority_code }}">
+                                        {{ priority_display }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Submit button -->
+                        <button type="submit" 
+                                class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition-colors text-sm">
+                            {% trans "Update Priority" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+            
+            <!-- LAST INTERNAL NOTE WIDGET - Phase 3B (Read-only sidebar) -->
+            {% if last_internal_note and is_staff %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        📌 {% trans "Last Internal Note" %}
+                    </h3>
+                </div>
+                
+                <div class="p-4">
+                    <!-- Note type badge -->
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-xs font-semibold px-2 py-1 rounded-full
+                            {% if last_internal_note_type == 'OBSERVATION' %}
+                                bg-gray-200 text-gray-700
+                            {% elif last_internal_note_type == 'DIAGNOSIS' %}
+                                bg-yellow-100 text-yellow-800
+                            {% elif last_internal_note_type == 'WORK_DONE' %}
+                                bg-green-100 text-green-800
+                            {% elif last_internal_note_type == 'ESCALATION' %}
+                                bg-red-100 text-red-800
+                            {% else %}
+                                bg-blue-100 text-blue-800
+                            {% endif %}">
+                            {{ last_internal_note_type }}
                         </span>
                     </div>
-                    <div class="flex-1 pb-4 border-b border-gray-100">
-                        <div class="flex justify-between">
-                            <p class="text-sm font-medium text-gray-900">
-                                {{ activity.action_label }}
-                            </p>
-                            <span class="text-xs text-gray-500">
-                                {{ activity.created_at|timesince }} ago
-                            </span>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1">
-                            by {{ activity.actor_username }}
+                    
+                    <!-- Author and timestamp -->
+                    <div class="mb-3">
+                        <p class="text-xs text-gray-600">
+                            By <strong>{{ last_internal_note.author.username }}</strong>
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            <time datetime="{{ last_internal_note.created_at|date:'c' }}">
+                                {{ last_internal_note.created_at|date:'M d, Y H:i' }}
+                            </time>
+                        </p>
+                    </div>
+                    
+                    <!-- Note preview (first 80 characters) -->
+                    <div class="text-sm text-gray-700 bg-gray-50 p-3 rounded border border-gray-200">
+                        <p class="whitespace-pre-wrap line-clamp-3">
+                            {{ last_internal_note.text|truncatewords:20 }}
                         </p>
                     </div>
                 </div>
-                {% endfor %}
             </div>
-        {% else %}
-            <p class="text-gray-500 text-sm">{% trans "No activity recorded." %}</p>
+            {% endif %}
+
+            <!-- CLIENT REVIEW WIDGET - Phase 3C (Read-only sidebar for internal staff) -->
+            {% if has_review and is_staff %}
+            <div class="bg-white rounded-lg shadow-sm border border-purple-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-purple-200 bg-purple-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        ⭐ {% trans "Client Review" %}
+                    </h3>
+                </div>
+                
+                <div class="p-4">
+                    <!-- Rating badge -->
+                    <div class="flex items-center gap-1 mb-3">
+                        {% if client_review.rating %}
+                            {% for i in "12345" %}
+                                {% if i|add:0 <= client_review.rating %}
+                                    <span class="text-lg">⭐</span>
+                                {% else %}
+                                    <span class="text-lg text-gray-300">☆</span>
+                                {% endif %}
+                            {% endfor %}
+                            <span class="text-sm text-gray-600 ml-1">({{ client_review.rating }}/5)</span>
+                        {% else %}
+                            <span class="text-sm text-gray-500 italic">{% trans "No rating" %}</span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Client username and timestamp -->
+                    <div class="mb-3">
+                        <p class="text-xs text-gray-600">
+                            {% trans "By" %} <strong>{{ client_review.author.username }}</strong>
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            <time datetime="{{ client_review.created_at|date:'c' }}">
+                                {{ client_review.created_at|date:'M d, Y H:i' }}
+                            </time>
+                        </p>
+                    </div>
+                    
+                    <!-- Comment preview (~120 chars) -->
+                    {% if client_review.comment %}
+                    <div class="text-sm text-gray-700 bg-gray-50 p-3 rounded border border-gray-200">
+                        <p class="whitespace-pre-wrap line-clamp-3">
+                            {{ client_review.comment|truncatechars:120 }}
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+        </aside>
+
+    </div>
+
+    <!-- ========================================================================
+         INTERNAL STAFF NOTES SECTION - Phase 3A (Full Width, before Activity Log)
+         ======================================================================== -->
+    {% if is_staff %}
+    <div class="mt-12 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <!-- Notes header with count -->
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">
+                    📝 {% trans "Internal Notes" %}
+                </h2>
+                {% if internal_notes_count %}
+                    <span class="text-xs font-medium text-gray-600 bg-gray-200 px-3 py-1 rounded-full">
+                        {{ internal_notes_count }} {% trans "note(s)" %}
+                    </span>
+                {% else %}
+                    <span class="text-xs font-medium text-gray-500 italic">
+                        {% trans "No notes yet" %}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Notes display area -->
+        <div class="px-6 py-4">
+            {% if internal_notes %}
+                <!-- Chronological list of notes -->
+                <div class="space-y-4">
+                    {% for note in internal_notes %}
+                        {% with note_type=note_types|get:note.id|default:"INTERNAL" %}
+                        <div class="p-4 rounded-lg bg-gray-50 border border-gray-200">
+                            <!-- Note header: Type badge + Author + Timestamp (Phase 3B) -->
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <!-- Phase 3B: Note type badge with color coding -->
+                                    <span class="text-xs font-semibold px-2 py-1 rounded-full
+                                        {% if note_type == 'OBSERVATION' %}
+                                            bg-gray-200 text-gray-700
+                                        {% elif note_type == 'DIAGNOSIS' %}
+                                            bg-yellow-100 text-yellow-800
+                                        {% elif note_type == 'WORK_DONE' %}
+                                            bg-green-100 text-green-800
+                                        {% elif note_type == 'ESCALATION' %}
+                                            bg-red-100 text-red-800
+                                        {% else %}
+                                            bg-blue-100 text-blue-800
+                                        {% endif %}">
+                                        {{ note_type }}
+                                    </span>
+                                    
+                                    <strong class="text-sm text-gray-900">
+                                        {{ note.author.username }}
+                                    </strong>
+                                    <span class="text-xs text-gray-500">
+                                        {% if note.author.role %}
+                                            ({{ note.author.get_role_display|default:note.author.role }})
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <time datetime="{{ note.created_at|date:'c' }}" class="text-xs text-gray-500 whitespace-nowrap ml-2">
+                                    {{ note.created_at|date:'M d, Y H:i' }}
+                                </time>
+                            </div>
+                            
+                            <!-- Note text (plain text, no rich formatting) -->
+                            <p class="text-sm text-gray-800 whitespace-pre-wrap">
+                                {{ note.text }}
+                            </p>
+                        </div>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Empty state (Phase 3B: enhanced message) -->
+                <div class="py-8 text-center">
+                    <p class="text-sm text-gray-600 font-medium mb-2">
+                        {% trans "No internal notes yet" %}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        {% trans "Use this section to document diagnosis, work performed, observations, or escalations." %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Note creation form (only if user can add notes) -->
+        {% if can_add_note %}
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">
+                {% trans "Add Internal Note" %}
+            </h3>
+            
+            <form method="post" id="note-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_note">
+                
+                <div class="space-y-4">
+                    <!-- Phase 3B: Note type selector dropdown -->
+                    <div>
+                        <label for="note_type" class="block text-sm font-medium text-gray-700 mb-2">
+                            {% trans "Note Type" %} <span class="text-gray-500">({% trans "optional" %})</span>
+                        </label>
+                        <select id="note_type" name="note_type" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <option value="INTERNAL" selected>🔵 {% trans "Internal" %}</option>
+                            <option value="OBSERVATION">⚪ {% trans "Observation" %}</option>
+                            <option value="DIAGNOSIS">🟡 {% trans "Diagnosis" %}</option>
+                            <option value="WORK_DONE">🟢 {% trans "Work Done" %}</option>
+                            <option value="ESCALATION">🔴 {% trans "Escalation" %}</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">
+                            {% trans "Classify the note to improve handoffs and visibility." %}
+                        </p>
+                    </div>
+                    
+                    <!-- Note text textarea -->
+                    <div>
+                        <label for="note_text" class="block text-sm font-medium text-gray-700 mb-2">
+                            {% trans "Note" %} <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="note_text" name="note_text" required 
+                                  rows="4"
+                                  maxlength="5000"
+                                  placeholder="{% trans 'Add an internal note (up to 5000 characters, plain text only)' %}"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm font-sans resize-vertical"
+                                  ></textarea>
+                        <p class="mt-1 text-xs text-gray-500">
+                            {% trans "Plain text only. Internal staff can view." %}
+                        </p>
+                    </div>
+                    
+                    <!-- Submit button -->
+                    <div class="flex gap-3">
+                        <button type="submit" 
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors text-sm">
+                            ✓ {% trans "Add Note" %}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
         {% endif %}
     </div>
+    {% endif %}
+
+    <!-- ========================================================================
+         CLIENT / REQUESTER REVIEW SECTION - Phase 3C (Full Width, Requester Only)
+         ======================================================================== -->
+    {% if user == ticket.requester %}
+    <div class="mt-12 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <!-- Review header -->
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h2 class="text-lg font-semibold text-gray-900">
+                ⭐ {% trans "Share Your Feedback" %}
+            </h2>
+        </div>
+
+        <!-- Review content -->
+        <div class="px-6 py-4">
+            {% if has_review %}
+                <!-- Existing review display (read-only) -->
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            {% if client_review.rating %}
+                                <div class="flex items-center gap-1 mb-2">
+                                    {% for i in "12345" %}
+                                        {% if i|add:0 <= client_review.rating %}
+                                            <span class="text-lg">⭐</span>
+                                        {% else %}
+                                            <span class="text-lg text-gray-300">☆</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <span class="text-sm text-gray-600 ml-2">({{ client_review.rating }}/5)</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <time datetime="{{ client_review.created_at|date:'c' }}" class="text-xs text-gray-500">
+                            {{ client_review.created_at|date:'M d, Y H:i' }}
+                        </time>
+                    </div>
+                    
+                    {% if client_review.comment %}
+                        <p class="text-sm text-gray-800 whitespace-pre-wrap">
+                            {{ client_review.comment }}
+                        </p>
+                    {% endif %}
+                </div>
+            {% elif can_submit_review %}
+                <!-- Review submission form -->
+                <form method="post" id="review-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="submit_review">
+                    
+                    <div class="space-y-4">
+                        <!-- Rating selector (1-5 stars) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-3">
+                                {% trans "Rating (Optional)" %}
+                            </label>
+                            <div class="flex gap-2">
+                                {% for rating in "12345" %}
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="radio" name="rating" value="{{ rating|add:0 }}" class="sr-only peer">
+                                        <span class="text-4xl peer-checked:text-yellow-400 text-gray-300 hover:text-yellow-300 transition-colors">⭐</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500">
+                                {% trans "Click to select a rating" %}
+                            </p>
+                        </div>
+                        
+                        <!-- Comment textarea -->
+                        <div>
+                            <label for="comment" class="block text-sm font-medium text-gray-700 mb-2">
+                                {% trans "Comments (Optional)" %}
+                            </label>
+                            <textarea id="comment" name="comment" 
+                                      rows="4"
+                                      maxlength="2000"
+                                      placeholder="{% trans 'Tell us about your experience with this ticket resolution...' %}"
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm font-sans resize-vertical"
+                                      ></textarea>
+                            <p class="mt-1 text-xs text-gray-500">
+                                {% trans "Plain text only, up to 2000 characters." %}
+                            </p>
+                        </div>
+                        
+                        <!-- Help text -->
+                        <p class="text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
+                            <strong>💡 {% trans "Your Feedback" %}:</strong> {% trans "Your feedback helps us improve our service. Once submitted, this review cannot be edited." %}
+                        </p>
+                        
+                        <!-- Submit button -->
+                        <div class="flex gap-3">
+                            <button type="submit" 
+                                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors text-sm">
+                                {% trans "Submit Review" %}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            {% elif ticket.status not in "RESOLVED,CLOSED" %}
+                <!-- Not eligible - ticket not resolved/closed -->
+                <div class="text-center py-6">
+                    <p class="text-sm text-gray-600">
+                        {% trans "Reviews are available once the ticket is resolved or closed." %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================================================================
+         ACTIVITY TIMELINE (Full Width)
+         ======================================================================== -->
+    <div class="mt-12 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">
+                    📋 {% trans "Activity Log" %}
+                </h2>
+                {% if activities_count %}
+                    <span class="text-xs font-medium text-gray-600 bg-gray-200 px-3 py-1 rounded-full">
+                        {{ activities_count }} {% trans "entries" %}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="p-6">
+            {% if activities %}
+                <!-- Activity entries list -->
+                <div class="space-y-6" id="activity-list">
+                    {% for activity in activities %}
+                    <div class="flex gap-4 pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
+                        <!-- Avatar circle with first letter of actor name -->
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span class="text-blue-600 text-sm font-semibold">
+                                    {{ activity.actor_name|first|upper }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Activity content -->
+                        <div class="flex-1 min-w-0">
+                            <!-- Header: Event type and timestamp -->
+                            <div class="flex items-start justify-between gap-2 mb-1">
+                                <h4 class="text-sm font-semibold text-gray-900">
+                                    {{ activity.event_type|default:activity.action|title }}
+                                </h4>
+                                <span class="text-xs text-gray-500 whitespace-nowrap">
+                                    <time datetime="{{ activity.timestamp|date:'c' }}">
+                                        {{ activity.timestamp|timesince }} {% trans "ago" %}
+                                    </time>
+                                </span>
+                            </div>
+
+                            <!-- Subheader: Actor info -->
+                            <p class="text-xs text-gray-600 mb-2">
+                                <strong>{{ activity.actor_name }}</strong>
+                                <span class="text-gray-500">({{ activity.actor_role }})</span>
+                                •
+                                <time datetime="{{ activity.timestamp|date:'c' }}" class="text-gray-500">
+                                    {{ activity.timestamp|date:'M d, Y H:i' }}
+                                </time>
+                            </p>
+
+                            <!-- Description/details -->
+                            {% if activity.description %}
+                            <div class="text-sm text-gray-700 bg-gray-50 rounded p-3 mt-2">
+                                {{ activity.description }}
+                            </div>
+                            {% endif %}
+
+                            <!-- Extra data (if any) -->
+                            {% if activity.extra_data %}
+                            <div class="text-xs text-gray-600 mt-2 space-y-1">
+                                {% for key, value in activity.extra_data.items %}
+                                    <p><strong>{{ key|title }}:</strong> {{ value }}</p>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Pagination -->
+                {% if activities.has_other_pages %}
+                <div class="mt-6 pt-6 border-t border-gray-200 flex justify-center gap-2">
+                    {% if activities.has_previous %}
+                        <a href="?activity_page=1" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            {% trans "First" %}
+                        </a>
+                        <a href="?activity_page={{ activities.previous_page_number }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            ← {% trans "Previous" %}
+                        </a>
+                    {% endif %}
+
+                    <span class="px-3 py-2 text-sm text-gray-600">
+                        {% trans "Page" %} {{ activities.number }} {% trans "of" %} {{ activities.paginator.num_pages }}
+                    </span>
+
+                    {% if activities.has_next %}
+                        <a href="?activity_page={{ activities.next_page_number }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            {% trans "Next" %} →
+                        </a>
+                        <a href="?activity_page={{ activities.paginator.num_pages }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            {% trans "Last" %}
+                        </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+            {% else %}
+                <!-- Empty state with helpful message -->
+                <div class="py-12 text-center">
+                    <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-gray-600 text-sm">
+                        {{ no_activities_reason|default:"No activity has been recorded yet." }}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
 </div>
 {% endblock %}

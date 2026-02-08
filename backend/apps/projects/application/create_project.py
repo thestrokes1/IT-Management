@@ -122,7 +122,11 @@ class CreateProject:
             except User.DoesNotExist:
                 return CreateProjectResult.fail(f"Owner with ID {owner_id} not found")
         else:
-            owner = user
+            # Auto-assign current user if they are MANAGER or SUPERADMIN
+            if user.role in ['MANAGER', 'SUPERADMIN']:
+                owner = user
+            else:
+                return CreateProjectResult.fail("A project manager must be selected")
 
         # Parse dates
         start_date_obj = None

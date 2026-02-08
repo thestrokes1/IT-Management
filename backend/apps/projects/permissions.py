@@ -17,7 +17,8 @@ class CanManageProjects(permissions.BasePermission):
 class IsProjectManagerOrReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow project managers and above to edit.
-    Read access for project members and authenticated users.
+    Read access for project members (including IT_ADMIN) and authenticated users.
+    IT_ADMIN users allowed read-only access via project membership.
     """
     
     def has_object_permission(self, request, view, obj):
@@ -31,22 +32,37 @@ class IsProjectManagerOrReadOnly(permissions.BasePermission):
                     request.user.is_admin
                 )
             else:
-                # For projects
-                return request.user.is_authenticated and (
+                # For projects - allow read access for team members and ITADMINs
+                is_project_member = (
                     request.user in obj.team_members.all() or
-                    obj.project_manager == request.user or
-                    request.user.is_admin
+                    obj.project_manager == request.user
                 )
+                # Check ProjectMember for IT_ADMIN assignments
+                if not is_project_member and hasattr(obj, 'memberships'):
+                    try:
+                        from apps.projects.models import ProjectMember
+                        is_project_member = ProjectMember.objects.filter(
+                            project=obj,
+                            user=request.user,
+                            is_active=True
+                        ).exists()
+                    except:
+                        pass
+                
+                return request.user.is_authenticated and (is_project_member or request.user.is_admin)
         
-        # Write permissions for project managers and admins
-        if request.user.is_admin:
+        # Write permissions for project managers and admins only (IT_ADMIN denied write)
+        if request.user.is_admin and request.user.role != 'IT_ADMIN':
             return True
         
         if hasattr(obj, 'project'):
             # For tasks
             return request.user == obj.project.project_manager or request.user.can_manage_projects
         else:
-            # For projects
+            # For projects - IT_ADMIN users cannot write
+            from apps.users.models import UserRole
+            if hasattr(request.user, 'role') and request.user.role == UserRole.IT_ADMIN:
+                return False
             return request.user == obj.project_manager or request.user.can_manage_projects
 
 class IsProjectMember(permissions.BasePermission):

@@ -66,6 +66,24 @@ class ProjectsView(LoginRequiredMixin, TemplateView):
         # Convert DTOs to list for processing
         projects_list = projects_dto.projects
         
+        # Sort projects based on user role
+        if self.request.user.role == 'IT_ADMIN' and not self.request.user.is_superuser:
+            # IT_ADMIN sees all projects but assigned projects appear first
+            from apps.projects.models import ProjectMember
+            assigned_project_ids = set(ProjectMember.objects.filter(
+                user=self.request.user,
+                is_active=True
+            ).values_list('project_id', flat=True))
+            # Sort: assigned projects first, then others
+            projects_list = sorted(
+                projects_list,
+                key=lambda p: (p.id not in assigned_project_ids, p.name)
+            )
+        elif not self.request.user.can_manage_projects:
+            # Other non-admin users: projects they manage or are team members of
+            # This filtering happens via permissions check in the template
+            pass
+        
         # Build permissions map using permission_mapper
         permissions_map = build_projects_permissions_map(self.request.user, projects_list)
         
@@ -76,7 +94,7 @@ class ProjectsView(LoginRequiredMixin, TemplateView):
         context.update({
             'projects': projects_list,
             'projects_dict': projects_dto.to_list(),
-            'total_count': projects_dto.total_count,
+            'total_count': len(projects_list),
             'status_choices': status_choices,
             'priority_choices': priority_choices,
             'permissions_map': permissions_map,
@@ -99,7 +117,7 @@ class CreateProjectView(LoginRequiredMixin, CanManageProjectsMixin, SafeTemplate
         context = super().get_context_data(**kwargs)
         # Use Query for reads - returns DTOs/dicts
         categories = ProjectQuery.get_categories()
-        available_users = ProjectQuery.get_active_users()
+        available_users = ProjectQuery.get_managers()
         
         # Get list permissions for template consistency
         list_permissions = get_list_permissions(self.request.user)
@@ -162,9 +180,11 @@ class EditProjectView(SafeTemplateView):
     redirect_url = 'frontend:projects'
     
     def dispatch(self, request, *args, **kwargs):
-        """Check edit permission using domain authority."""
-        from apps.projects.domain.services.project_authority import assert_can_edit
+        """Check view permission using domain authority."""
+        from apps.projects.domain.services.project_authority import assert_can_view
         from apps.core.exceptions import NotFoundError
+        from django.shortcuts import redirect
+        from django.contrib import messages
         
         project_id = kwargs.get('project_id')
         
@@ -180,14 +200,19 @@ class EditProjectView(SafeTemplateView):
         # Store project in view for later use
         self._project = project
         
-        # Check edit permission using domain authority (assert_can_edit raises AuthorizationError)
+        # Check view permission using domain authority (assert_can_view raises AuthorizationError)
         try:
-            assert_can_edit(request.user, project)
+            assert_can_view(request.user, project)
         except AuthorizationError as e:
-            raise PermissionDeniedError(
-                message=str(e),
-                details={'action': 'edit', 'resource_type': 'project'}
-            )
+            # For IT_ADMIN users without access, redirect to projects list instead of showing 403
+            if request.user.role == 'IT_ADMIN':
+                messages.warning(request, 'You can only access projects assigned to you.')
+                return redirect('frontend:projects')
+            else:
+                raise PermissionDeniedError(
+                    message=str(e),
+                    details={'action': 'view', 'resource_type': 'project'}
+                )
         
         return super().dispatch(request, *args, **kwargs)
     
@@ -206,7 +231,19 @@ class EditProjectView(SafeTemplateView):
             )
         
         categories = ProjectQuery.get_categories()
-        available_users = ProjectQuery.get_active_users()
+        available_users = ProjectQuery.get_managers()
+        
+        # Get IT_ADMIN users for assignment
+        from apps.users.models import User
+        it_admins = User.objects.filter(role='IT_ADMIN', is_active=True).order_by('username')
+        
+        # Get current IT_ADMIN assignments for this project
+        from apps.projects.models import ProjectMember
+        it_admin_assignments = ProjectMember.objects.filter(
+            project_id=project_id,
+            user__role='IT_ADMIN',
+            is_active=True
+        ).select_related('user')
         
         # Convert to dict for permissions
         project_dict = project_dto.to_dict() if hasattr(project_dto, 'to_dict') else project_dto
@@ -220,6 +257,8 @@ class EditProjectView(SafeTemplateView):
             'categories': categories,
             'categories_dict': [c.to_dict() for c in categories] if hasattr(categories[0], 'to_dict') else categories,
             'available_users': available_users,
+            'it_admins': it_admins,
+            'it_admin_assignments': it_admin_assignments,
             'form': {},
             'permissions': permissions,
         })

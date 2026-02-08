@@ -861,3 +861,102 @@ assert_can_resolve_ticket = assert_can_resolve
 assert_can_reopen_ticket = assert_can_reopen
 assert_can_cancel_ticket = assert_can_cancel
 
+
+# =============================================================================
+# TICKET AUTHORITY CLASS - Wrapper for domain service functions
+# =============================================================================
+
+class TicketAuthority:
+    """
+    Wrapper class for ticket authorization functions.
+    Allows using OOP-style access to authorization rules.
+    
+    Example:
+        authority = TicketAuthority()
+        if authority.can_view(user, ticket):
+            # proceed
+    """
+    
+    def can_view(self, user, ticket) -> bool:
+        """Check if user can view this ticket."""
+        return can_view(user, ticket)
+    
+    def can_view_list(self, user) -> bool:
+        """Check if user can view ticket list."""
+        return can_view_list(user)
+    
+    def can_view_details(self, user, ticket) -> bool:
+        """Check if user can view ticket details."""
+        return can_view_details(user, ticket)
+    
+    def can_create(self, user) -> bool:
+        """Check if user can create tickets."""
+        return can_create(user)
+    
+    def can_edit(self, user, ticket) -> bool:
+        """Check if user can edit this ticket."""
+        return can_edit(user, ticket)
+    
+    def can_update(self, user, ticket) -> bool:
+        """Check if user can update this ticket."""
+        return can_update(user, ticket)
+    
+    def can_modify(self, user, ticket) -> bool:
+        """Check if user can modify this ticket."""
+        return can_modify(user, ticket)
+    
+    def can_delete(self, user, ticket) -> bool:
+        """Check if user can delete this ticket."""
+        return can_delete(user, ticket)
+    
+    def can_assign(self, user, ticket, assignee) -> bool:
+        """Check if user can assign this ticket."""
+        return can_assign(user, ticket, assignee)
+    
+    def can_unassign(self, user, ticket) -> bool:
+        """Check if user can unassign this ticket."""
+        return can_unassign(user, ticket)
+    
+    def can_self_assign(self, user, ticket) -> bool:
+        """Check if user can self-assign this ticket."""
+        return can_self_assign(user, ticket)
+    
+    def can_unassign_self(self, user, ticket) -> bool:
+        """Check if user can unassign themselves from this ticket."""
+        return can_unassign_self(user, ticket)
+    
+    def can_assign_to_self(self, user, ticket) -> bool:
+        """Check if user can assign ticket to themselves."""
+        return can_assign_to_self(user, ticket)
+    
+    def can_reassign(self, user, ticket) -> bool:
+        """Check if user can reassign this ticket."""
+        return can_reassign(user, ticket)
+    
+    def can_close(self, user, ticket) -> bool:
+        """Check if user can close this ticket."""
+        return can_close(user, ticket)
+    
+    def can_resolve(self, user, ticket) -> bool:
+        """Check if user can mark ticket as resolved."""
+        return can_resolve(user, ticket)
+    
+    def can_reopen(self, user, ticket) -> bool:
+        """Check if user can reopen this ticket."""
+        return can_reopen(user, ticket)
+    
+    def can_cancel(self, user, ticket) -> bool:
+        """Check if user can cancel this ticket."""
+        return can_cancel(user, ticket)
+    
+    def can_add_comment(self, user, ticket) -> bool:
+        """Check if user can add comments to this ticket."""
+        return can_add_comment(user, ticket)
+    
+    def can_view_comment(self, user, ticket, comment) -> bool:
+        """Check if user can view a comment on this ticket."""
+        return can_view_comment(user, ticket, comment)
+    
+    def can_add_attachment(self, user, ticket) -> bool:
+        """Check if user can add attachments to this ticket."""
+        return can_add_attachment(user, ticket)

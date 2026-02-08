@@ -157,8 +157,8 @@ class User(AbstractUser):
     
     @property
     def can_access_projects(self):
-        """Check if user can access Projects menu (MANAGER only - IT_ADMIN excluded)."""
-        return self.role == UserRole.MANAGER or self.role == UserRole.SUPERADMIN
+        """Check if user can access Projects menu (MANAGER, IT_ADMIN, SUPERADMIN)."""
+        return self.role in [UserRole.MANAGER, UserRole.IT_ADMIN, UserRole.SUPERADMIN]
     
     @property
     def can_access_tickets(self):

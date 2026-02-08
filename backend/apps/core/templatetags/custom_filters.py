@@ -77,6 +77,10 @@ def get_item(dictionary, key):
     return dictionary.get(key)
 
 
+# Register 'get' as an alias for 'get_item' for backward compatibility
+register.filter('get', get_item)
+
+
 @register.filter
 def divide(value, arg):
     """

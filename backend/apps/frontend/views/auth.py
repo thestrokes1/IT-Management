@@ -14,6 +14,13 @@ class LoginView(TemplateView):
     """
     template_name = 'frontend/login.html'
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Get and clear logout message from session
+        if 'logout_message' in self.request.session:
+            context['logout_message'] = self.request.session.pop('logout_message')
+        return context
+    
     def post(self, request, *args, **kwargs):
         from django.contrib.auth import authenticate, login
         username = request.POST.get('username')
@@ -23,14 +30,15 @@ class LoginView(TemplateView):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
-                messages.success(request, f'Welcome back, {user.username}!')
+                # Store success message in session to display only on dashboard
+                request.session['login_success'] = f'Welcome back, {user.username}!'
                 return redirect('frontend:dashboard')
             else:
                 messages.error(request, 'Invalid username or password.')
         else:
             messages.error(request, 'Please provide both username and password.')
         
-        return render(request, self.template_name)
+        return render(request, self.template_name, self.get_context_data())
 
 
 class LogoutView(TemplateView):
@@ -40,7 +48,8 @@ class LogoutView(TemplateView):
     def get(self, request, *args, **kwargs):
         from django.contrib.auth import logout
         logout(request)
-        messages.info(request, 'You have been logged out successfully.')
+        # Store logout message in session to display on login page
+        request.session['logout_message'] = 'You have been logged out successfully.'
         return redirect('frontend:login')
 
 

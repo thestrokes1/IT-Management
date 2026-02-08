@@ -5,6 +5,42 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- Display Messages -->
+{% if messages %}
+<div class="mb-4 space-y-2">
+    {% for message in messages %}
+    <div class="px-4 py-2.5 rounded-md border flex items-start gap-2 text-sm alert-message
+        {% if message.tags == 'success' %}
+            bg-green-50 border-green-200 text-green-700
+        {% elif message.tags == 'error' %}
+            bg-red-50 border-red-200 text-red-700
+        {% elif message.tags == 'warning' %}
+            bg-yellow-50 border-yellow-200 text-yellow-700
+        {% else %}
+            bg-blue-50 border-blue-200 text-blue-700
+        {% endif %}" role="alert">
+        <div class="flex-shrink-0 mt-0.5">
+            {% if message.tags == 'success' %}
+                <i class="fas fa-check-circle text-green-500 text-xs"></i>
+            {% elif message.tags == 'error' %}
+                <i class="fas fa-exclamation-circle text-red-500 text-xs"></i>
+            {% elif message.tags == 'warning' %}
+                <i class="fas fa-exclamation-triangle text-yellow-500 text-xs"></i>
+            {% else %}
+                <i class="fas fa-info-circle text-blue-500 text-xs"></i>
+            {% endif %}
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-xs sm:text-sm font-medium leading-snug">{{ message }}</p>
+        </div>
+        <button onclick="this.parentElement.style.display='none'" class="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-600 transition">
+            <i class="fas fa-times text-xs"></i>
+        </button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <!-- Dashboard Header -->
 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4 sm:gap-0">
     <div>
@@ -29,7 +65,7 @@
             <i class="fas fa-sync-alt mr-2"></i>
             Refresh
         </button>
-        {% if can_access_reports %}
+        {% if is_admin %}
         <button onclick="exportDashboard()" class="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition">
             <i class="fas fa-download mr-2"></i>
             Export
@@ -37,567 +73,418 @@
         {% endif %}
     </div>
 </div>
-<!-- FIX: closing missing div -->
 
-<!-- Stats Overview - 5 Columns for Role-based visibility -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6 mb-6">
-    <!-- Users Card -->
-    {% if can_access_users %}
-    <a href="{% url 'frontend:users' %}" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
-        <div class="p-4 sm:p-6">
-            <div class="flex items-center gap-3 sm:gap-4">
-                <div class="flex-shrink-0">
-                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-users text-blue-600 text-lg sm:text-xl"></i>
-                    </div>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-xs sm:text-sm font-medium text-gray-500">Active Users</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ user_count|default:0 }}</p>
-                    <p class="text-xs sm:text-sm text-green-600">
-                        <i class="fas fa-arrow-up mr-1"></i>
-                        +5.2% from last month
-                    </p>
-                </div>
-            </div>
-        </div>
-    </a>
-    {% endif %}
+<!-- ACTION-DRIVEN DASHBOARD -->
+<div class="space-y-6">
 
-    <!-- Open Assets Card -->
-    {% if can_access_assets %}
-    <a href="{% url 'frontend:assets' %}?status=maintenance" class="bg-white rounded-lg shadow-sm border border-orange-200 hover:shadow-md transition-shadow block">
-        <div class="p-4 sm:p-6">
-            <div class="flex items-center gap-3 sm:gap-4">
-                <div class="flex-shrink-0">
-                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-exclamation-triangle text-orange-600 text-lg sm:text-xl"></i>
+    <!-- SECTION 1: MY RESPONSIBILITY (Role-aware) -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-4 sm:p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-user-tie text-indigo-600"></i>
                     </div>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-xs sm:text-sm font-medium text-gray-500">Open Assets</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ open_assets_count|default:0 }}</p>
-                    <p class="text-xs sm:text-sm text-orange-600">
-                        <i class="fas fa-wrench mr-1"></i>
-                        Needs attention
-                    </p>
-                </div>
-            </div>
-        </div>
-    </a>
-    {% endif %}
-
-    <!-- Active Assets Card -->
-    {% if can_access_assets %}
-    <a href="{% url 'frontend:assets' %}?status=active" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
-        <div class="p-4 sm:p-6">
-            <div class="flex items-center gap-3 sm:gap-4">
-                <div class="flex-shrink-0">
-                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-desktop text-green-600 text-lg sm:text-xl"></i>
-                    </div>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-xs sm:text-sm font-medium text-gray-500">Active Assets</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ asset_count|default:0 }}</p>
-                    <p class="text-xs sm:text-sm text-blue-600">
-                        <i class="fas fa-arrow-right mr-1"></i>
-                        12 new this week
-                    </p>
-                </div>
-            </div>
-        </div>
-    </a>
-    {% endif %}
-
-    <!-- Projects Card -->
-    {% if can_access_projects %}
-    <a href="{% url 'frontend:projects' %}" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
-        <div class="p-4 sm:p-6">
-            <div class="flex items-center gap-3 sm:gap-4">
-                <div class="flex-shrink-0">
-                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-project-diagram text-yellow-600 text-lg sm:text-xl"></i>
-                    </div>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-xs sm:text-sm font-medium text-gray-500">Active Projects</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ project_count|default:0 }}</p>
-                    <p class="text-xs sm:text-sm text-yellow-600">
-                        <i class="fas fa-clock mr-1"></i>
-                        3 due this week
-                    </p>
-                </div>
-            </div>
-        </div>
-    </a>
-    {% endif %}
-
-    <!-- Tickets Card -->
-    <a href="{% url 'frontend:tickets' %}?status=open" class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow block">
-        <div class="p-4 sm:p-6">
-            <div class="flex items-center gap-3 sm:gap-4">
-                <div class="flex-shrink-0">
-                    <div class="w-10 sm:w-12 h-10 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-ticket-alt text-red-600 text-lg sm:text-xl"></i>
-                    </div>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-xs sm:text-sm font-medium text-gray-500">Open Tickets</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ ticket_count|default:0 }}</p>
-                    <p class="text-xs sm:text-sm text-red-600">
-                        <i class="fas fa-exclamation-triangle mr-1"></i>
-                        2 high priority
-                    </p>
-                </div>
-            </div>
-        </div>
-    </a>
-</div>
-<!-- FIX: closing missing div -->
-
-<!-- Main Content Grid -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-    <!-- Recent Activity -->
-    <div class="lg:col-span-2">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div class="p-4 sm:p-6 border-b border-gray-200">
-                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-                    <h3 class="text-base sm:text-lg font-medium text-gray-900">Recent Activity (Last 10)</h3>
-                    <div class="flex items-center gap-2">
-                        <form method="GET" action="" class="flex items-center gap-2" id="activity-search-form">
-                            {% if can_access_logs %}
-                            <a href="{% url 'frontend:logs' %}" class="text-xs sm:text-sm text-primary-600 hover:text-primary-700 font-medium mr-2">View all</a>
-                            {% endif %}
-                            <input type="text" 
-                                   name="activity_search" 
-                                   value="{{ request.GET.activity_search|default:'' }}"
-                                   placeholder="Search..."
-                                   class="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 w-28 sm:w-40"
-                                   id="activity-search-input">
-                            {% if request.GET.activity_search %}
-                            <a href="?" class="text-xs text-gray-500 hover:text-gray-700">Clear</a>
-                            {% endif %}
-                            <button type="submit" class="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-md transition-colors">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-<div class="p-4 sm:p-6">
-                <div class="space-y-4">
-                    {% for activity in recent_activities %}
-                    {% if activity.target_type and activity.target_id %}
-                    <a href="{% if activity.target_type == 'ticket' %}{% url 'frontend:ticket-detail' activity.target_id %}{% elif activity.target_type == 'asset' %}{% url 'frontend:asset-detail' activity.target_id %}{% elif activity.target_type == 'project' %}{% url 'frontend:project-detail' activity.target_id %}{% elif activity.target_type == 'user' %}{% url 'frontend:user-detail' activity.target_id %}{% else %}{% url 'frontend:logs' %}{% endif %}" class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors block">
-                    {% else %}
-                    <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                    {% endif %}
-                        <div class="flex-shrink-0">
-                            {% if activity.level == 'ERROR' %}
-                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-exclamation-triangle text-red-600 text-xs"></i>
-                                </div>
-                            {% elif activity.level == 'WARNING' %}
-                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-exclamation text-yellow-600 text-xs"></i>
-                                </div>
-                            {% elif activity.level == 'SUCCESS' %}
-                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-check-circle text-green-600 text-xs"></i>
-                                </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">My Responsibility</h3>
+                        <p class="text-sm text-gray-500">
+                            {% if user_role == 'IT_ADMIN' %}
+                                Projects and tickets assigned to you
                             {% else %}
-                                <div class="w-7 sm:w-8 h-7 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-info-circle text-blue-600 text-xs"></i>
-                                </div>
+                                Tickets assigned to you or created by you
                             {% endif %}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs sm:text-sm font-medium text-gray-900">{{ activity.action_label|default:activity.action|default:"Activity" }}</p>
-                            <p class="text-xs sm:text-sm text-gray-600">{{ activity.description|default:"" }}</p>
-                            <div class="flex items-center gap-1 sm:gap-2 mt-1 text-xs text-gray-500">
-                                <span>{{ activity.timestamp|timesince }} ago</span>
-                                {% if activity.actor_username %}
-                                <span>•</span>
-                                <span>by {{ activity.actor_username }}</span>
-                                {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex gap-4 text-sm flex-wrap justify-end">
+                    {% if user_role != 'IT_ADMIN' %}
+                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
+                        <strong>{{ my_assigned_count }}</strong> Assigned
+                    </span>
+                    <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full">
+                        <strong>{{ my_created_count }}</strong> Created
+                    </span>
+                    {% if my_overdue_count > 0 %}
+                    <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full">
+                        <strong>{{ my_overdue_count }}</strong> Overdue
+                    </span>
+                    {% endif %}
+                    {% else %}
+                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full">
+                        <strong>{{ my_projects_count }}</strong> Projects
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="p-4 sm:p-6">
+            {% if user_role == 'IT_ADMIN' and my_projects %}
+            <!-- ITADMIN PROJECTS SECTION -->
+            <div class="mb-6">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <i class="fas fa-folder-open text-indigo-600"></i>
+                    Assigned Projects
+                </h4>
+                <div class="grid gap-3">
+                    {% for project in my_projects %}
+                    <a href="{% url 'frontend:project-detail' project.id %}" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition border-l-4 border-indigo-500">
+                        <div class="flex items-center gap-3 flex-1">
+                            <i class="fas fa-project-diagram text-indigo-600"></i>
+                            <div class="min-w-0 flex-1">
+                                <span class="text-sm font-medium text-gray-900 block truncate">{{ project.name }}</span>
+                                <span class="text-xs text-gray-500">{{ project.description|truncatechars:50 }}</span>
                             </div>
                         </div>
-                        <div class="flex-shrink-0">
-                            <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                {% if activity.level == 'ERROR' %}bg-red-100 text-red-800
-                                {% elif activity.level == 'WARNING' %}bg-yellow-100 text-yellow-800
-                                {% elif activity.level == 'SUCCESS' %}bg-green-100 text-green-800
-                                {% else %}bg-blue-100 text-blue-800{% endif %}">
-                                {{ activity.level|default:"INFO" }}
+                        <div class="flex items-center gap-3">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium
+                                {% if project.status == 'PLANNING' %}bg-gray-100 text-gray-800
+                                {% elif project.status == 'IN_PROGRESS' %}bg-blue-100 text-blue-800
+                                {% elif project.status == 'ON_HOLD' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-green-100 text-green-800{% endif %}">
+                                {{ project.get_status_display }}
                             </span>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
                         </div>
-                    {% if activity.target_type and activity.target_id %}
                     </a>
-                    {% else %}
-                    </div>
-                    {% endif %}
-                    {% empty %}
-                    <div class="text-center text-gray-500 py-8">
-                        <i class="fas fa-search text-lg sm:text-2xl mb-2"></i>
-                        <p class="text-xs sm:text-sm">No activity found</p>
-                    </div>
                     {% endfor %}
                 </div>
             </div>
-        </div>
-    </div>
-    <!-- FIX: closing missing div -->
-
-    <!-- Quick Actions & Alerts -->
-    <div class="space-y-4 sm:space-y-6">
-        <!-- Quick Actions -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div class="p-4 sm:p-6 border-b border-gray-200">
-                <h3 class="text-base sm:text-lg font-medium text-gray-900">Quick Actions</h3>
+            {% endif %}
+            {% if my_tickets %}
+            <!-- TICKETS SECTION -->
+            {% if user_role == 'IT_ADMIN' and my_projects %}
+            <div class="pt-6 border-t border-gray-200">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <i class="fas fa-ticket-alt text-blue-600"></i>
+                    Related Tickets
+                </h4>
             </div>
-            <div class="p-4 sm:p-6">
-                <div class="space-y-2 sm:space-y-3">
-                    <a href="{% url 'frontend:create-ticket' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors group">
-                        <div class="text-center">
-                            <i class="fas fa-ticket-alt text-gray-400 group-hover:text-primary-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
-                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-primary-700">Create Ticket</p>
-                        </div>
-                    </a>
-                    
-                    {% if can_access_projects %}
-                    <a href="{% url 'frontend:create-project' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors group">
-                        <div class="text-center">
-                            <i class="fas fa-project-diagram text-gray-400 group-hover:text-purple-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
-                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-purple-700">New Project</p>
-                        </div>
-                    </a>
-                    {% endif %}
-                    
-                    {% if can_access_assets %}
-                    <a href="{% url 'frontend:create-asset' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors group">
-                        <div class="text-center">
-                            <i class="fas fa-desktop text-gray-400 group-hover:text-green-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
-                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-green-700">Add Asset</p>
-                        </div>
-                    </a>
-                    {% endif %}
-                    
-                    {% if can_access_reports %}
-                    <a href="{% url 'frontend:reports' %}" class="w-full flex items-center justify-center p-2 sm:p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors group">
-                        <div class="text-center">
-                            <i class="fas fa-chart-bar text-gray-400 group-hover:text-indigo-500 text-base sm:text-xl mb-1 sm:mb-2"></i>
-                            <p class="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-indigo-700">Generate Report</p>
-                        </div>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- System Alerts -->
-        {% if can_access_security %}
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div class="p-4 sm:p-6 border-b border-gray-200">
-                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-                    <h3 class="text-base sm:text-lg font-medium text-gray-900">Security Events</h3>
-                    <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium 
-                        {% if security_events > 0 %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
-                        {{ security_events|default:0 }} Active
-                    </span>
-                </div>
-            </div>
-            <div class="p-4 sm:p-6">
-                <div class="space-y-2 sm:space-y-3">
-                    {% if security_events_list %}
-                        {% for event in security_events_list %}
-                        <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border 
-                            {% if event.severity == 'CRITICAL' %}bg-red-50 border-red-200
-                            {% elif event.severity == 'HIGH' %}bg-orange-50 border-orange-200
-                            {% elif event.severity == 'MEDIUM' %}bg-yellow-50 border-yellow-200
-                            {% else %}bg-blue-50 border-blue-200{% endif %}">
-                            <i class="fas fa-shield-alt 
-                                {% if event.severity == 'CRITICAL' %}text-red-600
-                                {% elif event.severity == 'HIGH' %}text-orange-600
-                                {% elif event.severity == 'MEDIUM' %}text-yellow-600
-                                {% else %}text-blue-600{% endif %} 
-                                text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-xs sm:text-sm font-medium 
-                                    {% if event.severity == 'CRITICAL' %}text-red-800
-                                    {% elif event.severity == 'HIGH' %}text-orange-800
-                                    {% elif event.severity == 'MEDIUM' %}text-yellow-800
-                                    {% else %}text-blue-800{% endif %}">
-                                    {{ event.event_type_label|default:event.event_type|default:"Security Event" }}
-                                </p>
-                                <p class="text-xs 
-                                    {% if event.severity == 'CRITICAL' %}text-red-600
-                                    {% elif event.severity == 'HIGH' %}text-orange-600
-                                    {% elif event.severity == 'text-yellow-600MEDIUM' %}
-                                    {% else %}text-blue-600{% endif %}">
-                                    {{ event.detected_at|timesince }} ago
-                                </p>
-                            </div>
-                            <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if event.severity == 'CRITICAL' %}bg-red-100 text-red-800
-                                {% elif event.severity == 'HIGH' %}bg-orange-100 text-orange-800
-                                {% elif event.severity == 'MEDIUM' %}bg-yellow-100 text-yellow-800
-                                {% else %}bg-blue-100 text-blue-800{% endif %}">
-                                {{ event.severity }}
-                            </span>
-                        </div>
-                        {% endfor %}
-                    {% elif security_events > 0 %}
-                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-red-50 rounded-lg border border-red-200">
-                        <i class="fas fa-shield-alt text-red-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs sm:text-sm font-medium text-red-800">Security Events</p>
-                            <p class="text-xs text-red-600">{{ security_events }} active security events require attention</p>
-                        </div>
+            {% endif %}
+            <div class="grid gap-3">
+                {% for ticket in my_tickets %}
+                <a href="{% url 'frontend:ticket-detail' ticket.id %}" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <div class="flex items-center gap-3">
+                        <span class="px-2 py-1 rounded text-xs font-medium
+                            {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800
+                            {% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800
+                            {% elif ticket.priority == 'MEDIUM' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-green-100 text-green-800{% endif %}">
+                            {{ ticket.priority }}
+                        </span>
+                        <span class="text-sm font-medium text-gray-900">{{ ticket.title|truncatechars:50 }}</span>
                     </div>
+                    <div class="flex items-center gap-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium
+                            {% if ticket.status == 'NEW' %}bg-gray-100 text-gray-800
+                            {% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800
+                            {% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-green-100 text-green-800{% endif %}">
+                            {{ ticket.get_status_display }}
+                        </span>
+                        <i class="fas fa-chevron-right text-gray-400"></i>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-clipboard-check text-4xl mb-3 text-gray-300"></i>
+                <p>
+                    {% if user_role == 'IT_ADMIN' %}
+                        No projects or tickets in your responsibility
                     {% else %}
-                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
-                        <i class="fas fa-check-circle text-green-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs sm:text-sm font-medium text-green-800">Security Status</p>
-                            <p class="text-xs text-green-600">No active security events</p>
+                        No tickets in your responsibility
+                    {% endif %}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- SECTION 2: SLA RISK INDICATORS -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- SLA Risks -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 sm:p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 {% if critical_sla_count > 0 %}bg-red-100{% else %}bg-green-100{% endif %} rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clock text-{% if critical_sla_count > 0 %}red{% else %}green{% endif %}-600"></i>
                         </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">SLA Risk Indicators</h3>
+                            <p class="text-sm text-gray-500">Tickets at risk of SLA breach</p>
+                        </div>
+                    </div>
+                    {% if sla_risk_count > 0 %}
+                    <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                        {{ sla_risk_count }} at risk
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="p-4 sm:p-6">
+                {% if sla_risks %}
+                <div class="space-y-3">
+                    {% for ticket in sla_risks %}
+                    <div class="flex items-center justify-between p-3 rounded-lg border transition-colors
+                        {% if ticket.risk_level == 'breached' %}bg-red-50 border-red-200 dark:bg-red-900 dark:bg-opacity-25 dark:border-red-700
+                        {% elif ticket.risk_level == 'critical' %}bg-orange-50 border-orange-200 dark:bg-orange-900 dark:bg-opacity-25 dark:border-orange-700
+                        {% else %}bg-yellow-50 border-yellow-200 dark:bg-yellow-900 dark:bg-opacity-25 dark:border-yellow-700{% endif %}">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ ticket.title|truncatechars:40 }}</span>
+                                <span class="px-1.5 py-0.5 rounded text-xs font-medium
+                                    {% if ticket.risk_level == 'breached' %}bg-red-200 text-red-800 dark:bg-red-700 dark:text-red-100
+                                    {% elif ticket.risk_level == 'critical' %}bg-orange-200 text-orange-800 dark:bg-orange-700 dark:text-orange-100
+                                    {% else %}bg-yellow-200 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100{% endif %}">
+                                    {{ ticket.risk_level|title }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ ticket.hours_elapsed }}/{{ ticket.sla_hours }}h elapsed • 
+                                {% if ticket.remaining_hours <= 0 %}
+                                    <span class="font-semibold {% if ticket.risk_level == 'breached' %}text-red-700 dark:text-red-300{% else %}text-orange-700 dark:text-orange-300{% endif %}">Breached by {{ ticket.remaining_hours|floatformat:0 }}h</span>
+                                {% else %}
+                                    <span class="font-semibold text-yellow-700 dark:text-yellow-300">{{ ticket.remaining_hours|floatformat:0 }}h remaining</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <a href="{% url 'frontend:ticket-detail' ticket.id %}" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium transition-colors">
+                            View
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-6 text-gray-500">
+                    <i class="fas fa-shield-alt text-3xl mb-2 text-green-300"></i>
+                    <p>All tickets within SLA</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 sm:p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Today's Overview</h3>
+            </div>
+            <div class="p-4 sm:p-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 bg-gray-50 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-gray-900">{{ stats.open_tickets|default:0 }}</p>
+                        <p class="text-sm text-gray-500">Open Tickets</p>
+                    </div>
+                    <div class="p-4 bg-green-50 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-green-600">{{ stats.resolved_today|default:0 }}</p>
+                        <p class="text-sm text-gray-500">Resolved Today</p>
+                    </div>
+                    <div class="p-4 bg-blue-50 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-blue-600">{{ stats.new_today|default:0 }}</p>
+                        <p class="text-sm text-gray-500">New Today</p>
+                    </div>
+                    {% if is_admin %}
+                    <div class="p-4 bg-purple-50 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-purple-600">{{ stats.active_projects|default:0 }}</p>
+                        <p class="text-sm text-gray-500">Active Projects</p>
                     </div>
                     {% endif %}
-                    
-                    {% if system_errors > 0 %}
-                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <i class="fas fa-exclamation-triangle text-yellow-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs sm:text-sm font-medium text-yellow-800">System Errors</p>
-                            <p class="text-xs text-yellow-600">{{ system_errors }} system errors detected</p>
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="flex items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
-                        <i class="fas fa-check-circle text-green-600 text-base flex-shrink-0 mt-0.5 sm:mt-0"></i>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs sm:text-sm font-medium text-green-800">System Status</p>
-                            <p class="text-xs text-green-600">All systems operational</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
-        {% endif %}
     </div>
-</div>
-<!-- FIX: closing missing div -->
 
-<!-- Charts Section -->
-{% if can_access_assets %}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <!-- Asset Status Overview -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="p-6 border-b border-gray-200">
-            <div class="flex items-center justify-between">
-                <h3 class="text-lg font-medium text-gray-900">Asset Status Overview</h3>
-                <a href="{% url 'frontend:assets' %}" class="text-sm text-primary-600 hover:text-primary-700">View all</a>
+    <!-- SECTION 3: UNASSIGNED / STALLED TICKETS (Admin Only) -->
+    {% if is_admin %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Unassigned Tickets -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 sm:p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 {% if unassigned_count > 0 %}bg-orange-100{% else %}bg-green-100{% endif %} rounded-lg flex items-center justify-center">
+                            <i class="fas fa-user-plus text-{% if unassigned_count > 0 %}orange{% else %}green{% endif %}-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Unassigned Tickets</h3>
+                            <p class="text-sm text-gray-500">Tickets waiting for assignment</p>
+                        </div>
+                    </div>
+                    {% if unassigned_count > 0 %}
+                    <span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
+                        {{ unassigned_count }} pending
+                    </span>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        <div class="p-6">
-            <div class="h-64 flex items-center justify-center relative">
-                {% if asset_status_counts and asset_status_labels %}
-                <canvas id="assetStatusChart"></canvas>
+            <div class="p-4 sm:p-6">
+                {% if unassigned_tickets %}
+                <div class="space-y-3">
+                    {% for ticket in unassigned_tickets %}
+                    <div class="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ ticket.title|truncatechars:45 }}</p>
+                            <p class="text-xs text-gray-500">Created by {{ ticket.created_by }} • {{ ticket.created_at|timesince }} ago</p>
+                        </div>
+                        <a href="{% url 'frontend:ticket-detail' ticket.id %}" class="text-orange-600 hover:text-orange-800 text-sm font-medium">
+                            Assign
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
                 {% else %}
-                <div class="text-center">
-                    <i class="fas fa-chart-pie text-4xl text-gray-400 mb-4"></i>
-                    <p class="text-gray-500">No asset data available</p>
-                    <p class="text-sm text-gray-400">Add assets to see status distribution</p>
+                <div class="text-center py-6 text-gray-500">
+                    <i class="fas fa-check-circle text-3xl mb-2 text-green-300"></i>
+                    <p>No unassigned tickets</p>
+                </div>
+                {% endif %}
+            </div>
+        </a>
+
+        <!-- Stalled Tickets -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 sm:p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 {% if stalled_count > 0 %}bg-yellow-100{% else %}bg-green-100{% endif %} rounded-lg flex items-center justify-center">
+                            <i class="fas fa-pause text-{% if stalled_count > 0 %}yellow{% else %}green{% endif %}-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Stalled Tickets</h3>
+                            <p class="text-sm text-gray-500">No update for 24+ hours</p>
+                        </div>
+                    </div>
+                    {% if stalled_count > 0 %}
+                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                        {{ stalled_count }} stalled
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="p-4 sm:p-6">
+                {% if stalled_tickets %}
+                <div class="space-y-3">
+                    {% for ticket in stalled_tickets %}
+                    <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ ticket.title|truncatechars:45 }}</p>
+                            <p class="text-xs text-gray-500">{{ ticket.assigned_to }} • Stalled {{ ticket.hours_stalled }}h</p>
+                        </div>
+                        <a href="{% url 'frontend:ticket-detail' ticket.id %}" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium">
+                            Update
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-6 text-gray-500">
+                    <i class="fas fa-check-circle text-3xl mb-2 text-green-300"></i>
+                    <p>No stalled tickets</p>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
+    {% endif %}
 
-    {% if can_access_projects %}
+    <!-- SECTION 4: RECENT EXPLAINABLE LOGS -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="p-6 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Project Timeline</h3>
+        <div class="p-4 sm:p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Recent Activity</h3>
         </div>
-        <div class="p-6">
-            <div class="space-y-4">
-                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                    <div>
-                        <p class="text-sm font-medium text-blue-900">IT Infrastructure Upgrade</p>
-                        <p class="text-xs text-blue-600">Due: Dec 30, 2025</p>
+        <div class="p-4 sm:p-6">
+            {% if recent_logs %}
+            <div class="space-y-3">
+                {% for log in recent_logs %}
+                <div class="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition">
+                    <div class="w-8 h-8 bg-{{ log.level_color }}-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <i class="fas {{ log.level_icon }} text-{{ log.level_color }}-600 text-xs"></i>
                     </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        75%
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900">{{ log.action_label }}</p>
+                        <p class="text-sm text-gray-600 truncate">{{ log.description }}</p>
+                        <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                            <span>{{ log.timestamp|timesince }} ago</span>
+                            <span>by {{ log.actor_username }}</span>
+                            {% if log.target_type %}
+                            <span>on {{ log.target_type }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium bg-{{ log.level_color }}-100 text-{{ log.level_color }}-800">
+                        {{ log.level }}
                     </span>
                 </div>
-                
-                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <div>
-                        <p class="text-sm font-medium text-green-900">Security Audit</p>
-                        <p class="text-xs text-green-600">Due: Jan 15, 2026</p>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-history text-4xl mb-3 text-gray-300"></i>
+                <p>No recent activity</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- SECTION 5: SECURITY EVENTS (Admin Only) -->
+    {% if is_admin %}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-4 sm:p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 {% if security_count > 0 %}bg-red-100{% else %}bg-green-100{% endif %} rounded-lg flex items-center justify-center">
+                        <i class="fas fa-shield-alt text-{% if security_count > 0 %}red{% else %}green{% endif %}-600"></i>
                     </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        45%
-                    </span>
-                </div>
-                
-                <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                     <div>
-                        <p class="text-sm font-medium text-yellow-900">User Training Program</p>
-                        <p class="text-xs text-yellow-600">Due: Feb 1, 2026</p>
+                        <h3 class="text-lg font-semibold text-gray-900">Security Events</h3>
+                        <p class="text-sm text-gray-500">Active security incidents</p>
                     </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        20%
-                    </span>
                 </div>
+                {% if security_count > 0 %}
+                <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                    {{ security_count }} active
+                </span>
+                {% endif %}
             </div>
         </div>
+        <div class="p-4 sm:p-6">
+            {% if security_events %}
+            <div class="space-y-3">
+                {% for event in security_events %}
+                <div class="flex items-center justify-between p-3 rounded-lg border
+                    {% if event.severity == 'CRITICAL' %}bg-red-50 border-red-200
+                    {% elif event.severity == 'HIGH' %}bg-orange-50 border-orange-200
+                    {% elif event.severity == 'MEDIUM' %}bg-yellow-50 border-yellow-200
+                    {% else %}bg-blue-50 border-blue-200{% endif %}">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-exclamation-triangle text-{% if event.severity == 'CRITICAL' %}red{% elif event.severity == 'HIGH' %}orange{% elif event.severity == 'MEDIUM' %}yellow{% else %}blue{% endif %}-600"></i>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ event.type }}</p>
+                            <p class="text-xs text-gray-500">{{ event.detected_at|timesince }} ago</p>
+                        </div>
+                    </div>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium
+                        {% if event.severity == 'CRITICAL' %}bg-red-100 text-red-800
+                        {% elif event.severity == 'HIGH' %}bg-orange-100 text-orange-800
+                        {% elif event.severity == 'MEDIUM' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ event.severity }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-gray-500">
+                <i class="fas fa-check-shield text-3xl mb-2 text-green-300"></i>
+                <p>No active security events</p>
+            </div>
+            {% endif %}
+        </div>
     </div>
-    <!-- FIX: closing missing div -->
     {% endif %}
-</div>
-<!-- FIX: closing missing div -->
-{% endif %}
 
-<!-- Recent Tickets -->
-<div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-    <div class="p-6 border-b border-gray-200">
-        <div class="flex items-center justify-between">
-            <h3 class="text-lg font-medium text-gray-900">Recent Tickets</h3>
-            <a href="{% url 'frontend:tickets' %}" class="text-sm text-primary-600 hover:text-primary-700">View all</a>
-        </div>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for ticket in recent_tickets %}
-                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='{% url 'frontend:ticket-detail' ticket.id %}'">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">{{ ticket.title }}</div>
-                        {% if ticket.description %}
-                        <div class="text-sm text-gray-500 truncate max-w-xs">{{ ticket.description }}</div>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                            {% if ticket.status == 'NEW' %}bg-gray-100 text-gray-800
-                            {% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800
-                            {% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
-                            {% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800
-                            {% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-600
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ ticket.get_status_display|default:ticket.status }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                            {% if ticket.priority == 'HIGH' %}bg-red-100 text-red-800
-                            {% elif ticket.priority == 'MEDIUM' %}bg-yellow-100 text-yellow-800
-                            {% elif ticket.priority == 'LOW' %}bg-green-100 text-green-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ ticket.get_priority_display|default:ticket.priority }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {% if ticket.created_at %}
-                        {{ ticket.created_at|timesince }} ago
-                        {% else %}
-                        Unknown
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" class="px-6 py-8 text-center text-gray-500">
-                        <i class="fas fa-ticket-alt text-3xl mb-3 text-gray-300"></i>
-                        <p>No recent tickets found</p>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
 </div>
-<!-- FIX: closing missing div -->
-
-<!-- Recent Assets -->
-{% if can_access_assets %}
-<div class="bg-white rounded-lg shadow-sm border border-gray-200">
-    <div class="p-6 border-b border-gray-200">
-        <div class="flex items-center justify-between">
-            <h3 class="text-lg font-medium text-gray-900">Recent Assets</h3>
-            <a href="{% url 'frontend:assets' %}" class="text-sm text-primary-600 hover:text-primary-700">View all</a>
-        </div>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for asset in recent_assets %}
-<tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='{% url 'frontend:asset-detail' asset.id %}'">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">{{ asset.name }}</div>
-                        {% if asset.asset_tag %}
-                        <div class="text-sm text-gray-500">{{ asset.asset_tag }}</div>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                            {% if asset.status == 'ACTIVE' %}bg-green-100 text-green-800
-                            {% elif asset.status == 'MAINTENANCE' %}bg-orange-100 text-orange-800
-                            {% elif asset.status == 'INACTIVE' %}bg-gray-100 text-gray-800
-                            {% elif asset.status == 'RETIRED' %}bg-red-100 text-red-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ asset.get_status_display|default:asset.status }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        {% if asset.category %}
-                        <span class="text-sm text-gray-900">{{ asset.category.name }}</span>
-                        {% else %}
-                        <span class="text-sm text-gray-500">Uncategorized</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {% if asset.created_at %}
-                        {{ asset.created_at|timesince }} ago
-                        {% else %}
-                        Unknown
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" class="px-6 py-8 text-center text-gray-500">
-                        <i class="fas fa-desktop text-3xl mb-3 text-gray-300"></i>
-                        <p>No recent assets found</p>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-<!-- FIX: closing missing div -->
-{% endif %}
-
 {% endblock %}
 
 {% block extra_js %}
@@ -635,124 +522,6 @@ document.addEventListener('DOMContentLoaded', function() {
             link.classList.add('bg-primary-100', 'text-primary-700');
         }
     });
-    
-    const searchInput = document.getElementById('activity-search-input');
-    if (searchInput) {
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                this.form.submit();
-            }
-        });
-    }
-    
-    // Initialize Asset Status Chart
-    initAssetStatusChart();
 });
-
-// Asset Status Chart initialization
-function initAssetStatusChart() {
-    const ctx = document.getElementById('assetStatusChart');
-    if (!ctx) return;
-    
-    // Get data from template context
-    const assetStatusCounts = {{ asset_status_counts|default:"{}"|safe }};
-    const assetStatusLabels = {{ asset_status_labels|default:"{}"|safe }};
-    
-    // Prepare chart data - only include statuses with counts > 0
-    const labels = [];
-    const data = [];
-    const backgroundColors = [];
-    const borderColors = [];
-    
-    // Status color mapping
-    const statusColors = {
-        'ACTIVE': { bg: 'rgba(16, 185, 129, 0.8)', border: 'rgba(16, 185, 129, 1)' },      // Green
-        'INACTIVE': { bg: 'rgba(107, 114, 128, 0.8)', border: 'rgba(107, 114, 128, 1)' },  // Gray
-        'IN_REPAIR': { bg: 'rgba(245, 158, 11, 0.8)', border: 'rgba(245, 158, 11, 1)' },    // Amber/Orange
-        'RETIRED': { bg: 'rgba(239, 68, 68, 0.8)', border: 'rgba(239, 68, 68, 1)' },        // Red
-        'DISPOSED': { bg: 'rgba(139, 92, 246, 0.8)', border: 'rgba(139, 92, 246, 1)' },      // Purple
-        'MISSING': { bg: 'rgba(234, 179, 8, 0.8)', border: 'rgba(234, 179, 8, 1)' }         // Yellow
-    };
-    
-    // Build chart data from status counts
-    for (const [status, count] of Object.entries(assetStatusCounts)) {
-        if (count > 0 && assetStatusLabels[status]) {
-            labels.push(assetStatusLabels[status]);
-            data.push(count);
-            
-            const colors = statusColors[status] || { bg: 'rgba(156, 163, 175, 0.8)', border: 'rgba(156, 163, 175, 1)' };
-            backgroundColors.push(colors.bg);
-            borderColors.push(colors.border);
-        }
-    }
-    
-    // Check if we have data to display
-    if (labels.length === 0) {
-        // Hide canvas and show empty state
-        ctx.style.display = 'none';
-        return;
-    }
-    
-    // Create the chart
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: backgroundColors,
-                borderColor: borderColors,
-                borderWidth: 2,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true,
-                        pointStyle: 'circle',
-                        font: {
-                            size: 12
-                        }
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleFont: {
-                        size: 14,
-                        weight: 'bold'
-                    },
-                    bodyFont: {
-                        size: 13
-                    },
-                    padding: 12,
-                    cornerRadius: 8,
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            },
-            cutout: '60%',
-            animation: {
-                animateScale: true,
-                animateRotate: true,
-                duration: 1000,
-                easing: 'easeOutQuart'
-            }
-        }
-    });
-}
 </script>
 {% endblock %}
-

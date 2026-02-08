@@ -1,11 +1,11 @@
 """
-Custom template tags and filters for the IT Management Platform frontend.
+Custom template filters for the IT Management Platform frontend.
 
 This module provides custom template filters for mathematical operations,
 dictionary access, and other utilities used across frontend templates.
 
 Usage:
-    {% load custom_filters %}
+    {% load frontend_filters %}
     
     {# Mathematical operations #}
     {{ value|divide:total }}
@@ -123,4 +123,3 @@ def get_item(dictionary, key):
         key = str(key).lower()
     
     return dictionary.get(key)
-

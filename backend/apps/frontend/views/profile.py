@@ -227,6 +227,10 @@ class ProfileView(LoginRequiredMixin, TemplateView):
 class LogsView(LoginRequiredMixin, TemplateView):
     """
     Logs management web interface with server-side filtering.
+    
+    Uses LogAdapter to convert ActivityLog models to template-safe dictionaries.
+    NEVER exposes log.user or user objects to templates.
+    All actor information is resolved in the backend.
     """
     template_name = 'frontend/logs.html'
     login_url = 'frontend:login'
@@ -240,17 +244,19 @@ class LogsView(LoginRequiredMixin, TemplateView):
         try:
             from django.contrib.auth import get_user_model
             from apps.logs.services.activity_service import ActivityService
+            from apps.logs.services.log_adapter import LogAdapter
             from datetime import datetime
             
             User = get_user_model()
             service = ActivityService()
+            adapter = LogAdapter()
             request = self.request
             
             # Read and normalize GET parameters for filtering
             raw_search = request.GET.get('search', '')
             raw_username = request.GET.get('username', '')
             raw_action = request.GET.get('action', '')
-            raw_actor_role = request.GET.get('actor_role', '')
+            raw_severity = request.GET.get('severity', '')
             raw_start_date = request.GET.get('start_date', '')
             raw_end_date = request.GET.get('end_date', '')
             raw_hour_from = request.GET.get('hour_from', '')
@@ -260,7 +266,7 @@ class LogsView(LoginRequiredMixin, TemplateView):
             search = self._clean(raw_search) or None
             username = self._clean(raw_username) or None
             action = self._clean(raw_action) or None
-            actor_role = self._clean(raw_actor_role) or None
+            severity = self._clean(raw_severity) or None
             hour_from = self._clean(raw_hour_from) or None
             hour_to = self._clean(raw_hour_to) or None
             
@@ -279,12 +285,11 @@ class LogsView(LoginRequiredMixin, TemplateView):
                     pass
             
             # Call ActivityService with filters (includes RBAC)
-            recent_logs = service.get_activity_logs(
+            activity_logs = service.get_activity_logs(
                 user=request.user,
                 search=search,
                 username=username,
                 action=action,
-                actor_role=actor_role,
                 start_date=start_date,
                 end_date=end_date,
                 hour_from=hour_from,
@@ -292,18 +297,23 @@ class LogsView(LoginRequiredMixin, TemplateView):
                 limit=100
             )
             
+            # Convert to template-safe dicts using LogAdapter
+            # This NEVER exposes log.user to templates
+            log_entries = adapter.to_template_dicts(activity_logs)
+            
             security_events = SecurityEvent.objects.select_related('affected_user').order_by('-detected_at')[:50]
             all_users = User.objects.all().order_by('username')
         except Exception as e:
             import traceback
             print(f"[LOGS_VIEW] Error: {e}")
             traceback.print_exc()
-            recent_logs = []
+            log_entries = []
             security_events = []
             all_users = []
         
+        # Pass ONLY log_entries to template - no ActivityLog objects, no user FKs
         context.update({
-            'recent_logs': recent_logs,
+            'log_entries': log_entries,
             'security_events': security_events,
             'all_users': all_users
         })
@@ -312,12 +322,21 @@ class LogsView(LoginRequiredMixin, TemplateView):
 
 class ReportsView(LoginRequiredMixin, TemplateView):
     """
-    Reports and analytics web interface with audit-grade activity logging.
+    Reports and analytics web interface.
+    
+    Uses ReportsQueryService for Clean Architecture - all business logic resolved
+    in backend, templates receive fully resolved data structures.
     """
     template_name = 'frontend/reports.html'
     login_url = 'frontend:login'
     
     def get_context_data(self, **kwargs):
+        """
+        Build context for reports page with real data from database.
+        
+        Data Flow:
+            DB Query → ReportsQueryService → View Context → Template Render
+        """
         context = super().get_context_data(**kwargs)
         request = self.request
         
@@ -329,186 +348,59 @@ class ReportsView(LoginRequiredMixin, TemplateView):
         )
         
         try:
-            # Basic counts with permission checks
-            if is_admin:
-                total_assets = Asset.objects.count() if Asset else 0
-                active_users = User.objects.filter(is_active=True).count() if User else 0
-            else:
-                total_assets = Asset.objects.filter(
-                    Q(assigned_to=request.user) | Q(assigned_to__isnull=True)
-                ).count() if Asset else 0
-                active_users = 1
+            # Use ReportsQueryService to get real data
+            from apps.frontend.services.reports_query_service import ReportsQueryService
             
-            active_projects = Project.objects.filter(status__in=['PLANNING', 'ACTIVE']).count() if Project else 0
-            open_tickets = Ticket.objects.filter(status__in=['NEW', 'OPEN', 'IN_PROGRESS']).count() if Ticket else 0
-            recent_security_events = SecurityEvent.objects.filter(
-                detected_at__gte=timezone.now() - timedelta(days=7)
-            ).count() if SecurityEvent else 0
+            report_service = ReportsQueryService()
             
-            # Recent Tickets with full audit information
-            if Ticket:
-                if is_admin:
-                    recent_tickets = Ticket.objects.select_related(
-                        'created_by', 'category', 'assigned_to'
-                    ).order_by('-created_at')[:20]
-                else:
-                    recent_tickets = Ticket.objects.filter(
-                        Q(created_by=request.user) | Q(assigned_to=request.user)
-                    ).select_related('created_by', 'category', 'assigned_to').order_by('-created_at')[:20]
-            else:
-                recent_tickets = []
+            # Get all report data
+            report_data = report_service.get_full_report_data(
+                user=request.user,
+                is_admin=is_admin
+            )
             
-            # Ticket Statistics
-            tickets_by_priority = {}
-            tickets_by_status = {}
-            total_tickets = 0
-            if Ticket:
-                for status, label in Ticket.STATUS_CHOICES:
-                    count = Ticket.objects.filter(status=status).count()
-                    tickets_by_status[status] = {'label': label, 'count': count}
-                    total_tickets += count
-                for priority, label in Ticket.PRIORITY_CHOICES:
-                    tickets_by_priority[priority] = {'label': label, 'count': Ticket.objects.filter(priority=priority).count()}
+            # Update context with all data
+            context.update(report_data)
             
-            # Asset Status Distribution
-            asset_status_distribution = {}
-            if Asset:
-                for status, label in Asset.STATUS_CHOICES:
-                    asset_status_distribution[status] = {'label': label, 'count': Asset.objects.filter(status=status).count()}
-            
-            # Recent Activity Logs with full audit-grade details
-            from apps.logs.services.activity_service import ActivityService
-            service = ActivityService()
-            
-            recent_activities = service.get_activity_logs(user=request.user, limit=30)
-            
-            # Build structured activity data for template
-            structured_activities = []
-            for activity in recent_activities:
-                target_type = activity.model_name or ''
-                target_id = activity.object_id
-                target_url = '#'
-                if target_type == 'ticket' and target_id:
-                    target_url = f'/tickets/{target_id}/'
-                elif target_type == 'asset' and target_id:
-                    target_url = f'/assets/{target_id}/'
-                elif target_type == 'project' and target_id:
-                    target_url = f'/projects/{target_id}/'
-                elif target_type == 'user' and target_id:
-                    target_url = f'/users/{target_id}/'
-                
-                actor_username = activity.extra_data.get('actor_username') or activity.user.username if activity.user else 'System'
-                actor_id = activity.extra_data.get('actor_id') or activity.user.id if activity.user else None
-                
-                changes_summary = ''
-                extra_data = activity.extra_data or {}
-                
-                if 'from_status' in extra_data and 'to_status' in extra_data:
-                    changes_summary = f"Status: {extra_data['from_status']} → {extra_data['to_status']}"
-                elif 'from_priority' in extra_data and 'to_priority' in extra_data:
-                    changes_summary = f"Priority: {extra_data['from_priority']} → {extra_data['to_priority']}"
-                elif 'from_assignee' in extra_data and 'to_assignee' in extra_data:
-                    changes_summary = f"Assignee: {extra_data['from_assignee']} → {extra_data['to_assignee']}"
-                elif 'changes' in extra_data:
-                    changes_summary = extra_data['changes']
-                elif activity.description:
-                    changes_summary = activity.description
-                
-                action_icon = self._get_action_icon(activity.action)
-                action_color = self._get_action_color(activity.action)
-                
-                structured_activities.append({
-                    'id': activity.log_id,
-                    'timestamp': activity.timestamp,
-                    'actor': {
-                        'username': actor_username,
-                        'id': actor_id,
-                        'role': activity.extra_data.get('actor_role', activity.user.role if activity.user else 'VIEWER')
-                    },
-                    'action': activity.action,
-                    'action_label': service._get_action_label(activity.action),
-                    'action_icon': action_icon,
-                    'action_color': action_color,
-                    'entity': {
-                        'type': target_type.capitalize() if target_type else 'System',
-                        'id': target_id,
-                        'name': activity.object_repr or '',
-                        'url': target_url
-                    },
-                    'changes_summary': changes_summary,
-                    'level': activity.level,
-                    'description': activity.description,
-                    'ip_address': activity.ip_address,
-                })
-            
+        except ImportError as e:
+            import traceback
+            print(f"[REPORTS_VIEW] ReportsQueryService not available: {e}")
+            traceback.print_exc()
+            # Fallback to empty data
+            context.update({
+                'total_assets': 0,
+                'active_projects': 0,
+                'open_tickets': 0,
+                'active_users': 0,
+                'recent_security_events': 0,
+                'asset_status_distribution': {},
+                'tickets_by_status': {},
+                'tickets_by_priority': {},
+                'total_tickets': 0,
+                'recent_tickets': [],
+                'recent_activities': [],
+                'is_admin': is_admin,
+            })
         except Exception as e:
             import traceback
             print(f"[REPORTS_VIEW] Error: {e}")
             traceback.print_exc()
-            total_assets = 0
-            active_projects = 0
-            open_tickets = 0
-            active_users = 0
-            recent_security_events = 0
-            recent_tickets = []
-            tickets_by_priority = {}
-            tickets_by_status = {}
-            asset_status_distribution = {}
-            structured_activities = []
-        
-        context.update({
-            'total_assets': total_assets,
-            'active_projects': active_projects,
-            'open_tickets': open_tickets,
-            'active_users': active_users,
-            'recent_security_events': recent_security_events,
-            'recent_tickets': recent_tickets,
-            'tickets_by_priority': tickets_by_priority,
-            'tickets_by_status': tickets_by_status,
-            'total_tickets': total_tickets,
-            'asset_status_distribution': asset_status_distribution,
-            'recent_activities': structured_activities,
-            'is_admin': is_admin,
-        })
+            context.update({
+                'total_assets': 0,
+                'active_projects': 0,
+                'open_tickets': 0,
+                'active_users': 0,
+                'recent_security_events': 0,
+                'asset_status_distribution': {},
+                'tickets_by_status': {},
+                'tickets_by_priority': {},
+                'total_tickets': 0,
+                'recent_tickets': [],
+                'recent_activities': [],
+                'is_admin': is_admin,
+            })
         
         return context
-    
-    def _get_action_icon(self, action):
-        """Get icon class for an action."""
-        icons = {
-            'TICKET_CREATED': 'fa-ticket-alt',
-            'TICKET_UPDATED': 'fa-edit',
-            'TICKET_ASSIGNED': 'fa-user-plus',
-            'TICKET_RESOLVED': 'fa-check-circle',
-            'TICKET_DELETED': 'fa-trash',
-            'ASSET_CREATED': 'fa-desktop',
-            'ASSET_UPDATED': 'fa-edit',
-            'ASSET_ASSIGNED': 'fa-hand-paper',
-            'ASSET_DELETED': 'fa-trash',
-            'PROJECT_CREATED': 'fa-project-diagram',
-            'PROJECT_UPDATED': 'fa-edit',
-            'PROJECT_DELETED': 'fa-trash',
-            'USER_CREATED': 'fa-user-plus',
-            'USER_LOGIN': 'fa-sign-in-alt',
-            'USER_LOGOUT': 'fa-sign-out-alt',
-            'USER_UPDATED': 'fa-edit',
-        }
-        return icons.get(action, 'fa-circle')
-    
-    def _get_action_color(self, action):
-        """Get color class for an action type."""
-        colors = {
-            'CREATED': 'text-green-500',
-            'DELETED': 'text-red-500',
-            'ASSIGNED': 'text-blue-500',
-            'RESOLVED': 'text-green-600',
-            'LOGIN': 'text-green-500',
-            'LOGOUT': 'text-gray-500',
-        }
-        for key, color in colors.items():
-            if key in action:
-                return color
-        return 'text-blue-500'
 
 
 # Wrapper functions for URL patterns
