@@ -7,7 +7,9 @@ logs/
 # Python
 .venv/
 __pycache__/
+*.py[cod]
 *.pyc
+*.so
 
 # Env
 .env
