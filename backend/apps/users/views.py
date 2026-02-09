@@ -6,6 +6,12 @@ All permission checks are enforced server-side using domain authority services.
 
 from django.contrib.auth import logout
 from django.db.models import Count, Q
+from django.conf import settings
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.tokens import default_token_generator
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -439,4 +445,193 @@ class LogoutView(APIView):
             return Response({'message': 'Logged out successfully'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ==================== Password Reset API ====================
+
+class PasswordResetRequestAPI(APIView):
+    """
+    API endpoint to request a password reset link.
+    Accepts email address and sends a reset link.
+    """
+    permission_classes = []  # Public endpoint
+    
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        
+        if not email:
+            return Response(
+                {'error': 'Email address is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate email format
+        import re
+        email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_regex, email):
+            return Response(
+                {'error': 'Please enter a valid email address'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user exists
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            # Return success even if user doesn't exist (security)
+            return Response({
+                'message': 'If an account with that email exists, a password reset link has been sent.',
+                'is_development': settings.DEBUG,
+                'reset_link': None
+            })
+        
+        # Generate reset token
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        
+        # Build reset link
+        reset_link = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/" if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL else None
+        
+        # In development mode, return the reset link directly
+        if settings.DEBUG:
+            return Response({
+                'message': 'Password reset link generated (development mode)',
+                'is_development': True,
+                'reset_link': reset_link
+            })
+        
+        # In production, send email
+        try:
+            subject = 'Password Reset Request - IT Management Platform'
+            
+            # Render email template
+            context = {
+                'user': user,
+                'reset_link': reset_link,
+                'uid': uid,
+                'token': token,
+                'site_name': 'IT Management Platform',
+            }
+            
+            html_message = render_to_string('emails/password_reset.html', context)
+            
+            send_mail(
+                subject,
+                html_message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            
+            return Response({
+                'message': 'If an account with that email exists, a password reset link has been sent.',
+                'is_development': False,
+                'reset_link': None
+            })
+            
+        except Exception as e:
+            # Log the error but don't expose details to user
+            print(f"Password reset email error: {str(e)}")
+            
+            # In case of email failure but user exists, return development info
+            return Response({
+                'message': 'Password reset link could not be sent. Please try again later.',
+                'is_development': settings.DEBUG,
+                'reset_link': reset_link if settings.DEBUG else None,
+                'error': 'Email sending failed'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PasswordResetValidateAPI(APIView):
+    """
+    API endpoint to validate a password reset token.
+    Used to check if the reset link is valid before showing the reset form.
+    """
+    permission_classes = []  # Public endpoint
+    
+    def get(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({
+                'valid': False,
+                'error': 'Invalid or expired reset link'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if default_token_generator.check_token(user, token):
+            return Response({
+                'valid': True,
+                'message': 'Reset token is valid'
+            })
+        else:
+            return Response({
+                'valid': False,
+                'error': 'Invalid or expired reset link'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmAPI(APIView):
+    """
+    API endpoint to confirm password reset with new password.
+    """
+    permission_classes = []  # Public endpoint
+    
+    def post(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({
+                'success': False,
+                'error': 'Invalid or expired reset link'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate token
+        if not default_token_generator.check_token(user, token):
+            return Response({
+                'success': False,
+                'error': 'Invalid or expired reset link'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get new password from request
+        new_password = request.data.get('new_password', '')
+        
+        if not new_password:
+            return Response({
+                'success': False,
+                'error': 'New password is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate password strength
+        if len(new_password) < 8:
+            return Response({
+                'success': False,
+                'error': 'Password must be at least 8 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check for common patterns
+        if new_password.isdigit():
+            return Response({
+                'success': False,
+                'error': 'Password cannot be all numbers'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Additional validation: check if password is too common
+        common_passwords = ['password', '12345678', 'qwerty', 'admin', 'administrator']
+        if new_password.lower() in common_passwords:
+            return Response({
+                'success': False,
+                'error': 'This password is too common. Please choose a stronger password.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update password
+        user.set_password(new_password)
+        user.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Your password has been reset successfully. You can now login with your new password.'
+        })
 

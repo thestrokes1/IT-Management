@@ -321,3 +321,22 @@ LOGS_DIR.mkdir(exist_ok=True)
 # When True, logs filter parameters and queryset counts.
 # ALWAYS False in production for security and performance.
 LOGS_DEBUG = False  # Set to True only for debugging
+
+# =============================================================================
+# Email Configuration
+# =============================================================================
+# For development: emails are printed to console
+# For production: configure real SMTP settings via environment variables
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='localhost')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@itmanagement.com')
+
+# Development mode - show reset links in browser
+DEBUG_EMAIL_MODE = config('DEBUG_EMAIL_MODE', default=True, cast=bool)
+
+# Password Reset Settings
+PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=3600, cast=int)  # 1 hour

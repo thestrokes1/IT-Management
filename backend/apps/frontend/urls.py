@@ -46,6 +46,15 @@ from apps.frontend.views import (
     reports,
     export_reports,
     command_palette_api,
+    search_api,
+    dashboard_api,
+    dashboard_stats_context,
+)
+# Import password reset API from users.views (where they are defined)
+from apps.users.views import (
+    PasswordResetRequestAPI,
+    PasswordResetValidateAPI,
+    PasswordResetConfirmAPI,
 )
 
 urlpatterns = [
@@ -105,4 +114,16 @@ urlpatterns = [
     
     # Command Palette API (Ctrl+K)
     path('api/command-palette/', command_palette_api, name='command-palette-api'),
+    
+    # Search API (Global Search)
+    path('api/search/', search_api, name='search-api'),
+    
+    # Dashboard API
+    path('dashboard/api/', dashboard_api, name='dashboard-api'),
+    
+    # Password Reset API
+    path('api/password-reset/request/', PasswordResetRequestAPI.as_view(), name='password-reset-request-api'),
+    path('api/password-reset/validate/<str:uidb64>/<str:token>/', PasswordResetValidateAPI.as_view(), name='password-reset-validate-api'),
+    path('api/password-reset/confirm/<str:uidb64>/<str:token>/', PasswordResetConfirmAPI.as_view(), name='password-reset-confirm-api'),
 ]
+
