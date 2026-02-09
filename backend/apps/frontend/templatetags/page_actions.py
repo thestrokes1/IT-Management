@@ -21,9 +21,7 @@ PAGE_ACTIONS = {
         {'key': 'export_data', 'label': 'Export Data', 'icon': 'fa-download', 'url': 'frontend:reports', 'roles': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']},
     ],
     'tickets': [
-        {'key': 'create_ticket', 'label': 'Create Ticket', 'icon': 'fa-plus', 'url': 'frontend:create-ticket', 'roles': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN', 'VIEWER']},
-        {'key': 'view_all_tickets', 'label': 'All Tickets', 'icon': 'fa-list', 'url': 'frontend:tickets', 'roles': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN', 'VIEWER']},
-        {'key': 'my_tickets', 'label': 'My Tickets', 'icon': 'fa-user', 'url': 'frontend:tickets', 'roles': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN', 'VIEWER']},
+        # Removed: create_ticket, view_all_tickets, my_tickets - Quick Actions section disabled
     ],
     'ticket_detail': [
         {'key': 'edit_ticket', 'label': 'Edit Ticket', 'icon': 'fa-edit', 'url': 'frontend:edit-ticket', 'roles': ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']},

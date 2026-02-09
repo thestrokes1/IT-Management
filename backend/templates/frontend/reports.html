@@ -3,6 +3,131 @@
 
 {% block title %}Reports & Analytics - IT Management Platform{% endblock %}
 
+{% block extra_head %}
+<style>
+/* Dark mode overrides for Reports page */
+html.dark .text-3xl,
+html.dark .text-4xl {
+    color: #f3f4f6;
+}
+html.dark .text-gray-600 {
+    color: #9ca3af !important;
+}
+html.dark .text-gray-700 {
+    color: #d1d5db !important;
+}
+html.dark .text-gray-900 {
+    color: #f3f4f6 !important;
+}
+html.dark .text-gray-500 {
+    color: #9ca3af !important;
+}
+html.dark .bg-gray-200 {
+    background-color: #374151 !important;
+}
+html.dark .bg-gray-100 {
+    background-color: #374151 !important;
+}
+html.dark .bg-gray-50 {
+    background-color: #1f2937 !important;
+}
+/* Priority distribution card backgrounds */
+html.dark .border-red-200 {
+    border-color: #7f1d1d !important;
+    background-color: rgba(127, 29, 29, 0.3) !important;
+}
+html.dark .border-orange-200 {
+    border-color: #92400e !important;
+    background-color: rgba(146, 64, 14, 0.3) !important;
+}
+html.dark .border-blue-200 {
+    border-color: #1e40af !important;
+    background-color: rgba(30, 64, 175, 0.3) !important;
+}
+html.dark .border-gray-200 {
+    border-color: #4b5563 !important;
+    background-color: rgba(75, 85, 99, 0.3) !important;
+}
+/* Priority text colors in dark mode */
+html.dark .text-red-600 {
+    color: #fca5a5 !important;
+}
+html.dark .text-orange-600 {
+    color: #fdba74 !important;
+}
+html.dark .text-blue-600 {
+    color: #93c5fd !important;
+}
+html.dark .text-gray-600 {
+    color: #d1d5db !important;
+}
+/* Status badge backgrounds in dark mode */
+html.dark .bg-blue-100 {
+    background-color: #1e3a8a !important;
+}
+html.dark .text-blue-800 {
+    color: #93c5fd !important;
+}
+html.dark .bg-yellow-100 {
+    background-color: #78350f !important;
+}
+html.dark .text-yellow-800 {
+    color: #fcd34d !important;
+}
+html.dark .bg-green-100 {
+    background-color: #064e3b !important;
+}
+html.dark .text-green-800 {
+    color: #86efac !important;
+}
+html.dark .bg-gray-100 {
+    background-color: #374151 !important;
+}
+html.dark .text-gray-800 {
+    color: #f3f4f6 !important;
+}
+html.dark .bg-orange-100 {
+    background-color: #7c2d12 !important;
+}
+html.dark .text-orange-800 {
+    color: #fdba74 !important;
+}
+/* Table styles in dark mode */
+html.dark table thead.bg-gray-100 {
+    background-color: #374151 !important;
+}
+html.dark table thead.bg-gray-100 th {
+    color: #f3f4f6;
+}
+html.dark table tbody.divide-y.divide-gray-200 td {
+    color: #f3f4f6;
+}
+html.dark table tbody.divide-y.divide-gray-200 td.text-gray-600 {
+    color: #9ca3af !important;
+}
+/* Icon background circles */
+html.dark .bg-blue-100 {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+}
+html.dark .bg-green-100 {
+    background-color: rgba(34, 197, 94, 0.2) !important;
+}
+html.dark .bg-yellow-100 {
+    background-color: rgba(234, 179, 8, 0.2) !important;
+}
+html.dark .bg-purple-100 {
+    background-color: rgba(168, 85, 247, 0.2) !important;
+}
+html.dark .bg-red-100 {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+}
+/* Priority distribution cards */
+html.dark .p-4.rounded-lg.border-2 {
+    background-color: #1f2937 !important;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <div class="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

@@ -19,6 +19,9 @@
         width: 2px;
         background: linear-gradient(to bottom, #3b82f6, #e5e7eb);
     }
+    html.dark .log-timeline::before {
+        background: linear-gradient(to bottom, #3b82f6, #374151);
+    }
     .log-entry {
         position: relative;
         margin-bottom: 1.5rem;
@@ -28,8 +31,15 @@
         overflow: hidden;
         transition: box-shadow 0.2s;
     }
+    html.dark .log-entry {
+        background: #1f2937;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
     .log-entry:hover {
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    html.dark .log-entry:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.4);
     }
     .log-entry::before {
         content: '';
@@ -42,6 +52,10 @@
         background: white;
         border: 2px solid #3b82f6;
         z-index: 1;
+    }
+    html.dark .log-entry::before {
+        background: #1f2937;
+        border: 2px solid #60a5fa;
     }
     .log-header {
         padding: 1rem 1.25rem;
@@ -73,9 +87,15 @@
         font-weight: 600;
         color: #111827;
     }
+    html.dark .log-title {
+        color: #f3f4f6;
+    }
     .log-actor {
         font-size: 0.875rem;
         color: #6b7280;
+    }
+    html.dark .log-actor {
+        color: #9ca3af;
     }
     .log-meta {
         display: flex;
@@ -114,6 +134,10 @@
         background: #f9fafb;
         display: none;
     }
+    html.dark .log-details {
+        border-top-color: #374151;
+        background: #111827;
+    }
     .log-details.expanded {
         display: block;
     }
@@ -129,10 +153,16 @@
         color: #6b7280;
         margin-bottom: 0.25rem;
     }
+    html.dark .detail-label {
+        color: #9ca3af;
+    }
     .detail-value {
         color: #111827;
         font-weight: 500;
         word-break: break-word;
+    }
+    html.dark .detail-value {
+        color: #f3f4f6;
     }
     .detail-value.json {
         font-family: monospace;
@@ -142,6 +172,10 @@
         border-radius: 0.25rem;
         max-height: 200px;
         overflow: auto;
+    }
+    html.dark .detail-value.json {
+        background: #374151;
+        color: #f3f4f6;
     }
     .expand-icon {
         transition: transform 0.2s;
@@ -161,6 +195,37 @@
     }
     .filter-item {
         min-width: 0;
+    }
+    /* Dark mode for filters */
+    html.dark .filter-container .bg-white {
+        background-color: #1f2937 !important;
+    }
+    html.dark .filter-container label {
+        color: #f3f4f6;
+    }
+    /* Dark mode for table headers and cells */
+    html.dark .bg-white.rounded-lg.shadow-md {
+        background-color: #1f2937 !important;
+    }
+    html.dark .text-3xl,
+    html.dark .text-4xl {
+        color: #f3f4f6;
+    }
+    html.dark .text-gray-600 {
+        color: #9ca3af !important;
+    }
+    /* Dark mode for security events table */
+    html.dark table thead.bg-gray-100 {
+        background-color: #374151 !important;
+    }
+    html.dark table thead.bg-gray-100 th {
+        color: #f3f4f6;
+    }
+    html.dark table tbody.divide-y.divide-gray-200 td {
+        color: #f3f4f6;
+    }
+    html.dark table tbody.divide-y.divide-gray-200 td.text-gray-600 {
+        color: #9ca3af !important;
     }
     @media (max-width: 640px) {
         .filter-grid {

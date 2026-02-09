@@ -46,6 +46,9 @@ from apps.frontend.views import (
     reports,
     export_reports,
     command_palette_api,
+    search_api,
+    dashboard_api,
+    dashboard_stats_context,
 )
 
 urlpatterns = [
@@ -105,4 +108,10 @@ urlpatterns = [
     
     # Command Palette API (Ctrl+K)
     path('api/command-palette/', command_palette_api, name='command-palette-api'),
+    
+    # Search API (Global Search)
+    path('api/search/', search_api, name='search-api'),
+    
+    # Dashboard API
+    path('dashboard/api/', dashboard_api, name='dashboard-api'),
 ]

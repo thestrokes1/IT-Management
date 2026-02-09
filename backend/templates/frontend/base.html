@@ -52,92 +52,121 @@
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
+    <!-- Blocking Dark Mode Script - Runs BEFORE any DOM rendering to prevent white flash -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const shouldBeDark = savedTheme === 'dark' || (!savedTheme && systemPrefersDark);
+            
+            if (shouldBeDark) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    
     <!-- Custom CSS -->
     <style>
-        /* Dark Mode Base Styles */
+        /* ===== DARK MODE CSS - Organized & Optimized ===== */
+        
+        /* CSS Custom Properties for Dark Mode - Applied BEFORE JS */
+        html.dark {
+            --bg-primary: #111827;
+            --bg-secondary: #1f2937;
+            --bg-tertiary: #374151;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --border-color: #374151;
+            --border-light: #4b5563;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Color Scheme Support */
         :root {
-            color-scheme: light;
+            color-scheme: light dark;
         }
         
         html.dark {
             color-scheme: dark;
         }
         
-        /* Dark Mode - Body & Main Background */
-        html.dark body {
-            background-color: #111827;
-            color: #f3f4f6;
-        }
-        
-        html.dark .bg-gray-50 {
-            background-color: #1f2937;
-        }
-        
-        html.dark .bg-gray-100 {
-            background-color: #1f2937;
-        }
-        
+        /* Base Backgrounds with CSS Variables and Transitions */
+        html.dark body,
+        html.dark .bg-gray-50,
+        html.dark .bg-gray-100,
         html.dark .bg-white {
-            background-color: #1f2937;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         
-        /* Dark Mode - Text Colors */
-        html.dark .text-gray-400 {
-            color: #9ca3af;
-        }
-        
+        /* Text Colors with Transitions */
+        html.dark .text-gray-400,
         html.dark .text-gray-500 {
-            color: #d1d5db;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
         }
         
-        html.dark .text-gray-600 {
-            color: #e5e7eb;
-        }
-        
-        html.dark .text-gray-700 {
-            color: #f3f4f6;
-        }
-        
-        html.dark .text-gray-800 {
-            color: #f9fafb;
-        }
-        
+        html.dark .text-gray-600,
+        html.dark .text-gray-700,
+        html.dark .text-gray-800,
         html.dark .text-gray-900 {
-            color: #f3f4f6;
+            color: var(--text-primary);
+            transition: color 0.3s ease;
         }
         
-        /* Dark Mode - Border Colors */
-        html.dark .border-gray-200 {
-            border-color: #374151;
-        }
-        
-        html.dark .border-gray-300 {
-            border-color: #4b5563;
-        }
-        
+        /* Border Colors with Transitions */
+        html.dark .border-gray-200,
+        html.dark .border-gray-300,
         html.dark .border-b.border-gray-200 {
-            border-color: #374151;
+            border-color: var(--border-color);
+            transition: border-color 0.3s ease;
         }
         
-        /* Dark Mode - Header */
+        /* Header with Transition */
         html.dark header.bg-white {
-            background-color: #1f2937;
+            background-color: var(--bg-secondary);
+            transition: background-color 0.3s ease;
         }
         
         html.dark header.shadow-sm {
             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
         }
         
-        /* Dark Mode - Input Fields */
+        /* Cards & Panels with Transitions */
+        html.dark .bg-white.rounded-lg {
+            background-color: var(--bg-secondary);
+            transition: background-color 0.3s ease;
+        }
+        
+        /* Sidebar with Transitions */
+        html.dark .sidebar {
+            background-color: var(--bg-secondary);
+            transition: background-color 0.3s ease;
+        }
+        
+        html.dark .nav-link {
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+        
+        html.dark .nav-link:hover {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        /* Form Elements with Transitions */
         html.dark input[type="text"],
         html.dark input[type="email"],
         html.dark input[type="password"],
         html.dark input[type="search"],
         html.dark textarea,
         html.dark select {
-            background-color: #374151;
-            color: #f3f4f6;
-            border-color: #4b5563;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-light);
+            transition: all 0.3s ease;
         }
         
         html.dark input[type="text"]:focus,
@@ -146,167 +175,136 @@
         html.dark input[type="search"]:focus,
         html.dark textarea:focus,
         html.dark select:focus {
-            background-color: #374151;
-            color: #f3f4f6;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
             border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
         }
         
-        html.dark input[type="text"]::placeholder,
-        html.dark input[type="email"]::placeholder,
-        html.dark input[type="password"]::placeholder,
-        html.dark input[type="search"]::placeholder,
+        html.dark input::placeholder,
         html.dark textarea::placeholder {
-            color: #9ca3af;
+            color: var(--text-muted);
         }
         
-        /* Dark Mode - Dropdown & Select */
+        /* Dropdown & Select Options */
         html.dark select option {
-            background-color: #374151;
-            color: #f3f4f6;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
         }
         
-        /* Dark Mode - Hover States */
-        html.dark .hover\:bg-gray-50:hover {
-            background-color: #374151;
-        }
-        
-        html.dark .hover\:bg-gray-100:hover {
-            background-color: #374151;
-        }
-        
-        html.dark .hover\:bg-primary-50:hover {
-            background-color: #1e3a8a;
-        }
-        
-        html.dark .hover\:bg-green-50:hover {
-            background-color: #064e3b;
-        }
-        
-        html.dark .hover\:bg-red-50:hover {
-            background-color: #7f1d1d;
-        }
-        
-        html.dark .hover\:bg-blue-50:hover {
-            background-color: #1e3a8a;
-        }
-        
-        html.dark .hover\:bg-purple-50:hover {
-            background-color: #3f0f5c;
-        }
-        
-        html.dark .hover\:bg-pink-50:hover {
-            background-color: #5f1147;
-        }
-        
-        html.dark .hover\:bg-yellow-50:hover {
-            background-color: #78350f;
-        }
-        
-        html.dark .hover\:bg-indigo-50:hover {
-            background-color: #3730a3;
-        }
-        
-        html.dark .hover\:bg-cyan-50:hover {
-            background-color: #164e63;
-        }
-        
-        html.dark .hover\:text-gray-700:hover {
-            color: #f3f4f6;
-        }
-        
-        html.dark .hover\:text-gray-900:hover {
-            color: #f9fafb;
-        }
-        
-        /* Dark Mode - Shadows */
-        html.dark .shadow,
-        html.dark .shadow-sm,
-        html.dark .shadow-lg,
-        html.dark .shadow-md {
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        /* Dark Mode - Cards & Panels */
-        html.dark .bg-white.rounded-lg {
-            background-color: #1f2937;
-        }
-        
-        /* Dark Mode - Modal */
-        html.dark .modal-content {
-            background: #1f2937;
-        }
-        
-        html.dark .modal-header {
-            color: #f3f4f6;
-        }
-        
-        html.dark .modal-body {
-            color: #d1d5db;
-        }
-        
-        html.dark .modal-btn-cancel {
-            background-color: #374151;
-            color: #f3f4f6;
-        }
-        
-        html.dark .modal-btn-cancel:hover {
-            background-color: #4b5563;
-        }
-        
-        /* Dark Mode - Mobile Search */
-        html.dark .mobile-search-modal {
-            background: #1f2937;
-        }
-        
-        html.dark .mobile-search-overlay {
-            background: rgba(0, 0, 0, 0.7);
-        }
-        
-        /* Dark Mode - Notifications */
-        html.dark #notifications-dropdown {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        
-        html.dark #user-menu-dropdown {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        
-        html.dark #search-results {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        
-        /* Dark Mode - Buttons */
-        html.dark button {
-            color: #f3f4f6;
-        }
-        
-        /* Dark Mode - Links */
+        /* Links with Transitions */
         html.dark a {
             color: #60a5fa;
+            transition: color 0.3s ease;
         }
         
         html.dark a:hover {
             color: #93c5fd;
         }
         
-        /* Dark Mode - Sidebar */
-        html.dark .sidebar {
-            background-color: #1f2937;
+        /* Buttons */
+        html.dark button {
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
         
-        html.dark .nav-link {
-            color: #d1d5db;
+        /* Dropdowns & Modals with Transitions */
+        html.dark #notifications-dropdown,
+        html.dark #user-menu-dropdown,
+        html.dark #search-results {
+            background-color: var(--bg-secondary);
+            border-color: var(--border-color);
+            transition: all 0.3s ease;
         }
         
-        html.dark .nav-link:hover {
-            background-color: #374151;
-            color: #f3f4f6;
+        html.dark .modal-content {
+            background: var(--bg-secondary);
+            transition: background-color 0.3s ease;
         }
         
-        /* Dark Mode - Badge */
+        html.dark .modal-header {
+            color: var(--text-primary);
+            transition: color 0.3s ease;
+        }
+        
+        html.dark .modal-body {
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+        
+        /* Shadows with Transitions */
+        html.dark .shadow,
+        html.dark .shadow-sm,
+        html.dark .shadow-lg,
+        html.dark .shadow-md {
+            box-shadow: 0 0 20px var(--shadow-color);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        /* Hover States with Transitions */
+        html.dark .hover\:bg-gray-50:hover,
+        html.dark .hover\:bg-gray-100:hover {
+            background-color: var(--bg-tertiary);
+            transition: background-color 0.3s ease;
+        }
+        
+        html.dark .hover\:bg-primary-50:hover { background-color: #1e3a8a; }
+        html.dark .hover\:bg-green-50:hover { background-color: #064e3b; }
+        html.dark .hover\:bg-red-50:hover { background-color: #7f1d1d; }
+        html.dark .hover\:bg-blue-50:hover { background-color: #1e3a8a; }
+        html.dark .hover\:bg-purple-50:hover { background-color: #3f0f5c; }
+        html.dark .hover\:bg-pink-50:hover { background-color: #5f1147; }
+        html.dark .hover\:bg-yellow-50:hover { background-color: #78350f; }
+        html.dark .hover\:bg-indigo-50:hover { background-color: #3730a3; }
+        html.dark .hover\:bg-cyan-50:hover { background-color: #164e63; }
+        
+        html.dark .hover\:text-gray-700:hover { color: var(--text-primary); }
+        html.dark .hover\:text-gray-900:hover { color: var(--text-primary); }
+        
+        /* SLA & Risk Indicators */
+        html.dark .sla-container,
+        html.dark .risk-indicator,
+        html.dark .sla-card {
+            background-color: var(--bg-secondary);
+            border-color: var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        html.dark .sla-status,
+        html.dark .sla-time,
+        html.dark .sla-metric {
+            color: var(--text-primary);
+        }
+        
+        html.dark .sla-breach { color: #fca5a5; }
+        html.dark .sla-warning { color: #fcd34d; }
+        html.dark .sla-safe { color: #86efac; }
+        html.dark .risk-high { color: #fca5a5; }
+        html.dark .risk-medium { color: #fcd34d; }
+        html.dark .risk-low { color: #86efac; }
+        
+        html.dark .btn-view-sla {
+            background-color: #3b82f6;
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+        
+        /* Toast Notifications with Transitions */
+        html.dark .toast {
+            transition: all 0.3s ease;
+        }
+        
+        /* Modal Buttons */
+        html.dark .modal-btn-cancel {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        html.dark .modal-btn-cancel:hover {
+            background-color: var(--border-light);
+        }
+        
+        /* Badge */
         html.dark .bg-primary-100 {
             background-color: #1e3a8a;
         }
@@ -315,77 +313,7 @@
             color: #93c5fd;
         }
         
-        /* Dark Mode - SLA & Risk Indicators */
-        html.dark .sla-container,
-        html.dark .risk-indicator {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        
-        html.dark .sla-status {
-            color: #f3f4f6;
-        }
-        
-        html.dark .sla-breach {
-            color: #fca5a5;
-            background-color: rgba(220, 38, 38, 0.1);
-            border-color: rgba(220, 38, 38, 0.3);
-        }
-        
-        html.dark .sla-warning {
-            color: #fcd34d;
-            background-color: rgba(217, 119, 6, 0.1);
-            border-color: rgba(217, 119, 6, 0.3);
-        }
-        
-        html.dark .sla-safe {
-            color: #86efac;
-            background-color: rgba(34, 197, 94, 0.1);
-            border-color: rgba(34, 197, 94, 0.3);
-        }
-        
-        html.dark .sla-time {
-            color: #d1d5db;
-        }
-        
-        html.dark .sla-metric {
-            color: #e5e7eb;
-        }
-        
-        html.dark .risk-high {
-            color: #fca5a5;
-        }
-        
-        html.dark .risk-medium {
-            color: #fcd34d;
-        }
-        
-        html.dark .risk-low {
-            color: #86efac;
-        }
-        
-        html.dark .sla-card {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        
-        html.dark .sla-card:hover {
-            background-color: #374151;
-            border-color: #4b5563;
-        }
-        
-        html.dark .btn-view-sla {
-            background-color: #3b82f6;
-            color: #ffffff;
-            border-color: #2563eb;
-        }
-        
-        html.dark .btn-view-sla:hover {
-            background-color: #2563eb;
-            border-color: #1d4ed8;
-        }
-        
-        /* Dark Mode - SLA/Risk card background and text in dark mode */
+        /* SLA/Risk card backgrounds */
         html.dark .bg-red-50 {
             background-color: rgba(127, 29, 29, 0.3);
         }
@@ -398,40 +326,27 @@
             background-color: rgba(120, 53, 15, 0.25);
         }
         
-        html.dark .border-red-200 {
-            border-color: #7f1d1d;
+        html.dark .border-red-200 { border-color: #7f1d1d; }
+        html.dark .border-orange-200 { border-color: #92400e; }
+        html.dark .border-yellow-200 { border-color: #b45309; }
+        
+        html.dark .bg-red-200 { background-color: #7f1d1d; }
+        html.dark .text-red-800 { color: #fca5a5; }
+        
+        html.dark .bg-orange-200 { background-color: #92400e; }
+        html.dark .text-orange-800 { color: #fed7aa; }
+        
+        html.dark .bg-yellow-200 { background-color: #b45309; }
+        html.dark .text-yellow-800 { color: #fcd34d; }
+        
+        /* Mobile Search */
+        html.dark .mobile-search-modal {
+            background: var(--bg-secondary);
+            transition: background-color 0.3s ease;
         }
         
-        html.dark .border-orange-200 {
-            border-color: #92400e;
-        }
-        
-        html.dark .border-yellow-200 {
-            border-color: #b45309;
-        }
-        
-        html.dark .bg-red-200 {
-            background-color: #7f1d1d;
-        }
-        
-        html.dark .text-red-800 {
-            color: #fca5a5;
-        }
-        
-        html.dark .bg-orange-200 {
-            background-color: #92400e;
-        }
-        
-        html.dark .text-orange-800 {
-            color: #fed7aa;
-        }
-        
-        html.dark .bg-yellow-200 {
-            background-color: #b45309;
-        }
-        
-        html.dark .text-yellow-800 {
-            color: #fcd34d;
+        html.dark .mobile-search-overlay {
+            background: rgba(0, 0, 0, 0.7);
         }
         
         /* Sidebar Transitions */
@@ -693,7 +608,7 @@
     
     {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-gray-50 font-sans">
+<body class="font-sans {% if request.resolver_match.url_name != 'login' %}bg-gray-50{% endif %}">
     <!-- Confirmation Modal -->
     <div id="confirmModal">
         <div class="modal-content">
@@ -876,25 +791,6 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- User Menu -->
-                        {% if user.is_authenticated %}
-                        <div class="relative">
-                            <button id="user-menu-toggle" class="flex items-center text-gray-700 hover:text-gray-900">
-                                <img class="h-8 w-8 rounded-full bg-gray-300" 
-                                     src="https://ui-avatars.com/api/?name={{ user.username }}&background=3b82f6&color=fff" 
-                                     alt="{{ user.username }}">
-                            </button>
-                            <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                <div class="p-2">
-                                    <a href="{% url 'frontend:profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">Profile</a>
-                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">Settings</a>
-                                    <hr class="my-2">
-                                    <a href="{% url 'frontend:logout' %}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded">Logout</a>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
             </header>
@@ -1100,43 +996,66 @@
             document.getElementById('notifications-dropdown').classList.toggle('hidden');
         });
         
-        // User menu dropdown
-        document.getElementById('user-menu-toggle').addEventListener('click', function() {
-            document.getElementById('user-menu-dropdown').classList.toggle('hidden');
-        });
-        
         // Global search
         document.getElementById('global-search').addEventListener('input', function() {
             const query = this.value;
+            const resultsContainer = document.getElementById('search-results');
+            
             if (query.length > 2) {
-                // Implement search functionality
+                // Implement search functionality using the correct API endpoint
                 fetch(`/api/search/?q=${encodeURIComponent(query)}`)
                     .then(response => response.json())
                     .then(data => {
-                        const resultsContainer = document.getElementById('search-results');
                         if (data.count > 0) {
                             let html = '<div class="p-2">';
-                            if (data.results.users) {
+                            
+                            // Users
+                            if (data.results.users && data.results.users.length > 0) {
                                 html += '<div class="text-xs font-semibold text-gray-500 mb-1">Users</div>';
                                 data.results.users.forEach(user => {
-                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${user.username}</div>`;
+                                    html += `<a href="/edit-user/${user.id}/" class="p-2 hover:bg-gray-100 cursor-pointer block">${user.username} <span class="text-xs text-gray-400">(${user.role})</span></a>`;
                                 });
                             }
-                            if (data.results.tickets) {
+                            
+                            // Tickets
+                            if (data.results.tickets && data.results.tickets.length > 0) {
                                 html += '<div class="text-xs font-semibold text-gray-500 mb-1 mt-2">Tickets</div>';
                                 data.results.tickets.forEach(ticket => {
-                                    html += `<div class="p-2 hover:bg-gray-100 cursor-pointer">${ticket.title}</div>`;
+                                    html += `<a href="/tickets/${ticket.id}/" class="p-2 hover:bg-gray-100 cursor-pointer block">${ticket.title}</a>`;
                                 });
                             }
+                            
+                            // Assets
+                            if (data.results.assets && data.results.assets.length > 0) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1 mt-2">Assets</div>';
+                                data.results.assets.forEach(asset => {
+                                    html += `<a href="/assets/${asset.id}/" class="p-2 hover:bg-gray-100 cursor-pointer block">${asset.name} <span class="text-xs text-gray-400">(${asset.asset_tag})</span></a>`;
+                                });
+                            }
+                            
+                            // Projects
+                            if (data.results.projects && data.results.projects.length > 0) {
+                                html += '<div class="text-xs font-semibold text-gray-500 mb-1 mt-2">Projects</div>';
+                                data.results.projects.forEach(project => {
+                                    html += `<a href="/project/${project.id}/" class="p-2 hover:bg-gray-100 cursor-pointer block">${project.name}</a>`;
+                                });
+                            }
+                            
                             html += '</div>';
                             resultsContainer.innerHTML = html;
                             resultsContainer.classList.remove('hidden');
                         } else {
-                            resultsContainer.classList.add('hidden');
+                            resultsContainer.innerHTML = '<div class="p-4 text-center text-gray-500">No results found</div>';
+                            resultsContainer.classList.remove('hidden');
                         }
+                    })
+                    .catch(error => {
+                        console.error('Search error:', error);
+                        resultsContainer.innerHTML = '<div class="p-4 text-center text-red-500">Search failed. Please try again.</div>';
+                        resultsContainer.classList.remove('hidden');
                     });
             } else {
-                document.getElementById('search-results').classList.add('hidden');
+                resultsContainer.classList.add('hidden');
             }
         });
         
@@ -1188,9 +1107,6 @@
         document.addEventListener('click', function(event) {
             if (!event.target.closest('#notifications-toggle')) {
                 document.getElementById('notifications-dropdown').classList.add('hidden');
-            }
-            if (!event.target.closest('#user-menu-toggle')) {
-                document.getElementById('user-menu-dropdown').classList.add('hidden');
             }
             if (!event.target.closest('#mobile-search-toggle') && !event.target.closest('#mobile-search-overlay')) {
                 closeMobileSearch();
