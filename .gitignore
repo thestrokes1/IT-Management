@@ -1,7 +1,8 @@
-# Logs
+# Runtime log output ONLY
+backend/runtime_logs/
 *.log
 logs/
-backend/logs/
+
 
 # Python
 .venv/
