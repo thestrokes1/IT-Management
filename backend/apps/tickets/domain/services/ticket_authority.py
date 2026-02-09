@@ -817,6 +817,15 @@ def can_unassign_ticket(user, ticket) -> bool:
     return can_unassign(user, ticket)
 
 
+
+
+def can_assign_self(user, ticket) -> bool:
+    """
+    Check if user can assign a ticket to themselves.
+    Alias for can_self_assign for naming consistency.
+    """
+    return can_self_assign(user, ticket)
+
 def get_ticket_permissions(user, ticket) -> dict:
     """Alias for get_permissions."""
     return get_permissions(user, ticket)
