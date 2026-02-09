@@ -23,3 +23,5 @@ django-filter==23.5
 
 # Production Ready
 gunicorn==21.2.0
+
+python-decouple==3.8

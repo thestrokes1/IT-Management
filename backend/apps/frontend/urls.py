@@ -1,5 +1,6 @@
 from django.urls import path
 from django.views.generic import RedirectView
+from django.views.generic import TemplateView
 
 app_name = 'frontend'
 from apps.frontend.views.tickets import (
@@ -31,6 +32,7 @@ from apps.frontend.views import (
     login_view,
     logout_view,
     profile,
+    profile_reopen_ticket,
     users,
     edit_user,
     create_user,
@@ -42,6 +44,8 @@ from apps.frontend.views import (
     edit_project,
     delete_project,
     reports,
+    export_reports,
+    command_palette_api,
 )
 
 urlpatterns = [
@@ -49,6 +53,7 @@ urlpatterns = [
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
     path('profile/', profile, name='profile'),
+    path('profile/reopen-ticket/<int:ticket_id>/', profile_reopen_ticket, name='profile_reopen_ticket'),
     
     # Tickets
     path('tickets/', tickets, name='tickets'),
@@ -77,6 +82,7 @@ urlpatterns = [
     
     # Users
     path('users/', users, name='users'),
+    path('user/<int:user_id>/', edit_user, name='user-detail'),  # Alias for template compatibility
     path('edit-user/<int:user_id>/', edit_user, name='edit-user'),
     path('create-user/', create_user, name='create-user'),
     path('change-user-role/<int:user_id>/', change_user_role, name='change-user-role'),
@@ -93,6 +99,10 @@ urlpatterns = [
     path('create-project/', create_project, name='create-project'),
     path('edit-project/<int:project_id>/', edit_project, name='edit-project'),
     
-    # Reports
+# Reports
     path('reports/', reports, name='reports'),
+    path('reports/export/', export_reports, name='export-reports'),
+    
+    # Command Palette API (Ctrl+K)
+    path('api/command-palette/', command_palette_api, name='command-palette-api'),
 ]

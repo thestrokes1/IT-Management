@@ -133,12 +133,20 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 Q(requirements__icontains=search)
             )
         
-        # For non-admin users, only show projects they are members of
+        # For non-admin users, only show projects they have access to
         if not self.request.user.is_admin and not self.request.user.can_manage_projects:
-            queryset = queryset.filter(
-                Q(project_manager=self.request.user) |
-                Q(team_members=self.request.user)
-            )
+            # IT_ADMIN: only self-assigned projects via ProjectMember
+            if self.request.user.role == 'IT_ADMIN':
+                queryset = queryset.filter(
+                    memberships__user=self.request.user,
+                    memberships__is_active=True
+                ).distinct()
+            else:
+                # Other non-admin users: project manager or team member
+                queryset = queryset.filter(
+                    Q(project_manager=self.request.user) |
+                    Q(team_members=self.request.user)
+                )
         
         return queryset.order_by('-created_at')
     

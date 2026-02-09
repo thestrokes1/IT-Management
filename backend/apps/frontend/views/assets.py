@@ -22,6 +22,7 @@ from apps.assets.domain.services.asset_authority import (
     assert_can_delete_asset,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.core.exceptions import ValidationError
 from apps.frontend.permissions_mapper import (
     build_asset_ui_permissions,
     build_assets_permissions_map,
@@ -127,6 +128,13 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
             
             messages.success(request, f'Asset "{asset.name}" created successfully!')
             return redirect('frontend:assets')
+        
+        except ValidationError as e:
+            # Handle validation errors (like duplicate serial_number)
+            messages.error(request, str(e.message))
+            context = self.get_context_data()
+            context['form'] = request.POST
+            return render(request, self.template_name, context)
         
         except Exception as e:
             import traceback
@@ -372,24 +380,29 @@ def asset_crud(request, asset_id):
         return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
 
 
-@login_required
-@require_http_methods(["POST"])
+
 def asset_assign_self(request, asset_id):
-    """Handle self-assignment of an asset."""
-    from apps.assets.application.assign_asset_to_self import AssignAssetToSelf
-    from django.utils.text import slugify
+    """
+    Handle self-assignment of an asset.
+    
+    Views MUST NOT import or instantiate use cases.
+    Views MUST ONLY:
+    1. Validate permissions
+    2. Build an immutable Command DTO
+    3. Pass it to a handler/resolver
+    4. Call use_case.execute(command)
+    """
     from uuid import UUID
     
-    # Convert asset_id to UUID string
+    # Convert asset_id to UUID
     try:
-        # Handle case where asset_id might be an integer from URL
         if isinstance(asset_id, int):
             from apps.assets.models import Asset
             asset = get_object_or_404(Asset, id=asset_id)
-            asset_id_str = str(asset.asset_id)
+            asset_uuid = asset.asset_id
         else:
-            asset_id_str = str(asset_id)
-    except (ValueError, TypeError):
+            asset_uuid = UUID(str(asset_id))
+    except (ValueError, TypeError, AttributeError):
         messages.error(request, 'Invalid asset ID.')
         return redirect('frontend:assets')
     
@@ -406,18 +419,23 @@ def asset_assign_self(request, asset_id):
     if not can_assign_to_self_asset(request.user, asset):
         messages.error(request, 'You cannot assign this asset to yourself.')
         return redirect('frontend:assets')
-
     
-    # Execute use case - pass the asset_id string, not the asset object
-    use_case = AssignAssetToSelf()
-    try:
-        result = use_case.execute(request.user, asset_id_str)
-        if result.success:
-            messages.success(request, result.data.get('message', 'Asset assigned to you successfully!'))
-        else:
-            messages.error(request, result.error)
-    except ValueError as e:
-        messages.error(request, str(e))
+    # Build immutable Command DTO (no business logic in view)
+    from apps.assets.application.commands import AssetAssignmentCommand
+    command = AssetAssignmentCommand(
+        actor=request.user,
+        asset_id=asset_uuid,
+        assignee_id=None  # None = self-assignment
+    )
+    
+    # Pass command to handler (handler routes to correct use case)
+    from apps.assets.application.handlers import assign_asset
+    result = assign_asset(command)
+    
+    if result.success:
+        messages.success(request, result.data.get('message', 'Asset assigned to you successfully!'))
+    else:
+        messages.error(request, result.error)
     
     return redirect('frontend:assets')
 
@@ -425,8 +443,16 @@ def asset_assign_self(request, asset_id):
 @login_required
 @require_http_methods(["POST"])
 def asset_assign_to_user(request, asset_id, user_id):
-    """Handle assignment of an asset to a specific user."""
-    from apps.assets.application.assign_asset_to_self import AssignAssetToSelf
+    """
+    Handle assignment of an asset to a specific user.
+    
+    Views MUST NOT import or instantiate use cases.
+    Views MUST ONLY:
+    1. Validate permissions
+    2. Build an immutable Command DTO
+    3. Pass it to a handler/resolver
+    4. Call use_case.execute(command)
+    """
     from django.shortcuts import get_object_or_404
     from apps.assets.models import Asset
     from apps.users.models import User
@@ -441,22 +467,28 @@ def asset_assign_to_user(request, asset_id, user_id):
         messages.error(request, 'User not found.')
         return redirect('frontend:asset-detail', asset_id=asset_id)
     
-    # Check permission using domain authority (can_assign)
+    # Check permission using domain authority
     from apps.assets.domain.services.asset_authority import can_assign as can_assign_asset
     if not can_assign_asset(request.user, asset, target_user):
         messages.error(request, 'You do not have permission to assign this asset.')
         return redirect('frontend:asset-detail', asset_id=asset_id)
     
-    # Use the CQRS command to assign
-    use_case = AssignAssetToSelf()
-    try:
-        result = use_case.execute(request.user, str(asset.asset_id), target_user.id)
-        if result.success:
-            messages.success(request, result.data.get('message', f'Asset assigned to {target_user.username} successfully!'))
-        else:
-            messages.error(request, result.error)
-    except ValueError as e:
-        messages.error(request, str(e))
+    # Build immutable Command DTO (no business logic in view)
+    from apps.assets.application.commands import AssetAssignmentCommand
+    command = AssetAssignmentCommand(
+        actor=request.user,
+        asset_id=asset.asset_id,
+        assignee_id=target_user.id
+    )
+    
+    # Pass command to handler (handler routes to correct use case)
+    from apps.assets.application.handlers import assign_asset
+    result = assign_asset(command)
+    
+    if result.success:
+        messages.success(request, result.data.get('message', f'Asset assigned to {target_user.username} successfully!'))
+    else:
+        messages.error(request, result.error)
     
     return redirect('frontend:asset-detail', asset_id=asset_id)
 

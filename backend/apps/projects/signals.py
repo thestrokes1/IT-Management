@@ -1,6 +1,25 @@
 """
 Project signals for IT Management Platform.
 Handles project creation, updates, task management, and audit logging.
+
+ARCHITECTURAL NOTE:
+==================
+Project model mutations (create, update, delete, status changes, membership changes)
+MUST ONLY occur in CQRS commands within apps/projects/application/*:
+
+    - CreateProject.execute()  - Create new project
+    - UpdateProject.execute()  - Update project details
+    - DeleteProject.execute()  - Delete project
+    - ChangeProjectStatus.execute() - Change project status
+    - ManageProjectMembers.execute() - Add/remove team members
+
+This signals file handles:
+    - Audit logging (side effect, acceptable)
+    - Completion percentage updates (derived state, acceptable)
+    - Team membership sync (derived state, acceptable)
+    - Deadline checking (alerts, acceptable)
+
+DO NOT add new model mutations here. Business logic belongs in CQRS commands.
 """
 
 from django.db.models.signals import post_save, post_delete, pre_save

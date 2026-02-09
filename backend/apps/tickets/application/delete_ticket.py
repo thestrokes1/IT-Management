@@ -9,6 +9,8 @@ Authorization is enforced via domain service with strict RBAC.
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from django.db import transaction
+
 from apps.tickets.domain.services.ticket_authority import (
     assert_can_delete,
     can_delete,
@@ -61,6 +63,7 @@ class DeleteTicket:
             print(f"Error: {result.error}")
     """
 
+    @transaction.atomic
     def execute(
         self,
         user: Any,
@@ -78,7 +81,6 @@ class DeleteTicket:
         Returns:
             DeleteTicketResult with deletion confirmation or error
         """
-        from django.db import transaction
         from apps.tickets.models import (
             Ticket, TicketAttachment, TicketComment,
             TicketHistory, TicketEscalation, TicketSatisfaction,
@@ -97,30 +99,49 @@ class DeleteTicket:
             return DeleteTicketResult.fail(str(e))
 
         # Delete with cascade
-        with transaction.atomic():
-            # Delete related records
-            TicketAttachment.objects.filter(ticket=ticket).delete()
-            TicketComment.objects.filter(ticket=ticket).delete()
-            TicketHistory.objects.filter(ticket=ticket).delete()
-            TicketEscalation.objects.filter(ticket=ticket).delete()
-            TicketSatisfaction.objects.filter(ticket=ticket).delete()
+        # Delete related records
+        TicketAttachment.objects.filter(ticket=ticket).delete()
+        TicketComment.objects.filter(ticket=ticket).delete()
+        TicketHistory.objects.filter(ticket=ticket).delete()
+        TicketEscalation.objects.filter(ticket=ticket).delete()
+        TicketSatisfaction.objects.filter(ticket=ticket).delete()
 
-            # Clear related tickets
-            ticket.related_tickets.clear()
+        # Clear related tickets
+        ticket.related_tickets.clear()
 
-            # Update child tickets
-            Ticket.objects.filter(parent_ticket=ticket).update(parent_ticket=None)
+        # Update child tickets
+        Ticket.objects.filter(parent_ticket=ticket).update(parent_ticket=None)
 
-            # Delete the ticket
-            ticket_id_str = str(ticket.ticket_id)
-            ticket.delete()
-
+        # Capture data before deletion for logging
+        ticket_id_str = str(ticket.ticket_id)
+        ticket_title = ticket.title
+        
+        # Delete the ticket
+        ticket.delete()
+        
+        # Activity logging - runs after transaction commits, never breaks command
+        transaction.on_commit(lambda: self._log_ticket_deleted(ticket_id_str, ticket_title, user))
+        
         return DeleteTicketResult.ok(
             data={
                 'ticket_id': ticket_id_str,
                 'message': 'Ticket deleted successfully',
             }
         )
+    
+    def _log_ticket_deleted(self, ticket_id_str, ticket_title, user):
+        """Log ticket deletion activity."""
+        try:
+            from apps.logs.services.activity_service import ActivityService
+            ActivityService().log_ticket_action(
+                action='DELETE',
+                ticket=None,  # Ticket is already deleted
+                actor=user,
+                request=None,
+                description=f"Deleted ticket #{ticket_id_str}: {ticket_title}"
+            )
+        except Exception:
+            pass  # Logging must never break the command
 
 
 class CanDeleteTicket:

@@ -1,6 +1,24 @@
 """
+
 Project serializers for IT Management Platform.
 Handles serialization and validation for project and task operations.
+
+ARCHITECTURAL NOTE:
+==================
+Project model mutations (create, update, delete) MUST ONLY occur in 
+CQRS commands within apps/projects/application/*:
+
+    - CreateProject.execute()  - Create new project
+    - UpdateProject.execute()  - Update project details
+    - DeleteProject.execute()  - Delete project
+
+The create() and update() methods in this file are for:
+    - API endpoints that use CQRS commands (preferred)
+    - Internal consistency within the serializer layer
+
+For views and other non-CQRS code, use the CQRS commands instead of
+calling these serializer methods directly.
+
 """
 
 from rest_framework import serializers

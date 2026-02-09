@@ -42,19 +42,20 @@ class AssignAsset:
     - Assignee can be any active user
     
     Input (via execute):
-        user: User - User performing the assignment
-        asset_id: UUID - ID of asset to assign
-        assignee_id: int - User ID of the assignee
+        command: AssetAssignmentCommand with actor, asset_id, assignee_id
         
     Output:
         AssignAssetResult with assignment confirmation or error
         
     Usage:
-        result = AssignAsset().execute(
-            user=request.user,
+        from apps.assets.application.commands import AssetAssignmentCommand
+        
+        command = AssetAssignmentCommand(
+            actor=request.user,
             asset_id=asset_uuid,
             assignee_id=target_user.id
         )
+        result = AssignAsset().execute(command)
         
         if result.success:
             print(f"Assigned asset: {result.data['name']}")
@@ -64,17 +65,13 @@ class AssignAsset:
 
     def execute(
         self,
-        user: Any,
-        asset_id: str,
-        assignee_id: int,
+        command,
     ) -> AssignAssetResult:
         """
         Execute asset assignment use case.
 
         Args:
-            user: User performing the assignment
-            asset_id: UUID string of asset to assign
-            assignee_id: User ID of the assignee
+            command: AssetAssignmentCommand containing actor, asset_id, and assignee_id
 
         Returns:
             AssignAssetResult with assignment confirmation or error
@@ -82,6 +79,10 @@ class AssignAsset:
         from apps.assets.models import Asset
         from apps.users.models import User
         from django.utils import timezone
+        
+        user = command.actor
+        asset_id = str(command.asset_id)
+        assignee_id = command.assignee_id
         
         # Get asset
         try:

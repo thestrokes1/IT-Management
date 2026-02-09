@@ -9,6 +9,8 @@ Authorization is enforced via domain service with strict RBAC.
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from django.db import transaction
+
 from apps.assets.domain.services.asset_authority import (
     assert_can_delete,
     can_delete,
@@ -62,6 +64,7 @@ class DeleteAsset:
             print(f"Error: {result.error}")
     """
 
+    @transaction.atomic
     def execute(
         self,
         user: Any,
@@ -79,7 +82,6 @@ class DeleteAsset:
         Returns:
             DeleteAssetResult with deletion confirmation or error
         """
-        from django.db import transaction
         from apps.assets.models import (
             Asset, AssetAssignment, AssetMaintenance,
             AssetAuditLog, AssetDocument,
@@ -100,18 +102,21 @@ class DeleteAsset:
         # Store asset info before deletion for result
         asset_name = asset.name
         asset_id_int = asset.id
-
+        asset_id_str = asset_id
+        
         # Delete with cascade
-        with transaction.atomic():
-            # Delete related records
-            AssetAssignment.objects.filter(asset=asset).delete()
-            AssetMaintenance.objects.filter(asset=asset).delete()
-            AssetAuditLog.objects.filter(asset_id=asset.id).delete()
-            AssetDocument.objects.filter(asset=asset).delete()
+        # Delete related records
+        AssetAssignment.objects.filter(asset=asset).delete()
+        AssetMaintenance.objects.filter(asset=asset).delete()
+        AssetAuditLog.objects.filter(asset_id=asset.id).delete()
+        AssetDocument.objects.filter(asset=asset).delete()
 
-            # Delete the asset
-            asset.delete()
-
+        # Delete the asset
+        asset.delete()
+        
+        # Activity logging - runs after transaction commits, never breaks command
+        transaction.on_commit(lambda: self._log_asset_deleted(asset_id_str, asset_name, user))
+        
         return DeleteAssetResult.ok(
             data={
                 'asset_id': asset_id,
@@ -119,6 +124,20 @@ class DeleteAsset:
                 'message': 'Asset deleted successfully',
             }
         )
+    
+    def _log_asset_deleted(self, asset_id_str, asset_name, user):
+        """Log asset deletion activity."""
+        try:
+            from apps.logs.services.activity_service import ActivityService
+            ActivityService().log_asset_action(
+                action='DELETE',
+                asset=None,  # Asset is already deleted
+                actor=user,
+                request=None,
+                description=f"Deleted asset: {asset_name}"
+            )
+        except Exception:
+            pass  # Logging must never break the command
 
 
 class CanDeleteAsset:

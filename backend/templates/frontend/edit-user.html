@@ -21,17 +21,7 @@
         </p>
     </div>
 
-    <!-- Messages -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="mb-6 p-4 rounded border
-                {% if message.tags == 'success' %}bg-green-50 border-green-200
-                {% elif message.tags == 'error' %}bg-red-50 border-red-200
-                {% else %}bg-blue-50 border-blue-200{% endif %}">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
+
 
     <!-- MAIN EDIT FORM (NO ROLE HERE) -->
     <div class="bg-white rounded-lg shadow border p-6">

@@ -43,17 +43,20 @@ class AssignAssetToSelf:
     - Admin roles can always self-assign
     
     Input (via execute):
-        user: User - User performing the self-assignment
-        asset_id: UUID - ID of asset to self-assign
+        command: AssetAssignmentCommand with actor, asset_id, assignee_id=None
         
     Output:
         AssignAssetToSelfResult with assignment confirmation or error
         
     Usage:
-        result = AssignAssetToSelf().execute(
-            user=request.user,
-            asset_id=asset_uuid
+        from apps.assets.application.commands import AssetAssignmentCommand
+        
+        command = AssetAssignmentCommand(
+            actor=request.user,
+            asset_id=asset_uuid,
+            assignee_id=None  # None indicates self-assignment
         )
+        result = AssignAssetToSelf().execute(command)
         
         if result.success:
             print(f"Self-assigned to asset: {result.data['name']}")
@@ -63,21 +66,22 @@ class AssignAssetToSelf:
 
     def execute(
         self,
-        user: Any,
-        asset_id: str,
+        command,
     ) -> AssignAssetToSelfResult:
         """
         Execute asset self-assignment use case.
 
         Args:
-            user: User performing the self-assignment
-            asset_id: UUID string of asset to self-assign
+            command: AssetAssignmentCommand containing actor, asset_id, and assignee_id=None
 
         Returns:
             AssignAssetToSelfResult with assignment confirmation or error
         """
         from apps.assets.models import Asset
         from django.utils import timezone
+        
+        user = command.actor
+        asset_id = str(command.asset_id)
         
         # Get asset
         try:

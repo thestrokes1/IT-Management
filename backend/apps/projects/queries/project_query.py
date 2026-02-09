@@ -132,6 +132,27 @@ class ProjectQuery:
         ]
     
     @staticmethod
+    def get_managers() -> List[Dict[str, Any]]:
+        """
+        Get all active managers (MANAGER and SUPERADMIN roles) for project manager selection.
+        Returns: List of user dictionaries with id, username, full_name, role
+        """
+        from apps.users.models import User
+        users = User.objects.filter(
+            is_active=True,
+            role__in=['MANAGER', 'SUPERADMIN']
+        ).order_by('username')
+        return [
+            {
+                'id': u.id,
+                'username': u.username,
+                'full_name': f"{u.first_name} {u.last_name}".strip() or u.username,
+                'role': u.role
+            }
+            for u in users
+        ]
+    
+    @staticmethod
     def get_for_dashboard() -> Dict[str, Any]:
         """
         Get project statistics for dashboard.

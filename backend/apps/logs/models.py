@@ -35,7 +35,15 @@ class LogCategory(models.Model):
 
 class ActivityLog(models.Model):
     """
-    General user activity logging.
+    Activity log model for the IT Management Platform.
+
+    Architectural rules:
+    - `timestamp` is the canonical and ONLY time field for activity logging.
+    - The `created_at` field must NEVER be added to this model.
+    - All ordering, filtering, and display logic MUST use `timestamp`.
+    - Actor information (actor_id, actor_name, actor_role) is captured at log creation time
+      and stored as plain strings to avoid foreign key dereferencing in templates.
+      This ensures logs remain readable even if the user is deleted.
     """
     # Log level choices
     LEVEL_CHOICES = [
@@ -66,13 +74,125 @@ class ActivityLog(models.Model):
         ('OTHER', 'Other'),
     ]
     
+    # Actor type choices - determines WHO performed the action
+    ACTOR_TYPE_CHOICES = [
+        ('user', 'User'),
+        ('system', 'System'),
+        ('automation', 'Automation'),
+        ('api', 'API'),
+    ]
+    
+    # Severity choices - used for filtering and display prioritization
+    SEVERITY_CHOICES = [
+        ('INFO', 'Info'),
+        ('WARNING', 'Warning'),
+        ('ERROR', 'Error'),
+        ('SECURITY', 'Security'),
+    ]
+    
+    # Intent choices - describes WHY the action was performed
+    INTENT_CHOICES = [
+        ('workflow', 'Workflow'),
+        ('sla_risk', 'SLA Risk'),
+        ('security', 'Security'),
+        ('system', 'System'),
+    ]
+    
     # Log ID (unique identifier)
     log_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     
-    # Basic information
+    # ==========================================================================
+    # Actor Information - IMMUTABLE, captured at log creation time
+    # These fields are NOT foreign keys to avoid template FK dereferencing
+    # ==========================================================================
+    actor_type = models.CharField(
+        max_length=20,
+        choices=ACTOR_TYPE_CHOICES,
+        default='user',
+        help_text="Type of actor that performed the action"
+    )
+    actor_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Actor ID (user ID for users, null for system/automation)"
+    )
+    actor_name = models.CharField(
+        max_length=255,
+        help_text="Actor name resolved at log creation time (e.g., username)"
+    )
+    actor_role = models.CharField(
+        max_length=50,
+        default='VIEWER',
+        help_text="Actor role resolved at log creation time, never dereferenced from FK"
+    )
+    
+    # ==========================================================================
+    # Event Information
+    # ==========================================================================
+    event_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Specific event type (e.g., TICKET_CREATED, ASSET_UPDATED)"
+    )
+    severity = models.CharField(
+        max_length=10,
+        choices=SEVERITY_CHOICES,
+        default='INFO',
+        help_text="Severity level for filtering and prioritization"
+    )
+    intent = models.CharField(
+        max_length=20,
+        choices=INTENT_CHOICES,
+        default='workflow',
+        help_text="Intent/purpose of the logged action"
+    )
+    
+    # ==========================================================================
+    # Entity Information - What was affected
+    # ==========================================================================
+    entity_type = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Type of affected entity (e.g., ticket, asset, project, user)"
+    )
+    entity_id = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="ID of the affected entity"
+    )
+    
+    # ==========================================================================
+    # Causal Log Chaining - Parent/Child relationship
+    # Each log may reference a parent_log_id to form causal chains:
+    # Asset failure → Ticket created → Technician assigned → SLA breach → Escalation
+    # ==========================================================================
+    parent_log_id = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Parent log ID for causal chaining. Creates: Asset failure → Ticket created → ..."
+    )
+    chain_depth = models.PositiveIntegerField(
+        default=0,
+        db_index=True,
+        help_text="Depth in the log chain (0 = root, 1 = child, 2 = grandchild, etc.)"
+    )
+    chain_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Type of causal relationship (e.g., CAUSED, ESCALATED, RESOLVED)"
+    )
+    
+    # ==========================================================================
+    # Legacy Foreign Key (deprecated but kept for backward compatibility)
+    # DO NOT dereference this field in templates - use actor_* fields instead
+    # ==========================================================================
     user = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_logs'
     )
+    
+    # Action and categorization
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='INFO')
     category = models.ForeignKey(
@@ -102,7 +222,15 @@ class ActivityLog(models.Model):
     tags = models.JSONField(default=list, blank=True)
     
     # Timestamps
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp = models.DateTimeField(
+    auto_now_add=True,
+    db_index=True,
+    help_text=(
+        "Primary timestamp for activity logging. "
+        "Used for dashboard ordering, display, and all temporal queries."
+    ),
+)
+
     
     class Meta:
         db_table = 'activity_logs'
@@ -196,7 +324,15 @@ class AuditLog(models.Model):
     extra_data = models.JSONField(default=dict, blank=True)
     
     # Timestamp
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp = models.DateTimeField(
+    auto_now_add=True,
+    db_index=True,
+    help_text=(
+        "Primary timestamp for activity logging. "
+        "Used for dashboard ordering, display, and all temporal queries."
+    ),
+)
+
     
     class Meta:
         db_table = 'audit_logs'
@@ -273,7 +409,15 @@ class SystemLog(models.Model):
     extra_data = models.JSONField(default=dict, blank=True)
     
     # Timestamp
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp = models.DateTimeField(
+    auto_now_add=True,
+    db_index=True,
+    help_text=(
+        "Primary timestamp for activity logging. "
+        "Used for dashboard ordering, display, and all temporal queries."
+    ),
+)
+
     
     class Meta:
         db_table = 'system_logs'
