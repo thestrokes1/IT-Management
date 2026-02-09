@@ -310,6 +310,15 @@ class SecurityLogger:
     Security event logging utility.
     """
     
+    # Events that should be logged as warnings (important events)
+    WARNING_EVENTS = [
+        'FAILED_LOGIN',
+        'SUSPICIOUS_ACTIVITY',
+        'RATE_LIMIT_EXCEEDED',
+        'UNAUTHORIZED_ACCESS',
+        'BRUTE_FORCE_DETECTED',
+    ]
+    
     @staticmethod
     def log_security_event(event_type, details, user=None, ip_address=None):
         """
@@ -326,7 +335,12 @@ class SecurityLogger:
             'timestamp': secrets.token_hex(8)  # For anonymization
         }
         
-        logger.warning(f"Security Event: {log_data}")
+        # Only log warnings for important events, debug for routine ones
+        if event_type in SecurityLogger.WARNING_EVENTS:
+            logger.warning(f"Security Event: {log_data}")
+        else:
+            # Use debug for routine events like successful logins
+            logger.debug(f"Security Event: {log_data}")
     
     @staticmethod
     def log_failed_login(username, ip_address, reason="Invalid credentials"):

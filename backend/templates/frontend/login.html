@@ -203,9 +203,9 @@
                     </div>
 
                     <div class="text-sm">
-                        <a href="{% url 'password_reset' %}" class="font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors">
+                        <button type="button" id="openPasswordResetModal" class="font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors">
                             Forgot password?
-                        </a>
+                        </button>
                     </div>
                 </div>
 
@@ -265,6 +265,98 @@
                 <i class="fas fa-lock mr-1"></i>
                 Your login credentials are encrypted and securely transmitted
             </p>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="passwordResetModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-6 text-center relative">
+                <button type="button" id="closePasswordResetModal" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-key text-white text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white">Reset Password</h2>
+                <p class="text-white/80 mt-2">Enter your email to receive a password reset link</p>
+            </div>
+            
+            <!-- Modal Content -->
+            <div class="p-6">
+                <!-- Request Reset Form -->
+                <form id="passwordResetRequestForm" class="space-y-4">
+                    <div>
+                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-envelope mr-2 text-primary-500"></i>
+                            Email Address
+                        </label>
+                        <input 
+                            type="email" 
+                            id="resetEmail" 
+                            name="email"
+                            required
+                            autocomplete="email"
+                            class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white transition-all"
+                            placeholder="Enter your registered email">
+                    </div>
+                    
+                    <div id="resetRequestError" class="hidden bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        <span id="resetRequestErrorText"></span>
+                    </div>
+                    
+                    <div id="resetRequestSuccess" class="hidden bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg text-sm">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <span id="resetRequestSuccessText"></span>
+                    </div>
+                    
+                    <div id="resetDevelopmentInfo" class="hidden bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg text-sm">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle mr-2 mt-0.5"></i>
+                            <div>
+                                <span class="font-medium">Development Mode:</span>
+                                <p class="mt-1">Reset link: <a id="developmentResetLink" href="#" class="underline hover:no-underline break-all"></a></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" id="cancelResetRequest" class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" id="submitResetRequest" class="flex-1 px-4 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Send Reset Link
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Reset Confirmation Form (Hidden by default) -->
+                <form id="passwordResetConfirmForm" class="hidden space-y-4">
+                    <div class="text-center mb-4">
+                        <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-check text-green-500 dark:text-green-400 text-2xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Password Reset Successful</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">Your password has been reset. You can now login with your new password.</p>
+                    </div>
+                    
+                    <button type="button" id="goToLogin" class="w-full px-4 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all shadow-lg hover:shadow-xl">
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Go to Login
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Security Note -->
+            <div class="px-6 pb-4">
+                <div class="flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                    <i class="fas fa-shield-alt mr-2"></i>
+                    <span>Reset links expire in 1 hour for security</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -379,6 +471,161 @@
             // Focus on username field on page load
             if (!usernameInput.value) {
                 usernameInput.focus();
+            }
+            
+            // ===== Password Reset Modal Functionality =====
+            const passwordResetModal = document.getElementById('passwordResetModal');
+            const openPasswordResetModalBtn = document.getElementById('openPasswordResetModal');
+            const closePasswordResetModalBtn = document.getElementById('closePasswordResetModal');
+            const cancelResetRequestBtn = document.getElementById('cancelResetRequest');
+            const passwordResetRequestForm = document.getElementById('passwordResetRequestForm');
+            const passwordResetConfirmForm = document.getElementById('passwordResetConfirmForm');
+            const resetEmailInput = document.getElementById('resetEmail');
+            const resetRequestError = document.getElementById('resetRequestError');
+            const resetRequestErrorText = document.getElementById('resetRequestErrorText');
+            const resetRequestSuccess = document.getElementById('resetRequestSuccess');
+            const resetRequestSuccessText = document.getElementById('resetRequestSuccessText');
+            const resetDevelopmentInfo = document.getElementById('resetDevelopmentInfo');
+            const developmentResetLink = document.getElementById('developmentResetLink');
+            const submitResetRequestBtn = document.getElementById('submitResetRequest');
+            const goToLoginBtn = document.getElementById('goToLogin');
+            
+            // Open modal
+            function openPasswordResetModal() {
+                passwordResetModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                resetEmailInput.focus();
+            }
+            
+            // Close modal
+            function closePasswordResetModalFunc() {
+                passwordResetModal.classList.add('hidden');
+                document.body.style.overflow = '';
+                resetModalToInitialState();
+            }
+            
+            // Reset modal to initial state
+            function resetModalToInitialState() {
+                passwordResetRequestForm.classList.remove('hidden');
+                passwordResetConfirmForm.classList.add('hidden');
+                resetEmailInput.value = '';
+                resetRequestError.classList.add('hidden');
+                resetRequestSuccess.classList.add('hidden');
+                resetDevelopmentInfo.classList.add('hidden');
+                submitResetRequestBtn.disabled = false;
+            }
+            
+            // Event listeners for opening/closing modal
+            if (openPasswordResetModalBtn) {
+                openPasswordResetModalBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openPasswordResetModal();
+                });
+            }
+            
+            if (closePasswordResetModalBtn) {
+                closePasswordResetModalBtn.addEventListener('click', closePasswordResetModalFunc);
+            }
+            
+            if (cancelResetRequestBtn) {
+                cancelResetRequestBtn.addEventListener('click', closePasswordResetModalFunc);
+            }
+            
+            // Close modal when clicking outside
+            if (passwordResetModal) {
+                passwordResetModal.addEventListener('click', (e) => {
+                    if (e.target === passwordResetModal) {
+                        closePasswordResetModalFunc();
+                    }
+                });
+            }
+            
+            // Close modal with Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !passwordResetModal.classList.contains('hidden')) {
+                    closePasswordResetModalFunc();
+                }
+            });
+            
+            // Handle password reset request form submission
+            if (passwordResetRequestForm) {
+                passwordResetRequestForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const email = resetEmailInput.value.trim();
+                    if (!email) {
+                        showResetError('Please enter your email address');
+                        return;
+                    }
+                    
+                    // Validate email format
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(email)) {
+                        showResetError('Please enter a valid email address');
+                        return;
+                    }
+                    
+                    // Disable submit button and show loading
+                    submitResetRequestBtn.disabled = true;
+                    submitResetRequestBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+                    resetRequestError.classList.add('hidden');
+                    
+                    try {
+                        const response = await fetch('/api/users/password/reset/request/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ email: email })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            // Show success message
+                            resetRequestSuccess.classList.remove('hidden');
+                            
+                            // Check if in development mode and show reset link
+                            if (data.is_development && data.reset_link) {
+                                resetDevelopmentInfo.classList.remove('hidden');
+                                developmentResetLink.href = data.reset_link;
+                                developmentResetLink.textContent = data.reset_link;
+                                resetRequestSuccessText.textContent = 'Email sent! In development mode, click the link below to reset your password.';
+                            } else {
+                                resetRequestSuccessText.textContent = data.message || 'If an account with that email exists, a password reset link has been sent.';
+                            }
+                            
+                            // Hide form and show confirmation after delay
+                            setTimeout(() => {
+                                passwordResetRequestForm.classList.add('hidden');
+                                passwordResetConfirmForm.classList.remove('hidden');
+                            }, 2000);
+                        } else {
+                            // Show error message
+                            showResetError(data.error || 'Failed to send password reset email. Please try again.');
+                        }
+                    } catch (error) {
+                        console.error('Password reset error:', error);
+                        showResetError('An error occurred. Please check your internet connection and try again.');
+                    } finally {
+                        submitResetRequestBtn.disabled = false;
+                        submitResetRequestBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Reset Link';
+                    }
+                });
+            }
+            
+            // Show error message
+            function showResetError(message) {
+                resetRequestError.classList.remove('hidden');
+                resetRequestErrorText.textContent = message;
+                resetRequestSuccess.classList.add('hidden');
+            }
+            
+            // Go to login button
+            if (goToLoginBtn) {
+                goToLoginBtn.addEventListener('click', () => {
+                    closePasswordResetModalFunc();
+                });
             }
         });
     </script>

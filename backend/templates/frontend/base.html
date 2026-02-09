@@ -1113,15 +1113,19 @@
             }
         });
         
-        // Auto-refresh dashboard stats every 30 seconds
-        setInterval(function() {
-            fetch('/dashboard/api/')
-                .then(response => response.json())
-                .then(data => {
-                    // Update stats display
-                    console.log('Dashboard stats updated:', data.stats);
-                });
-        }, 30000);
+        // Auto-refresh dashboard stats every 30 seconds (optional - disabled until API is available)
+        // setInterval(function() {
+        //     fetch('/dashboard/api/')
+        //         .then(response => response.json())
+        //         .then(data => {
+        //             // Update stats display
+        //             console.log('Dashboard stats updated:', data.stats);
+        //         })
+        //         .catch(error => {
+        //             // Silently handle errors - API may not exist
+        //             console.debug('Dashboard API not available');
+        //         });
+        // }, 30000);
         
         // Enhanced Toast notification system
         function showToast(message, type = 'info', duration = 5000) {
