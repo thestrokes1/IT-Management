@@ -1,31 +1,67 @@
-# Runtime log output ONLY
-backend/runtime_logs/
-*.log
-logs/
-
-
-# Python
+# PYTHON
+venv/
 .venv/
+env/
+ENV/
+
 __pycache__/
 *.py[cod]
 *.pyc
 *.so
+*$py.class
 
-# Env
+.pytest_cache/
+.coverage
+.pytest_result/
+
+# DJANGO
+*.sqlite3
+db.sqlite3
+
+staticfiles/
+media/
+
 .env
+.env.local
+.env.*.local
 
-# OS
+# LOGS
+backend/runtime_logs/
+*.log
+logs/
+
+# IDE & EDITORS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
 
-# Editors
-.idea/
-.vscode/
-*.swp
-*~
-
-# Testing / coverage
-.pytest_cache/
-.coverage
+# DEVELOPMENT
 htmlcov/
-.env
+.tox/
+.nox/
+dist/
+build/
+*.egg-info/
+.eggs/
+.site/
+.pybuilder/
+
+# TESTING & COVERAGE
+coverage.xml
+*.cover
+
+# MISCELLANEOUS
+*.pot
+
+# KEEP tracked files
+runtime.txt
+requirements.txt
+manage.py
+config/
+apps/
+.env.example
+.github/
