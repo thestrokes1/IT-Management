@@ -26,4 +26,5 @@ gunicorn==21.2.0
 
 python-decouple==3.8
 
-setuptools>=70.0.0
+
+setuptools<81
