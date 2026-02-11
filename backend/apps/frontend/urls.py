@@ -75,7 +75,8 @@ urlpatterns = [
     path('cancel-ticket/<int:ticket_id>/', cancel_ticket, name='cancel-ticket'),
     path('delete-ticket/<int:ticket_id>/', delete_ticket, name='delete-ticket'),
     path('reopen-ticket/<int:ticket_id>/', reopen_ticket, name='reopen-ticket'),
-    path('ticket-crud/', ticket_crud, name='ticket_crud'),
+    path('ticket-crud/<int:ticket_id>/', ticket_crud, name='ticket_crud'),
+    path('ticket-crud/', ticket_crud, name='ticket_crud_no_id'),  # Alias for backward compatibility
     
     # Assets
     path('assets/', assets, name='assets'),
