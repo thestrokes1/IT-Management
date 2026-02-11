@@ -105,6 +105,7 @@ urlpatterns = [
     path('project/<int:project_id>/', project_detail, name='project-detail'),
     path('delete-project/<int:project_id>/', delete_project, name='delete-project'),
     path('delete-project/<int:project_id>/', delete_project, name='project_delete'),  # Alias for template compatibility
+    path('project-crud/<int:project_id>/', delete_project, name='project_crud'),  # Alias for test compatibility
     path('create-project/', create_project, name='create-project'),
     path('edit-project/<int:project_id>/', edit_project, name='edit-project'),
     

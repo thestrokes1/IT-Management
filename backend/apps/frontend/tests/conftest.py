@@ -58,6 +58,32 @@ def superadmin_user(db):
 
 
 @pytest.fixture
+def it_admin_user(db):
+    """Create an IT Admin user for testing."""
+    from apps.users.models import User
+    user = User.objects.create_user(
+        username='it_admin',
+        email='it_admin@test.com',
+        password='testpass123',
+        role='IT_ADMIN'
+    )
+    return user
+
+
+@pytest.fixture
+def other_it_admin(db):
+    """Create another IT Admin user for testing."""
+    from apps.users.models import User
+    user = User.objects.create_user(
+        username='other_it_admin',
+        email='other_it_admin@test.com',
+        password='testpass123',
+        role='IT_ADMIN'
+    )
+    return user
+
+
+@pytest.fixture
 def ticket_category(db):
     """Create a ticket category for testing."""
     from apps.tickets.models import TicketCategory
@@ -68,13 +94,25 @@ def ticket_category(db):
 
 
 @pytest.fixture
-def ticket(ticket_category, technician_user):
+def ticket_type(db, ticket_category):
+    """Create a ticket type for testing (required for NOT NULL constraint)."""
+    from apps.tickets.models import TicketType
+    return TicketType.objects.create(
+        name='General Issue',
+        category=ticket_category,
+        description='A test ticket type'
+    )
+
+
+@pytest.fixture
+def ticket(ticket_category, ticket_type, technician_user):
     """Create a ticket for testing."""
     from apps.tickets.models import Ticket
     return Ticket.objects.create(
         title='Test Ticket',
         description='A test ticket',
         category=ticket_category,
+        ticket_type=ticket_type,
         created_by=technician_user,
         priority='MEDIUM',
         status='NEW'
