@@ -91,6 +91,15 @@ class Asset(models.Model):
     specifications = models.JSONField(default=dict, blank=True)
     tags = models.JSONField(default=list, blank=True)
     
+    # Contact information
+    CONTACT_TYPE_CHOICES = [
+        ('CLIENT', 'Client'),
+        ('TECHNICIAN', 'Technician'),
+    ]
+    contact_type = models.CharField(max_length=20, choices=CONTACT_TYPE_CHOICES, blank=True)
+    contact_email = models.EmailField(blank=True)
+    contact_phone = models.CharField(max_length=20, blank=True)
+    
     # Audit fields
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets_created')
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets_updated')

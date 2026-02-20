@@ -5,14 +5,19 @@
 {% block content %}
 <div class="container mx-auto px-4 py-6 sm:py-8">
     
-    <!-- Breadcrumb / Back link -->
-    <div class="mb-6">
+<!-- Breadcrumb / Back link -->
+    <div class="mb-6 flex items-center justify-between">
         <a href="{% url 'frontend:tickets' %}" 
            class="text-blue-600 hover:text-blue-900 flex items-center gap-2 text-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
             {% trans "Back to Tickets" %}
+        </a>
+        <a href="{% url 'frontend:edit-ticket' ticket.id %}" 
+           class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+            <i class="fas fa-edit mr-2"></i>
+            {% trans "Edit" %}
         </a>
     </div>
 
@@ -38,7 +43,7 @@
                         {{ ticket.title }}
                     </h1>
                     
-                    <!-- Subtitle: Created by, Created at -->
+<!-- Subtitle: Created by, Created at -->
                     <p class="text-sm text-gray-600">
                         {% trans "Created by" %} <strong>{{ ticket.requester.username }}</strong>
                         {% trans "on" %} 
@@ -98,6 +103,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Column 1 -->
                         <div class="space-y-4">
+                            <!-- Category -->
                             <div class="flex justify-between py-3 border-b border-gray-200">
                                 <dt class="text-sm font-medium text-gray-600">{% trans "Category" %}</dt>
                                 <dd class="text-sm font-medium text-gray-900">
@@ -105,6 +111,7 @@
                                 </dd>
                             </div>
                             
+                            <!-- Type -->
                             <div class="flex justify-between py-3 border-b border-gray-200">
                                 <dt class="text-sm font-medium text-gray-600">{% trans "Type" %}</dt>
                                 <dd class="text-sm font-medium text-gray-900">
@@ -112,6 +119,7 @@
                                 </dd>
                             </div>
                             
+                            <!-- Impact -->
                             <div class="flex justify-between py-3 border-b border-gray-200">
                                 <dt class="text-sm font-medium text-gray-600">{% trans "Impact" %}</dt>
                                 <dd class="text-sm font-medium text-gray-900">
@@ -119,16 +127,23 @@
                                 </dd>
                             </div>
 
-                            <div class="flex justify-between py-3">
+                            <!-- Urgency -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
                                 <dt class="text-sm font-medium text-gray-600">{% trans "Urgency" %}</dt>
                                 <dd class="text-sm font-medium text-gray-900">
                                     {{ ticket_urgency_display|default:"-" }}
                                 </dd>
                             </div>
-                        </div>
 
-                        <!-- Column 2 -->
-                        <div class="space-y-4">
+                            <!-- Location -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Location" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket.location|default:"-" }}
+                                </dd>
+                            </div>
+
+                            <!-- Assigned To -->
                             <div class="flex justify-between py-3 border-b border-gray-200">
                                 <dt class="text-sm font-medium text-gray-600">{% trans "Assigned To" %}</dt>
                                 <dd class="text-sm font-medium text-gray-900">
@@ -143,39 +158,73 @@
                                     {% endif %}
                                 </dd>
                             </div>
+                        </div>
 
+                        <!-- Column 2 -->
+                        <div class="space-y-4">
+                            <!-- Status -->
                             <div class="flex justify-between py-3 border-b border-gray-200">
-                                <dt class="text-sm font-medium text-gray-600">{% trans "Created" %}</dt>
-                                <dd class="text-sm font-medium text-gray-900">
-                                    <time datetime="{{ ticket.created_at|date:'c' }}">
-                                        {{ ticket.created_at|date:'M d, Y' }}
-                                    </time>
-                                </dd>
-                            </div>
-
-                            <div class="flex justify-between py-3 border-b border-gray-200">
-                                <dt class="text-sm font-medium text-gray-600">{% trans "Updated" %}</dt>
-                                <dd class="text-sm font-medium text-gray-900">
-                                    <time datetime="{{ ticket.updated_at|date:'c' }}">
-                                        {{ ticket.updated_at|date:'M d, Y' }}
-                                    </time>
-                                </dd>
-                            </div>
-
-                            <div class="flex justify-between py-3">
                                 <dt class="text-sm font-medium text-gray-600">{% trans "Status" %}</dt>
                                 <dd class="text-sm font-medium text-gray-900">
-                                    {% if ticket.resolved_at %}
-                                        <time datetime="{{ ticket.resolved_at|date:'c' }}">
-                                            {{ ticket.resolved_at|date:'M d, Y H:i' }}
-                                        </time>
-                                    {% elif ticket.closed_at %}
-                                        <time datetime="{{ ticket.closed_at|date:'c' }}">
-                                            {{ ticket.closed_at|date:'M d, Y H:i' }}
-                                        </time>
-                                    {% else %}
-                                        {% trans "Ongoing" %}
-                                    {% endif %}
+                                    <span class="px-2 py-1 rounded text-xs font-semibold
+                                        {% if ticket.status == 'NEW' %}bg-blue-100 text-blue-800
+                                        {% elif ticket.status == 'OPEN' %}bg-green-100 text-green-800
+                                        {% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
+                                        {% elif ticket.status == 'PENDING' %}bg-orange-100 text-orange-800
+                                        {% elif ticket.status == 'RESOLVED' %}bg-indigo-100 text-indigo-800
+                                        {% elif ticket.status == 'CLOSED' %}bg-gray-100 text-gray-800
+                                        {% elif ticket.status == 'CANCELLED' %}bg-red-100 text-red-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ ticket_status_display|upper }}
+                                    </span>
+                                </dd>
+                            </div>
+
+                            <!-- Priority -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Priority" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    <span class="px-2 py-1 rounded text-xs font-semibold
+                                        {% if ticket.priority == 'LOW' %}bg-blue-50 text-blue-700
+                                        {% elif ticket.priority == 'MEDIUM' %}bg-yellow-50 text-yellow-700
+                                        {% elif ticket.priority == 'HIGH' %}bg-orange-50 text-orange-700
+                                        {% elif ticket.priority == 'CRITICAL' %}bg-red-50 text-red-700
+                                        {% elif ticket.priority == 'URGENT' %}bg-red-100 text-red-900 font-bold
+                                        {% else %}bg-gray-50 text-gray-700{% endif %}">
+                                        {{ ticket_priority_display|upper }}
+                                    </span>
+                                </dd>
+                            </div>
+
+                            <!-- Contact Type -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Contact Type" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if ticket.contact_type %}{{ ticket.get_contact_type_display }}{% else %}-{% endif %}
+                                </dd>
+                            </div>
+
+                            <!-- Contact Email -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Contact Email" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket.contact_email|default:"-" }}
+                                </dd>
+                            </div>
+
+                            <!-- Contact Phone -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Contact Phone" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket.contact_phone|default:"-" }}
+                                </dd>
+                            </div>
+
+                            <!-- Requester -->
+                            <div class="flex justify-between py-3">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Created By" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket.requester.username|default:"-" }}
                                 </dd>
                             </div>
                         </div>
@@ -253,10 +302,11 @@
                 </div>
                 
                 <div class="p-4 space-y-3 text-sm">
+                    <!-- Fecha de creación -->
                     <div class="flex gap-2">
                         <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #3B82F6; margin-top: 3px;"></span>
                         <div>
-                            <p class="font-medium text-gray-900">{{ ticket_status_display }}</p>
+                            <p class="font-medium text-gray-900">{% trans "Fecha de creación" %}</p>
                             <p class="text-xs text-gray-500">
                                 <time datetime="{{ ticket.created_at|date:'c' }}">
                                     {{ ticket.created_at|date:'M d, H:i' }}
@@ -265,33 +315,18 @@
                         </div>
                     </div>
                     
-                    {% if ticket.resolved_at %}
+                    <!-- Last Updated -->
                     <div class="flex gap-2">
                         <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #10B981; margin-top: 3px;"></span>
                         <div>
-                            <p class="font-medium text-gray-900">{% trans "Resolved" %}</p>
+                            <p class="font-medium text-gray-900">{% trans "Last Updated" %}</p>
                             <p class="text-xs text-gray-500">
-                                <time datetime="{{ ticket.resolved_at|date:'c' }}">
-                                    {{ ticket.resolved_at|date:'M d, H:i' }}
+                                <time datetime="{{ ticket.updated_at|date:'c' }}">
+                                    {{ ticket.updated_at|date:'M d, H:i' }}
                                 </time>
                             </p>
                         </div>
                     </div>
-                    {% endif %}
-                    
-                    {% if ticket.closed_at %}
-                    <div class="flex gap-2">
-                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #6B7280; margin-top: 3px;"></span>
-                        <div>
-                            <p class="font-medium text-gray-900">{% trans "Closed" %}</p>
-                            <p class="text-xs text-gray-500">
-                                <time datetime="{{ ticket.closed_at|date:'c' }}">
-                                    {{ ticket.closed_at|date:'M d, H:i' }}
-                                </time>
-                            </p>
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
 
@@ -721,116 +756,6 @@
             </form>
         </div>
         {% endif %}
-    </div>
-    {% endif %}
-
-    <!-- ========================================================================
-         CLIENT / REQUESTER REVIEW SECTION - Phase 3C (Full Width, Requester Only)
-         ======================================================================== -->
-    {% if user == ticket.requester %}
-    <div class="mt-12 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <!-- Review header -->
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h2 class="text-lg font-semibold text-gray-900">
-                ⭐ {% trans "Share Your Feedback" %}
-            </h2>
-        </div>
-
-        <!-- Review content -->
-        <div class="px-6 py-4">
-            {% if has_review %}
-                <!-- Existing review display (read-only) -->
-                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div class="flex items-start justify-between mb-3">
-                        <div>
-                            {% if client_review.rating %}
-                                <div class="flex items-center gap-1 mb-2">
-                                    {% for i in "12345" %}
-                                        {% if i|add:0 <= client_review.rating %}
-                                            <span class="text-lg">⭐</span>
-                                        {% else %}
-                                            <span class="text-lg text-gray-300">☆</span>
-                                        {% endif %}
-                                    {% endfor %}
-                                    <span class="text-sm text-gray-600 ml-2">({{ client_review.rating }}/5)</span>
-                                </div>
-                            {% endif %}
-                        </div>
-                        <time datetime="{{ client_review.created_at|date:'c' }}" class="text-xs text-gray-500">
-                            {{ client_review.created_at|date:'M d, Y H:i' }}
-                        </time>
-                    </div>
-                    
-                    {% if client_review.comment %}
-                        <p class="text-sm text-gray-800 whitespace-pre-wrap">
-                            {{ client_review.comment }}
-                        </p>
-                    {% endif %}
-                </div>
-            {% elif can_submit_review %}
-                <!-- Review submission form -->
-                <form method="post" id="review-form">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="submit_review">
-                    
-                    <div class="space-y-4">
-                        <!-- Rating selector (1-5 stars) -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-3">
-                                {% trans "Rating (Optional)" %}
-                            </label>
-                            <div class="flex gap-2">
-                                {% for rating in "12345" %}
-                                    <label class="flex items-center cursor-pointer">
-                                        <input type="radio" name="rating" value="{{ rating|add:0 }}" class="sr-only peer">
-                                        <span class="text-4xl peer-checked:text-yellow-400 text-gray-300 hover:text-yellow-300 transition-colors">⭐</span>
-                                    </label>
-                                {% endfor %}
-                            </div>
-                            <p class="mt-2 text-xs text-gray-500">
-                                {% trans "Click to select a rating" %}
-                            </p>
-                        </div>
-                        
-                        <!-- Comment textarea -->
-                        <div>
-                            <label for="comment" class="block text-sm font-medium text-gray-700 mb-2">
-                                {% trans "Comments (Optional)" %}
-                            </label>
-                            <textarea id="comment" name="comment" 
-                                      rows="4"
-                                      maxlength="2000"
-                                      placeholder="{% trans 'Tell us about your experience with this ticket resolution...' %}"
-                                      class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm font-sans resize-vertical"
-                                      ></textarea>
-                            <p class="mt-1 text-xs text-gray-500">
-                                {% trans "Plain text only, up to 2000 characters." %}
-                            </p>
-                        </div>
-                        
-                        <!-- Help text -->
-                        <p class="text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
-                            <strong>💡 {% trans "Your Feedback" %}:</strong> {% trans "Your feedback helps us improve our service. Once submitted, this review cannot be edited." %}
-                        </p>
-                        
-                        <!-- Submit button -->
-                        <div class="flex gap-3">
-                            <button type="submit" 
-                                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors text-sm">
-                                {% trans "Submit Review" %}
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            {% elif ticket.status not in "RESOLVED,CLOSED" %}
-                <!-- Not eligible - ticket not resolved/closed -->
-                <div class="text-center py-6">
-                    <p class="text-sm text-gray-600">
-                        {% trans "Reviews are available once the ticket is resolved or closed." %}
-                    </p>
-                </div>
-            {% endif %}
-        </div>
     </div>
     {% endif %}
 

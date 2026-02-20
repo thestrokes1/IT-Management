@@ -101,7 +101,60 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
                 "You do not have permission to view this ticket."
             )
         
+        # Log ticket view event
+        self._log_ticket_view(request.user, ticket)
+        
         return super().dispatch(request, *args, **kwargs)
+    
+    def _log_ticket_view(self, actor, ticket: Ticket) -> None:
+        """
+        Log ticket view event in ActivityLog.
+        
+        Args:
+            actor: User who viewed the ticket
+            ticket: Ticket that was viewed
+        """
+        # Check if this view was already logged recently (within last 5 minutes)
+        # to avoid spamming the activity log
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        recent_view = ActivityLog.objects.filter(
+            event_type='TICKET_VIEWED',
+            actor_id=str(actor.id),
+            entity_id=ticket.id,
+            timestamp__gte=timezone.now() - timedelta(minutes=5)
+        ).exists()
+        
+        if recent_view:
+            return  # Skip logging if already logged recently
+        
+        ActivityLog.objects.create(
+            event_type='TICKET_VIEWED',
+            action='VIEW',
+            level='INFO',
+            severity='INFO',
+            intent='access',
+            entity_type='ticket',
+            entity_id=ticket.id,
+            actor_type='user',
+            actor_id=str(actor.id),
+            actor_name=actor.username,
+            actor_role=actor.role,
+            title=f'Ticket viewed by {actor.username}',
+            description=f'User viewed ticket details',
+            model_name='ticket',
+            object_id=ticket.id,
+            object_repr=f'{ticket.title}',
+            ip_address=self._get_client_ip(self.request),
+            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+            request_path=self.request.path,
+            request_method=self.request.method,
+            extra_data={
+                'ticket_id': str(ticket.ticket_id),
+                'ticket_title': ticket.title,
+            }
+        )
     
     def post(self, request, *args, **kwargs):
         """
@@ -215,7 +268,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             level='INFO',
             severity='INFO',
             intent='workflow',
-            entity_type='Ticket',
+            entity_type='ticket',
             entity_id=ticket.id,
             actor_type='user',
             actor_id=str(actor.id),
@@ -223,7 +276,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             actor_role=actor.role,
             title=f'Ticket assigned to {new_assignee.username}',
             description=description,
-            model_name='Ticket',
+            model_name='ticket',
             object_id=ticket.id,
             object_repr=f'{ticket.title} (assigned to {new_assignee.username})',
             ip_address=self._get_client_ip(self.request),
@@ -353,10 +406,12 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         
         allowed = base_transitions.get(current_status, [])
         
-        # Technicians have additional restrictions
+        # Technicians have full access to status transitions
+        # (can resolve, pending, in progress, close, and cancel)
         if user.role == 'TECHNICIAN':
-            # Technicians cannot close or revert from closed
-            allowed = [s for s in allowed if s not in ['CLOSED', 'CANCELLED']]
+            # Technicians can now transition to any available status
+            # No restrictions - they can resolve, close, or cancel tickets
+            pass
         
         # Admins can also directly change to certain statuses
         if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
@@ -387,7 +442,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             level='INFO',
             severity='INFO',
             intent='workflow',
-            entity_type='Ticket',
+            entity_type='ticket',
             entity_id=ticket.id,
             actor_type='user',
             actor_id=str(actor.id),
@@ -511,7 +566,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             level='INFO',
             severity='INFO',
             intent='workflow',
-            entity_type='Ticket',
+            entity_type='ticket',
             entity_id=ticket.id,
             actor_type='user',
             actor_id=str(actor.id),
@@ -630,10 +685,12 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             return note_types
         
         # Query ActivityLog for all TICKET_NOTE_ADDED events for these notes
+        # Use case-insensitive matching for entity_type
         log_entries = ActivityLog.objects.filter(
             event_type='TICKET_NOTE_ADDED',
-            entity_type='Ticket',
-            entity_id=ticket.id
+        ).filter(
+            Q(entity_type__iexact='ticket', entity_id=ticket.id) |
+            Q(model_name__iexact='ticket', object_id=ticket.id)
         ).values('object_id', 'extra_data')
         
         # Build mapping from extra_data which contains note_id and note_type
@@ -679,7 +736,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             level='INFO',
             severity='INFO',
             intent='workflow',
-            entity_type='Ticket',
+            entity_type='ticket',
             entity_id=ticket.id,
             actor_type='user',
             actor_id=str(actor.id),
@@ -792,7 +849,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             level='INFO',
             severity='INFO',
             intent='feedback',
-            entity_type='Ticket',
+            entity_type='ticket',
             entity_id=ticket.id,
             actor_type='user',
             actor_id=str(actor.id),
@@ -876,9 +933,10 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         # ACTIVITY LOG - Source of truth for all ticket events
         # =====================================================================
         # Query ActivityLog filtered by this ticket
+        # Use case-insensitive matching for entity_type to catch both 'ticket' and 'Ticket'
         activity_entries = ActivityLog.objects.filter(
-            entity_type='Ticket',
-            entity_id=ticket.id
+            Q(entity_type__iexact='ticket', entity_id=ticket.id) |
+            Q(model_name__iexact='ticket', object_id=ticket.id)
         ).select_related(
             'user'  # Optional: if you have user FK for legacy data
         ).order_by('-timestamp')  # Newest first
@@ -887,6 +945,24 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         paginator = Paginator(activity_entries, per_page=10)
         page_number = self.request.GET.get('activity_page', 1)
         activities_page = paginator.get_page(page_number)
+        
+        # Format activities for template compatibility
+        formatted_activities = []
+        for activity in activities_page:
+            # Build formatted activity dict that template expects
+            formatted = {
+                'actor_name': activity.actor_name or activity.user.username if activity.user else 'System',
+                'actor_role': activity.actor_role or (activity.user.role if activity.user else 'SYSTEM'),
+                'event_type': activity.event_type or activity.action or 'ACTIVITY',
+                'action': activity.action or activity.event_type or 'ACTIVITY',
+                'timestamp': activity.timestamp,
+                'description': activity.description or '',
+                'extra_data': activity.extra_data or {},
+            }
+            formatted_activities.append(formatted)
+        
+        # Replace the paginator page with formatted activities
+        activities_page.object_list = formatted_activities
         
         context['activities'] = activities_page
         context['activities_count'] = activity_entries.count()

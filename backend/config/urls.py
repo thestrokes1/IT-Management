@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/tickets/', include('apps.tickets.urls')),
     path('api/projects/', include('apps.projects.urls')),
     path('api/logs/', include('apps.logs.urls')),
+    path('api/logs/', include('apps.logs.api.urls')),  # Activity Timeline API
     path('api/security/', include('apps.security.urls')),
     
     # Web interface (Django templates)

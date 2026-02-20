@@ -93,7 +93,19 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         # Use Query for reads
         categories = AssetQuery.get_categories()
-        available_users = AssetQuery.get_active_users()
+        
+        # Get list of assignable users based on role
+        from apps.users.models import User
+        user = self.request.user
+        
+        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+            # Show all technicians for assignment
+            available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
+        elif user.role == 'TECHNICIAN':
+            # Technician can only see themselves for self-assignment
+            available_users = User.objects.filter(id=user.id)
+        else:
+            available_users = User.objects.none()
         
         # Get list permissions for template consistency
         list_permissions = get_list_permissions(self.request.user)
@@ -187,16 +199,90 @@ class AssetDetailView(LoginRequiredMixin, TemplateView):
             'assignable_users': assignable_users,
         })
         return context
+    
+    def post(self, request, *args, **kwargs):
+        """Handle asset assignment from sidebar form."""
+        asset_id = self.kwargs.get('asset_id')
+        action = request.POST.get('action')
+        
+        if action == 'assign':
+            assigned_to_id = request.POST.get('assigned_to')
+            
+            if not assigned_to_id:
+                # Unassign the asset
+                from apps.assets.models import Asset
+                from apps.assets.application.commands import AssetAssignmentCommand
+                from apps.assets.application.handlers import assign_asset
+                from uuid import UUID
+                
+                try:
+                    asset = Asset.objects.get(id=asset_id)
+                    command = AssetAssignmentCommand(
+                        actor=request.user,
+                        asset_id=asset.asset_id,
+                        assignee_id=None  # None = unassign
+                    )
+                    result = assign_asset(command)
+                    
+                    if result.success:
+                        messages.success(request, 'Asset unassigned successfully!')
+                    else:
+                        messages.error(request, result.error)
+                except Exception as e:
+                    messages.error(request, f'Error: {str(e)}')
+            else:
+                # Assign to selected user
+                from apps.users.models import User
+                from apps.assets.models import Asset
+                from apps.assets.application.commands import AssetAssignmentCommand
+                from apps.assets.application.handlers import assign_asset
+                
+                try:
+                    target_user = User.objects.get(id=assigned_to_id)
+                    asset = Asset.objects.get(id=asset_id)
+                    
+                    command = AssetAssignmentCommand(
+                        actor=request.user,
+                        asset_id=asset.asset_id,
+                        assignee_id=target_user.id
+                    )
+                    result = assign_asset(command)
+                    
+                    if result.success:
+                        messages.success(request, f'Asset assigned to {target_user.username} successfully!')
+                    else:
+                        messages.error(request, result.error)
+                except User.DoesNotExist:
+                    messages.error(request, 'User not found.')
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    messages.error(request, f'Error: {str(e)}')
+        
+        return redirect('frontend:asset-detail', asset_id=asset_id)
 
 
-class EditAssetView(CanManageAssetsMixin, TemplateView):
+class EditAssetView(LoginRequiredMixin, TemplateView):
     """
     Edit asset web interface.
     Uses AssetQuery for reads, AssetService for writes.
     Uses permission_mapper for UI permission flags.
+    
+    Allows:
+    - SUPERADMIN, MANAGER, IT_ADMIN: Full edit access
+    - TECHNICIAN: Self-assignment only (can assign/unassign themselves)
     """
     template_name = 'frontend/edit-asset.html'
     login_url = 'frontend:login'
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Allow technicians for self-assignment, otherwise require can_manage_assets
+        if request.user.role == 'TECHNICIAN':
+            pass  # Technicians allowed for self-assignment
+        elif not request.user.can_manage_assets:
+            messages.error(request, 'You do not have permission to manage assets.')
+            return redirect('frontend:assets')
+        return super().dispatch(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -210,7 +296,19 @@ class EditAssetView(CanManageAssetsMixin, TemplateView):
             return redirect('frontend:assets')
         
         categories = AssetQuery.get_categories()
-        available_users = AssetQuery.get_active_users()
+        
+        # Get list of assignable users based on role
+        from apps.users.models import User
+        user = self.request.user
+        
+        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+            # Show all technicians for assignment
+            available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
+        elif user.role == 'TECHNICIAN':
+            # Technician can only see themselves for self-assignment
+            available_users = User.objects.filter(id=user.id)
+        else:
+            available_users = User.objects.none()
         
         # Build UI permission flags using permission_mapper
         permissions = build_asset_ui_permissions(self.request.user, asset)

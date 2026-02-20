@@ -1,121 +1,482 @@
+
 {% extends "frontend/base.html" %}
 {% load i18n %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-6 sm:py-8">
-    <div class="mb-4">
-        <a href="/assets/" class="text-blue-600 hover:text-blue-900 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+    
+    <!-- Breadcrumb / Back link -->
+    <div class="mb-6 flex items-center justify-between">
+        <a href="/assets/" 
+           class="text-blue-600 hover:text-blue-900 flex items-center gap-2 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
             {% trans "Back to Assets" %}
         </a>
+        {% if permissions.can_update %}
+        <a href="{% url 'frontend:edit-asset' asset.id %}" 
+           class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+            <i class="fas fa-edit mr-2"></i>
+            {% trans "Edit" %}
+        </a>
+        {% endif %}
     </div>
-    
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900">{{ asset.name }}</h1>
-                <p class="text-sm text-gray-500 mt-1">#{{ asset.id }} - {{ asset.asset_tag }}</p>
+
+    <!-- Header Section -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6 border-b-4" 
+         style="border-bottom-color: {% if asset.status == 'ACTIVE' %}#10B981{% elif asset.status == 'MAINTENANCE' %}#F59E0B{% elif asset.status == 'RETIRED' %}#6B7280{% elif asset.status == 'INACTIVE' %}#EF4444{% else %}#6B7280{% endif %}">
+        
+        <div class="px-6 py-6">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <p class="text-xs font-mono text-gray-500 mb-2">
+                        Asset ID: <code class="bg-gray-100 px-2 py-1 rounded">#{{ asset.id }}</code>
+                    </p>
+                    
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                        {{ asset.name }}
+                    </h1>
+                    
+                    <p class="text-sm text-gray-600">
+                        {% trans "Asset Tag" %}: <strong>{{ asset.asset_tag }}</strong>
+                    </p>
+                </div>
+
+                <!-- Status badge -->
+                <div class="flex flex-col gap-2 ml-4">
+                    <span class="px-4 py-2 rounded-full text-sm font-semibold inline-block text-center
+                        {% if asset.status == 'ACTIVE' %}bg-green-100 text-green-800
+                        {% elif asset.status == 'MAINTENANCE' %}bg-yellow-100 text-yellow-800
+                        {% elif asset.status == 'RETIRED' %}bg-gray-100 text-gray-800
+                        {% elif asset.status == 'INACTIVE' %}bg-red-100 text-red-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ asset.get_status_display|default:asset.status|upper }}
+                    </span>
+                </div>
             </div>
-            <span class="px-3 py-1 rounded-full text-sm font-medium {% if asset.status == 'ACTIVE' %}bg-green-100 text-green-800{% elif asset.status == 'INACTIVE' %}bg-gray-100 text-gray-800{% elif asset.status == 'MAINTENANCE' %}bg-yellow-100 text-yellow-800{% else %}bg-red-100 text-red-800{% endif %}">
-                {{ asset.status }}
-            </span>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- LEFT COLUMN: Main content (2/3 width on desktop) -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- OVERVIEW METADATA SECTION -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 class="text-lg font-semibold text-gray-900">
+                        {% trans "Overview" %}
+                    </h2>
+                </div>
+                
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <!-- Asset Type -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Asset Type" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.get_asset_type_display|default:asset.asset_type|upper }}
+                                </dd>
+                            </div>
+                            
+                            <!-- Category -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Category" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.category.name|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <!-- Serial Number -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Serial Number" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.serial_number|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <!-- Model -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Model" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.model|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <!-- Manufacturer -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Manufacturer" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.manufacturer|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <!-- Version -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Version" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.version|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <!-- Location -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Location" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.location|default:"-" }}
+                                </dd>
+                            </div>
+
+                            <!-- Assigned To -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Assigned To" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if asset.assigned_to %}
+                                        <span class="px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-semibold">
+                                            {{ asset.assigned_to.username }}
+                                        </span>
+                                    {% else %}
+                                        <span class="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-semibold">
+                                            {% trans "Unassigned" %}
+                                        </span>
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <!-- Status -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Status" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    <span class="px-2 py-1 rounded text-xs font-semibold
+                                        {% if asset.status == 'ACTIVE' %}bg-green-100 text-green-800
+                                        {% elif asset.status == 'MAINTENANCE' %}bg-yellow-100 text-yellow-800
+                                        {% elif asset.status == 'RETIRED' %}bg-gray-100 text-gray-800
+                                        {% elif asset.status == 'INACTIVE' %}bg-red-100 text-red-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ asset.get_status_display|default:asset.status|upper }}
+                                    </span>
+                                </dd>
+                            </div>
+                            
+                            <!-- Purchase Date -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Purchase Date" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if asset.purchase_date %}{{ asset.purchase_date|date:"m/d/Y" }}{% else %}-{% endif %}
+                                </dd>
+                            </div>
+                            
+                            <!-- Purchase Cost -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Purchase Cost" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if asset.purchase_cost %}${{ asset.purchase_cost }}{% else %}-{% endif %}
+                                </dd>
+                            </div>
+                            
+                            <!-- Warranty Expiry -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Warranty Expiry" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if asset.warranty_expiry %}{{ asset.warranty_expiry|date:"m/d/Y" }}{% else %}-{% endif %}
+                                </dd>
+                            </div>
+                            
+                            <!-- End of Life -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "End of Life" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if asset.end_of_life %}{{ asset.end_of_life|date:"m/d/Y" }}{% else %}-{% endif %}
+                                </dd>
+                            </div>
+                            
+                            <!-- Contact Type -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Contact Type" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {% if asset.contact_type %}{{ asset.get_contact_type_display }}{% else %}-{% endif %}
+                                </dd>
+                            </div>
+                            
+                            <!-- Contact Email -->
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Contact Email" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.contact_email|default:"-" }}
+                                </dd>
+                            </div>
+                            
+                            <!-- Contact Phone -->
+                            <div class="flex justify-between py-3">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Contact Phone" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ asset.contact_phone|default:"-" }}
+                                </dd>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DESCRIPTION SECTION -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 class="text-lg font-semibold text-gray-900">
+                        {% trans "Description" %}
+                    </h2>
+                </div>
+                
+                <div class="p-6">
+                    {% if asset.description %}
+                        <p class="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                            {{ asset.description }}
+                        </p>
+                    {% else %}
+                        <p class="text-gray-400 italic">
+                            {% trans "No description provided." %}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Sidebar -->
+        <aside class="lg:col-span-1 space-y-6">
+            
+            <!-- TIMELINE WIDGET -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        📊 {% trans "Timeline" %}
+                    </h3>
+                </div>
+                
+                <div class="p-4 space-y-3 text-sm">
+                    <div class="flex gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #10B981; margin-top: 3px;"></span>
+                        <div>
+                            <p class="font-medium text-gray-900">{% trans "Created" %}</p>
+                            <p class="text-xs text-gray-500">
+                                <time datetime="{{ asset.created_at|date:'c' }}">
+                                    {{ asset.created_at|date:'M d, H:i' }}
+                                </time>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {% if asset.updated_at %}
+                    <div class="flex gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background-color: #6B7280; margin-top: 3px;"></span>
+                        <div>
+                            <p class="font-medium text-gray-900">{% trans "Last Updated" %}</p>
+                            <p class="text-xs text-gray-500">
+                                <time datetime="{{ asset.updated_at|date:'c' }}">
+                                    {{ asset.updated_at|date:'M d, H:i' }}
+                                </time>
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ASSIGNEE WIDGET -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        👤 {% trans "Assignee" %}
+                    </h3>
+                </div>
+                
+                <div class="p-4">
+                    {% if asset.assigned_to %}
+                        <div class="text-center">
+                            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-blue-100 flex items-center justify-center text-lg font-semibold text-blue-600">
+                                {{ asset.assigned_to.username|first|upper }}
+                            </div>
+                            <p class="text-sm font-medium text-gray-900">
+                                {{ asset.assigned_to.username }}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ asset.assigned_to.get_role_display|default:asset.assigned_to.role }}
+                            </p>
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-gray-500 text-center py-2">
+                            {% trans "Not assigned" %}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ASSIGNMENT CONTROL -->
+            {% if request.user.role in "SUPERADMIN,MANAGER,IT_ADMIN" %}
+            {% if assignable_users %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        ✏️ {% trans "Assign Asset" %}
+                    </h3>
+                </div>
+                
+                <form method="post" class="p-4" id="assignment-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assign">
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label for="assigned_to" class="block text-sm font-medium text-gray-700 mb-2">
+                                {% trans "Assign to Technician" %} <span class="text-red-500">*</span>
+                            </label>
+                            <select id="assigned_to" name="assigned_to" required 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <option value="">-- {% trans "Select Technician" %} --</option>
+                                <option value="">{% trans "Unassigned (Available)" %}</option>
+                                {% for user in assignable_users %}
+                                    <option value="{{ user.id }}" 
+                                            {% if asset.assigned_to.id == user.id %}selected{% endif %}>
+                                        {{ user.username }} ({{ user.role }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <button type="submit" 
+                                class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors text-sm">
+                            {% trans "Save Assignment" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            <!-- SELF-ASSIGN BUTTON -->
+            {% if request.user.role == "TECHNICIAN" and permissions.can_self_assign and not asset.assigned_to %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                        🙋 {% trans "Self-Assignment" %}
+                    </h3>
+                </div>
+                <div class="p-4">
+                    <form method="post" action="{% url 'frontend:asset_assign_self' asset.id %}">
+                        {% csrf_token %}
+                        <button type="submit" 
+                                class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors text-sm">
+                            {% trans "Assign to Me" %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+        </aside>
+
+    </div>
+
+    <!-- Activity Log Section (Full Width) -->
+    <div class="mt-12 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">
+                    📋 {% trans "Activity Log" %}
+                </h2>
+                {% if activities_count %}
+                    <span class="text-xs font-medium text-gray-600 bg-gray-200 px-3 py-1 rounded-full">
+                        {{ activities_count }} {% trans "entries" %}
+                    </span>
+                {% endif %}
+            </div>
         </div>
 
         <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Details" %}</h3>
-                    <dl class="space-y-2">
-                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "Serial Number" %}</dt><dd class="font-medium">{{ asset.serial_number|default:"-" }}</dd></div>
-                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "Category" %}</dt><dd class="font-medium">{{ asset.category.name|default:"-" }}</dd></div>
-                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "Location" %}</dt><dd class="font-medium">{{ asset.location.name|default:"-" }}</dd></div>
-                        <div class="flex justify-between py-2 border-b"><dt class="text-gray-600">{% trans "Assigned To" %}</dt><dd class="font-medium">{{ asset.assigned_to.username|default:"Available" }}</dd></div>
-                    </dl>
-                </div>
-                <div>
-                    <h3 class="text-sm font-medium text-gray-500 mb-2">{% trans "Description" %}</h3>
-                    <p class="text-gray-700 whitespace-pre-wrap">{{ asset.description|default:"No description" }}</p>
-                </div>
-        </div>
+            {% if activities %}
+                <div class="space-y-6" id="activity-list">
+                    {% for activity in activities %}
+                    <div class="flex gap-4 pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
+                        <!-- Avatar circle -->
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span class="text-blue-600 text-sm font-semibold">
+                                    {{ activity.actor_username|first|upper }}
+                                </span>
+                            </div>
+                        </div>
 
-        {% if not is_deleted %}
-        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
-            <div class="flex flex-wrap gap-3">
-                {# ===== Assignment actions ===== #}
-                
-                {# Assign dropdown for SUPERADMIN, MANAGER, IT_ADMIN #}
-                {% if request.user.role in "SUPERADMIN,MANAGER,IT_ADMIN" %}
-                    {% if assignable_users %}
-                    <div class="relative inline-block">
-                        <form method="post" action="{% url 'frontend:asset_assign_to_user' asset.id 0 %}" id="asset-assign-form" style="display:inline;">
-                            {% csrf_token %}
-                            <select name="user_id" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm" onchange="if(this.value){this.form.action='{% url 'frontend:asset_assign_to_user' asset.id 0 %}'.replace('0', this.value); this.form.submit();}">
-                                <option value="">{% trans "Assign to..." %}</option>
-                                {% for user in assignable_users %}
-                                <option value="{{ user.id }}">{{ user.username }} ({{ user.role }})</option>
-                                {% endfor %}
-                            </select>
-                        </form>
+                        <!-- Activity content -->
+                        <div class="flex-1 min-w-0">
+                            <!-- Header: Event type and timestamp -->
+                            <div class="flex items-start justify-between gap-2 mb-1">
+                                <h4 class="text-sm font-semibold text-gray-900">
+                                    {{ activity.action_label }}
+                                </h4>
+                                <span class="text-xs text-gray-500 whitespace-nowrap">
+                                    <time datetime="{{ activity.created_at|date:'c' }}">
+                                        {{ activity.created_at|timesince }} {% trans "ago" %}
+                                    </time>
+                                </span>
+                            </div>
+
+                            <!-- Subheader: Actor info -->
+                            <p class="text-xs text-gray-600 mb-2">
+                                <strong>{{ activity.actor_username }}</strong>
+                                •
+                                <time datetime="{{ activity.created_at|date:'c' }}" class="text-gray-500">
+                                    {{ activity.created_at|date:'M d, Y H:i' }}
+                                </time>
+                            </p>
+                        </div>
                     </div>
+                    {% endfor %}
+                </div>
+
+                {% if activities.has_other_pages %}
+                <div class="mt-6 pt-6 border-t border-gray-200 flex justify-center gap-2">
+                    {% if activities.has_previous %}
+                        <a href="?activity_page=1" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            {% trans "First" %}
+                        </a>
+                        <a href="?activity_page={{ activities.previous_page_number }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            ← {% trans "Previous" %}
+                        </a>
                     {% endif %}
-                {% endif %}
-                
-                {# Self-assign button for TECHNICIAN #}
-                {% if request.user.role == "TECHNICIAN" and permissions.can_self_assign %}
-                <form method="post" action="{% url 'frontend:asset_assign_self' asset.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm">
-                        Assign to me
-                    </button>
-                </form>
-                {% endif %}
 
-                {# Unassign button for assigned user #}
-                {% if permissions.assigned_to_me and permissions.can_unassign %}
-                <form method="post" action="{% url 'frontend:asset_unassign_self' asset.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm" onclick="return confirm('Unassign this asset from yourself?');">
-                        Cancel assignment
-                    </button>
-                </form>
-                {% endif %}
+                    <span class="px-3 py-2 text-sm text-gray-600">
+                        {% trans "Page" %} {{ activities.number }} {% trans "of" %} {{ activities.paginator.num_pages }}
+                    </span>
 
-                {% if permissions.can_checkout %}
-                <a href="{% url 'frontend:asset_checkout' asset.id %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm">{% trans "[ Checkout ]" %}</a>
-                {% endif %}
-                {% if permissions.can_checkin %}
-                <a href="{% url 'frontend:asset_checkin' asset.id %}" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition text-sm" onclick="return confirm('Return this asset?');">{% trans "[ Return ]" %}</a>
-                {% endif %}
-                {% if permissions.can_edit %}
-                <a href="{% url 'frontend:asset_edit' asset.id %}" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition text-sm">{% trans "[ Edit ]" %}</a>
-                {% endif %}
-                {% if permissions.can_delete %}
-                <a href="{% url 'frontend:asset_delete' asset.id %}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm" onclick="return confirm('Delete this asset?');">{% trans "[ Delete ]" %}</a>
-                {% endif %}
-            </div>
-        {% endif %}
-    </div>
-
-    <div class="mt-6 bg-white rounded-lg shadow-md p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">{% trans "Activity Timeline" %}</h3>
-        {% if activities %}
-        <div class="space-y-4">
-            {% for activity in activities %}
-            <div class="flex gap-4">
-                <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span class="text-blue-600 text-sm font-medium">{{ activity.actor_username|make_list|first|upper }}</span>
+                    {% if activities.has_next %}
+                        <a href="?activity_page={{ activities.next_page_number }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            {% trans "Next" %} →
+                        </a>
+                        <a href="?activity_page={{ activities.paginator.num_pages }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                            {% trans "Last" %}
+                        </a>
+                    {% endif %}
                 </div>
-                <div class="flex-1 pb-4 border-b border-gray-100">
-                    <div class="flex justify-between items-start">
-                        <p class="text-sm font-medium text-gray-900">{{ activity.action_label }}</p>
-                        <span class="text-xs text-gray-500">{{ activity.created_at|timesince }} ago</span>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">by {{ activity.actor_username }}</p>
+                {% endif %}
+
+            {% else %}
+                <div class="py-12 text-center">
+                    <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-gray-600 text-sm">
+                        No activity has been recorded yet.
+                    </p>
                 </div>
-            {% endfor %}
+            {% endif %}
         </div>
-        {% else %}
-        <p class="text-gray-500 text-sm">{% trans "No activity recorded." %}</p>
-        {% endif %}
     </div>
+
+</div>
 {% endblock %}
+

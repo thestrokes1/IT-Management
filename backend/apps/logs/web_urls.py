@@ -6,6 +6,9 @@ Used for Django templates (non-API views).
 from django.urls import path
 from django.views.generic import TemplateView
 
+from apps.frontend.views.logs import activity_timeline
+
+
 urlpatterns = [
     path(
         'logs/',
@@ -51,5 +54,11 @@ urlpatterns = [
         'logs/export/',
         TemplateView.as_view(template_name='frontend/logs.html'),
         name='web-log-export',
+    ),
+    # Activity Timeline (Unified Logs)
+    path(
+        'logs/timeline/',
+        activity_timeline,
+        name='activity_timeline',
     ),
 ]

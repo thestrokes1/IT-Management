@@ -97,14 +97,13 @@
                                 <a href="/tickets/{{ ticket.id }}/" class="text-blue-600 hover:text-blue-900 mr-4">Open</a>
                                 
                                 {% if ticket_perms.assigned_to_me and ticket_perms.can_unassign %}
-                                    <form method="post"
-                                          action="{% url 'frontend:ticket_unassign_self' ticket.id %}"
-                                          style="display:inline;">
-                                        {% csrf_token %}
-                                        <button class="text-orange-600 hover:text-orange-900 mr-4">
-                                            Unassign
-                                        </button>
-                                    </form>
+                                    <button onclick="confirmUnassign({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-orange-600 hover:text-orange-900 mr-4 bg-none border-none cursor-pointer">
+                                        Unassign
+                                    </button>
+                                {% elif not ticket.assigned_to and ticket_perms.can_self_assign %}
+                                    <button onclick="confirmSelfAssignFromList({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-green-600 hover:text-green-900 mr-4 bg-none border-none cursor-pointer">
+                                        Assign
+                                    </button>
                                 {% endif %}
                                 
                                 {% if ticket_perms.can_update %}
@@ -144,14 +143,13 @@
                         </div>
                         <div class="flex space-x-2 ml-2">
                             {% if ticket_perms.assigned_to_me and ticket_perms.can_unassign %}
-                                <form method="post"
-                                      action="{% url 'frontend:ticket_unassign_self' ticket.id %}"
-                                      style="display:inline;">
-                                    {% csrf_token %}
-                                    <button class="text-orange-600 hover:text-orange-900 p-1" title="Unassign">
-                                        <i class="fas fa-user-minus text-sm"></i>
-                                    </button>
-                                </form>
+                                <button onclick="confirmUnassign({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-orange-600 hover:text-orange-900 p-1" title="Unassign">
+                                    <i class="fas fa-user-minus text-sm"></i>
+                                </button>
+                            {% elif not ticket.assigned_to and ticket_perms.can_self_assign %}
+                                <button onclick="confirmSelfAssignFromList({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-green-600 hover:text-green-900 p-1" title="Assign">
+                                    <i class="fas fa-user-plus text-sm"></i>
+                                </button>
                             {% endif %}
                             {% if ticket_perms.can_update %}
                                 <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
@@ -188,6 +186,110 @@
 </div>
 
 <script>
+// Function to confirm self-assign from ticket list
+function confirmSelfAssignFromList(ticketId, ticketTitle) {
+    showConfirmation(
+        'Assign Ticket to Yourself',
+        'Are you sure you want to assign ticket "' + ticketTitle + '" to yourself?',
+        function() {
+            // Get CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                             document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] ||
+                             '{{ csrf_token }}';
+            
+            // Submit the assignment via fetch
+            fetch('/tickets/' + ticketId + '/assign-self/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                }
+            })
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                const isJson = contentType && contentType.includes('application/json');
+                
+                if (isJson) {
+                    return response.json().then(data => ({ ok: response.ok, data }));
+                } else {
+                    return response.text().then(text => {
+                        if (response.ok && (response.redirected || text.includes('Redirect'))) {
+                            return { ok: true, data: { success: true } };
+                        }
+                        throw new Error('Server returned HTML instead of JSON');
+                    });
+                }
+            })
+            .then(result => {
+                if (result.ok) {
+                    showToast('Ticket assigned to you successfully!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const errorMsg = result.data?.error || 'Failed to assign ticket';
+                    showToast('Error: ' + errorMsg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error assigning ticket: ' + error.message, 'error');
+            });
+        }
+    );
+}
+
+// Function to confirm unassign from ticket list
+function confirmUnassign(ticketId, ticketTitle) {
+    showConfirmation(
+        'Unassign Ticket',
+        'Are you sure you want to unassign yourself from ticket "' + ticketTitle + '"?',
+        function() {
+            // Get CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                             document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] ||
+                             '{{ csrf_token }}';
+            
+            // Submit the unassignment via fetch
+            fetch('/tickets/' + ticketId + '/unassign-self/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                }
+            })
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                const isJson = contentType && contentType.includes('application/json');
+                
+                if (isJson) {
+                    return response.json().then(data => ({ ok: response.ok, data }));
+                } else {
+                    return response.text().then(text => {
+                        if (response.ok && (response.redirected || text.includes('Redirect'))) {
+                            return { ok: true, data: { success: true } };
+                        }
+                        throw new Error('Server returned HTML instead of JSON');
+                    });
+                }
+            })
+            .then(result => {
+                if (result.ok) {
+                    showToast('Ticket unassigned successfully!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const errorMsg = result.data?.error || 'Failed to unassign ticket';
+                    showToast('Error: ' + errorMsg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error unassigning ticket: ' + error.message, 'error');
+            });
+        }
+    );
+}
+
 function deleteTicket(ticketId, ticketTitle) {
     showConfirmation(
         'Delete Ticket',

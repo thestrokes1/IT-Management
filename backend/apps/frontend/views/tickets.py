@@ -104,7 +104,7 @@ class TicketDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         ticket = get_object_or_404(Ticket, pk=pk)
         
-        # Check view permission using authority
+# Check view permission using authority
         if not can_view_ticket(request.user, ticket):
             raise PermissionDenied("You don't have permission to view this ticket.")
         
@@ -131,11 +131,13 @@ class TicketDetailView(LoginRequiredMixin, View):
         from apps.logs.models import ActivityLog
         from apps.logs.services.activity_service import ActivityService
         
-        activities = []
         try:
             # Fetch activities related to this ticket
+            # Use both entity_type/entity_id (new) and model_name/object_id (legacy) for compatibility
+            # Use iexact for case-insensitive matching
             activities = ActivityLog.objects.filter(
-                Q(model_name='ticket') & Q(object_id=ticket.id)
+                Q(entity_type__iexact='ticket', entity_id=ticket.id) |
+                Q(model_name__iexact='ticket', object_id=ticket.id)
             ).select_related('user').order_by('-timestamp')[:50]
             
             # Format activities for template using ActivityService
@@ -303,6 +305,9 @@ class EditTicketView(LoginRequiredMixin, View):
     Uses domain authority to check edit permission.
     """
     def get(self, request, pk):
+        from apps.tickets.models import TicketCategory, TicketType
+        from apps.users.models import User
+        
         ticket = get_object_or_404(Ticket, pk=pk)
         
         # Check edit permission using authority
@@ -310,36 +315,153 @@ class EditTicketView(LoginRequiredMixin, View):
             messages.error(request, "You don't have permission to edit this ticket.")
             return redirect("frontend:ticket-detail", ticket_id=pk)
         
+        # Get categories and ticket types for the form
+        categories = TicketCategory.objects.filter(is_active=True).order_by('name')
+        ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
+        
+        # Get list of assignable users based on role
+        user = request.user
+        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+            # Show all technicians for assignment
+            available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
+        elif user.role == 'TECHNICIAN':
+            # Technician can only see themselves for self-assignment
+            available_users = User.objects.filter(id=user.id)
+        else:
+            available_users = User.objects.none()
+        
         # Build UI permission flags for template consistency
+        # This already contains: can_assign, can_unassign, can_self_assign, assigned_to_me
         permissions = build_ticket_ui_permissions(request.user, ticket)
         
         return render(request, "frontend/edit-ticket.html", {
             "ticket": ticket,
             "permissions": permissions,
+            "categories": categories,
+            "ticket_types": ticket_types,
+            "available_users": available_users,
+            "assign_config": {
+                "visible": True,
+                "readonly": False,
+                "default_user_id": None,
+                "can_assign": permissions.get('can_assign', False),
+                "can_self_assign": permissions.get('can_self_assign', False),
+                "assigned_to_me": permissions.get('assigned_to_me', False),
+            },
         })
 
     def post(self, request, pk):
+        from apps.tickets.models import TicketCategory, TicketType
+        from apps.users.models import User
+        
         ticket = get_object_or_404(Ticket, pk=pk)
         
-        # Use CQRS command with authority check
-        update_use_case = UpdateTicket()
-        result = update_use_case.execute(
-            user=request.user,
-            ticket_id=str(ticket.ticket_id),
-            ticket_data={
-                'title': request.POST.get("title", ticket.title),
-                'description': request.POST.get("description", ticket.description),
-            }
-        )
-        
-        if result.success:
-            messages.success(request, "Ticket updated successfully.")
+        # Check edit permission using authority
+        if not can_edit_ticket(request.user, ticket):
+            messages.error(request, "You don't have permission to edit this ticket.")
             return redirect("frontend:ticket-detail", ticket_id=pk)
-        else:
-            messages.error(request, result.error)
+        
+        # Get form data
+        title = request.POST.get("title", "").strip()
+        description = request.POST.get("description", "").strip()
+        category_id = request.POST.get("category", "")
+        ticket_type_id = request.POST.get("ticket_type", "")
+        status = request.POST.get("status", ticket.status)
+        priority = request.POST.get("priority", ticket.priority)
+        impact = request.POST.get("impact", ticket.impact)
+        urgency = request.POST.get("urgency", ticket.urgency)
+        assigned_to_id = request.POST.get("assigned_to", "")
+        location = request.POST.get("location", "")
+        contact_phone = request.POST.get("contact_phone", "")
+        contact_email = request.POST.get("contact_email", "")
+        sla_due_at = request.POST.get("sla_due_at", "")
+        resolution_summary = request.POST.get("resolution_summary", "")
+        
+        # Validate required fields
+        errors = {}
+        if not title:
+            errors['title'] = 'Title is required'
+        if not description:
+            errors['description'] = 'Description is required'
+        if not category_id:
+            errors['category'] = 'Category is required'
+        
+        if errors:
+            # Re-render form with errors
+            categories = TicketCategory.objects.filter(is_active=True).order_by('name')
+            ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
+            
+            user = request.user
+            if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+                available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
+            elif user.role == 'TECHNICIAN':
+                available_users = User.objects.filter(id=user.id)
+            else:
+                available_users = User.objects.none()
+            
+            permissions = build_ticket_ui_permissions(request.user, ticket)
+            
             return render(request, "frontend/edit-ticket.html", {
-                "ticket": ticket
+                "ticket": ticket,
+                "permissions": permissions,
+                "categories": categories,
+                "ticket_types": ticket_types,
+                "available_users": available_users,
+                "assign_config": {
+                    "visible": True,
+                    "readonly": False,
+                    "default_user_id": None,
+                    "can_assign": permissions.get('can_assign', False),
+                    "can_self_assign": permissions.get('can_self_assign', False),
+                    "assigned_to_me": permissions.get('assigned_to_me', False),
+                },
+                "errors": errors,
             })
+        
+        # Update ticket fields
+        ticket.title = title
+        ticket.description = description
+        
+        if category_id:
+            ticket.category_id = category_id
+        if ticket_type_id:
+            ticket.ticket_type_id = ticket_type_id
+        
+        ticket.status = status
+        ticket.priority = priority
+        ticket.impact = impact
+        ticket.urgency = urgency
+        ticket.location = location
+        ticket.contact_phone = contact_phone
+        ticket.contact_email = contact_email
+        ticket.resolution_summary = resolution_summary
+        
+        # Handle SLA due date
+        if sla_due_at:
+            from django.utils.dateparse import parse_datetime
+            ticket.sla_due_at = parse_datetime(sla_due_at)
+        else:
+            ticket.sla_due_at = None
+        
+        # Handle assignment
+        if assigned_to_id:
+            # Assign to selected user
+            try:
+                assigned_user = User.objects.get(id=assigned_to_id)
+                ticket.assigned_to = assigned_user
+                ticket.assignment_status = 'ASSIGNED'
+            except User.DoesNotExist:
+                pass
+        else:
+            # Unassign (empty value means unassign)
+            ticket.assigned_to = None
+            ticket.assignment_status = 'UNASSIGNED'
+        
+        ticket.updated_by = request.user
+        ticket.save()
+        
+        messages.success(request, "Ticket updated successfully.")
+        return redirect("frontend:ticket-detail", ticket_id=pk)
 
 
 # Function-based views for URLs

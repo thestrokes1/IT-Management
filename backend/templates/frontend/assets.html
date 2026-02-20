@@ -83,15 +83,18 @@
                                 <div class="flex gap-1 sm:gap-4 text-xs sm:text-sm">
                                     <a href="/assets/{{ asset.id }}/" class="text-blue-600 hover:text-blue-900">Open</a>
                                     
-                                    {% if asset_perms.assigned_to_me and asset_perms.can_unassign %}
-                                        <form method="post"
-                                              action="{% url 'frontend:asset_unassign_self' asset.id %}"
-                                              style="display:inline;">
-                                            {% csrf_token %}
-                                            <button class="text-orange-600 hover:text-orange-900">
+                                    {% if asset.assigned_to %}
+                                        {% if asset_perms.assigned_to_me and asset_perms.can_unassign %}
+                                            <button onclick="confirmUnassign({{ asset.id }}, '{{ asset.name|escapejs }}')" class="text-orange-600 hover:text-orange-900 bg-none border-none cursor-pointer">
                                                 Unassign
                                             </button>
-                                        </form>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if asset_perms.can_self_assign %}
+                                            <button onclick="confirmAssign({{ asset.id }}, '{{ asset.name|escapejs }}')" class="text-green-600 hover:text-green-900 bg-none border-none cursor-pointer">
+                                                Assign
+                                            </button>
+                                        {% endif %}
                                     {% endif %}
 
                                     {% if asset_perms.can_update %}
@@ -134,6 +137,111 @@
 
 <script>
 console.log('Assets page loaded');
+
+// Function to confirm self-assign from asset list
+function confirmAssign(assetId, assetName) {
+    showConfirmation(
+        'Assign Asset to Yourself',
+        'Are you sure you want to assign "' + assetName + '" to yourself?',
+        function() {
+            executeAssign(assetId);
+        }
+    );
+}
+
+// Function to execute self-assign
+function executeAssign(assetId) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] ||
+                     '{{ csrf_token }}';
+    
+    fetch('/assets/' + assetId + '/assign-self/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken || '',
+            'Accept': 'application/json',
+        }
+    })
+    .then(response => {
+        const contentType = response.headers.get('content-type');
+        const isJson = contentType && contentType.includes('application/json');
+        
+        if (isJson) {
+            return response.json().then(data => ({ ok: response.ok, data }));
+        } else {
+            return response.text().then(text => ({ ok: response.ok, data: { message: text } }));
+        }
+    })
+    .then(result => {
+        if (result.ok) {
+            showToast('Asset assigned to you successfully!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const errorMsg = result.data?.error || 'Failed to assign asset';
+            showToast('Error: ' + errorMsg, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error assigning asset: ' + error.message, 'error');
+    });
+}
+
+// Function to confirm unassign from asset list
+function confirmUnassign(assetId, assetName) {
+    showConfirmation(
+        'Unassign Asset',
+        'Are you sure you want to unassign "' + assetName + '" from yourself?',
+        function() {
+            executeUnassign(assetId);
+        }
+    );
+}
+
+// Function to execute unassign
+function executeUnassign(assetId) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                     document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] ||
+                     '{{ csrf_token }}';
+    
+    fetch('/assets/' + assetId + '/unassign-self/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken || '',
+            'Accept': 'application/json',
+        }
+    })
+    .then(response => {
+        // Handle redirect (302) - reload the page
+        if (response.redirected) {
+            showToast('Asset unassigned successfully!', 'success');
+            setTimeout(() => location.reload(), 1500);
+            return;
+        }
+        
+        const contentType = response.headers.get('content-type');
+        const isJson = contentType && contentType.includes('application/json');
+        
+        if (isJson) {
+            return response.json().then(data => ({ ok: response.ok, data }));
+        } else {
+            return response.text().then(text => ({ ok: response.ok, data: { message: text } }));
+        }
+    })
+    .then(result => {
+        if (result && result.ok) {
+            showToast('Asset unassigned successfully!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const errorMsg = result?.data?.error || 'Failed to unassign asset';
+            showToast('Error: ' + errorMsg, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error unassigning asset: ' + error.message, 'error');
+    });
+}
 
 function deleteAsset(assetId, assetName) {
     console.log('deleteAsset called with:', assetId, assetName);

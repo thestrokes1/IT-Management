@@ -98,8 +98,10 @@ from .profile import (
 # Logs views (Enterprise Timeline UI)
 from .logs import (
     LogsView,
+    ActivityTimelineView,
     logs,
     logs_api,
     logs_export,
     logs_detail,
+    activity_timeline,
 )

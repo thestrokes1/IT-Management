@@ -473,14 +473,16 @@ def profile_reopen_ticket(request, ticket_id):
             ticket.updated_by = user
             ticket.save(update_fields=['status', 'updated_by', 'updated_at'])
             
-            # Log the activity
-            ActivityService.log_activity(
-                user=user,
+# Log the activity using ActivityService
+            service = ActivityService()
+            service.log_ticket_action(
                 action='TICKET_REOPENED',
-                model_name='ticket',
-                object_id=ticket.id,
-                object_repr=str(ticket),
-                description=f"Ticket reopened from {old_status} to IN_PROGRESS",
+                ticket=ticket,
+                actor=user,
+                metadata={
+                    'old_status': old_status,
+                    'new_status': 'IN_PROGRESS',
+                },
                 request=request
             )
             

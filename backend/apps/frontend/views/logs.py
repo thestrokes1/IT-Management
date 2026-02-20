@@ -1,4 +1,6 @@
 """
+
+
 Enterprise Logs View with Timeline UI
 
 Features:
@@ -357,3 +359,117 @@ def logs_detail(request, log_id):
         'changes_summary': ui_data.changes_summary,
         'changes_detail': ui_data.changes_detail,
     })
+
+
+# =============================================================================
+# Activity Timeline View (Enterprise Audit Log)
+# =============================================================================
+
+class ActivityTimelineView(TemplateView):
+    """
+    Activity Timeline View - Unified Logs page.
+    
+    This view provides a professional timeline UI for viewing
+    all platform activities in a centralized location.
+    """
+    template_name = 'frontend/activity_timeline.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Check access policy
+        policy_service = LogAccessPolicyService(user=self.request.user)
+        access_policy = policy_service.get_access_policy()
+        
+        if not access_policy.allowed:
+            context['error'] = 'You do not have permission to view the activity timeline.'
+            return context
+        
+        # Build query from filters
+        query_service = LogQueryService(user=self.request.user)
+        query_service = self._apply_filters(query_service, self.request.GET)
+        
+        # Get paginated results
+        page = int(self.request.GET.get('page', 1))
+        per_page = int(self.request.GET.get('per_page', 20))
+        
+        queryset = query_service.order_by('-timestamp').all()
+        paginator = Paginator(queryset, per_page)
+        page_obj = paginator.get_page(page)
+        
+        # Use ActivityAdapter to format entries for template
+        log_entries = ActivityAdapter.adapt_queryset(page_obj.object_list)
+        
+        # Enhance entries with additional timeline-specific data
+        for entry in log_entries:
+            # Add formatted timestamp
+            if hasattr(entry, 'timestamp'):
+                entry.formatted_timestamp = entry.timestamp.strftime('%b %d, %Y %H:%M')
+                entry.time_ago = self._get_time_ago(entry.timestamp)
+            
+            # Extract changes from extra_data
+            entry.changes = getattr(entry, 'changes', {}) or {}
+            
+            # Extract performed_by info
+            entry.performed_by_username = getattr(entry, 'actor_username', None) or getattr(entry, 'actor_name', 'System')
+            entry.performed_by_role = getattr(entry, 'actor_role', '')
+        
+        # Get all active users for filter dropdown
+        from apps.users.models import User
+        all_users = User.objects.filter(is_active=True).order_by('username')[:100]
+        
+        context.update({
+            'log_entries': log_entries,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'all_users': all_users,
+        })
+        
+        return context
+    
+    def _apply_filters(self, query_service: LogQueryService, params) -> LogQueryService:
+        """Apply filters to query service."""
+        if params.get('entity_type'):
+            # Map entity_type to model_name
+            entity_map = {'asset': 'asset', 'ticket': 'ticket', 'project': 'project', 'user': 'user'}
+            entity = entity_map.get(params['entity_type'].lower())
+            if entity:
+                query_service = query_service.filter_by_target(entity)
+        
+        if params.get('username'):
+            username = params['username'].strip() if isinstance(params['username'], str) else params['username']
+            query_service = query_service.filter_by_actor(actor_name=username)
+        
+        if params.get('action'):
+            query_service = query_service.filter_by_action([params['action']])
+        
+        if params.get('start_date') or params.get('end_date'):
+            query_service = query_service.filter_by_date_range(
+                start_date=params.get('start_date'),
+                end_date=params.get('end_date')
+            )
+        
+        if params.get('search'):
+            search_term = params['search'].strip() if isinstance(params['search'], str) else params['search']
+            query_service = query_service.search(search_term)
+        
+        return query_service
+    
+    def _get_time_ago(self, timestamp) -> str:
+        """Get human-readable time ago string."""
+        from django.utils import timezone
+        from django.utils.timesince import timesince
+        
+        if timestamp.tzinfo:
+            now = timezone.now()
+        else:
+            from datetime import datetime
+            now = datetime.now()
+        
+        return timesince(timestamp, now)
+
+
+def activity_timeline(request):
+    """Activity Timeline page view."""
+    view = ActivityTimelineView.as_view()
+    return view(request)

@@ -1,0 +1,907 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Activity Timeline - IT Management Platform{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+<style>
+    /* Timeline Container */
+    .timeline-container {
+        position: relative;
+        padding-left: 3rem;
+    }
+    
+    .timeline-container::before {
+        content: '';
+        position: absolute;
+        left: 0.75rem;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: linear-gradient(to bottom, #3b82f6, #60a5fa, #93c5fd);
+        border-radius: 2px;
+    }
+    
+    html.dark .timeline-container::before {
+        background: linear-gradient(to bottom, #3b82f6, #1d4ed8, #1e40af);
+    }
+    
+    /* Timeline Entry */
+    .timeline-entry {
+        position: relative;
+        margin-bottom: 1.5rem;
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+        overflow: hidden;
+        transition: all 0.2s ease;
+    }
+    
+    html.dark .timeline-entry {
+        background: #1f2937;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .timeline-entry:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06);
+        transform: translateY(-1px);
+    }
+    
+    html.dark .timeline-entry:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* Timeline Dot */
+    .timeline-dot {
+        position: absolute;
+        left: -2.25rem;
+        top: 1.25rem;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        background: white;
+        border: 3px solid #3b82f6;
+        z-index: 10;
+        box-shadow: 0 0 0 3px white;
+    }
+    
+    html.dark .timeline-dot {
+        background: #1f2937;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px #1f2937;
+    }
+    
+    /* Entity-specific colors */
+    .timeline-dot.asset { border-color: #10b981; }
+    .timeline-dot.ticket { border-color: #3b82f6; }
+    .timeline-dot.project { border-color: #8b5cf6; }
+    .timeline-dot.user { border-color: #f59e0b; }
+    
+    /* Entry Header */
+    .timeline-header {
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.2s;
+    }
+    
+    .timeline-entry.expanded .timeline-header {
+        border-bottom-color: #e5e7eb;
+    }
+    
+    html.dark .timeline-entry.expanded .timeline-header {
+        border-bottom-color: #374151;
+    }
+    
+    /* Entity Icon */
+    .entity-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 1rem;
+    }
+    
+    .entity-icon.asset { background: #d1fae5; color: #059669; }
+    .entity-icon.ticket { background: #dbeafe; color: #2563eb; }
+    .entity-icon.project { background: #ede9fe; color: #7c3aed; }
+    .entity-icon.user { background: #fef3c7; color: #d97706; }
+    
+    html.dark .entity-icon.asset { background: #064e3b; color: #34d399; }
+    html.dark .entity-icon.ticket { background: #1e3a8a; color: #60a5fa; }
+    html.dark .entity-icon.project { background: #4c1d95; color: #a78bfa; }
+    html.dark .entity-icon.user { background: #78350f; color: #fbbf24; }
+    
+    /* Entry Content */
+    .timeline-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .timeline-title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    
+    .timeline-title {
+        font-weight: 600;
+        color: #111827;
+        font-size: 0.95rem;
+    }
+    
+    html.dark .timeline-title {
+        color: #f3f4f6;
+    }
+    
+    .timeline-description {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+        line-height: 1.5;
+    }
+    
+    html.dark .timeline-description {
+        color: #9ca3af;
+    }
+    
+    /* Badges */
+    .timeline-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 0.5rem;
+    }
+    
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.125rem 0.625rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    /* Action type badges */
+    .badge-created { background: #d1fae5; color: #059669; }
+    .badge-updated { background: #dbeafe; color: #2563eb; }
+    .badge-deleted { background: #fee2e2; color: #dc2626; }
+    .badge-status_changed { background: #fef3c7; color: #d97706; }
+    .badge-assigned { background: #ede9fe; color: #7c3aed; }
+    .badge-unassigned { background: #f3f4f6; color: #6b7280; }
+    .badge-resolved { background: #d1fae5; color: #059669; }
+    .badge-reopened { background: #fee2e2; color: #dc2626; }
+    .badge-login { background: #d1fae5; color: #059669; }
+    .badge-logout { background: #f3f4f6; color: #6b7280; }
+    
+    html.dark .badge-created { background: #064e3b; color: #34d399; }
+    html.dark .badge-updated { background: #1e3a8a; color: #60a5fa; }
+    html.dark .badge-deleted { background: #7f1d1d; color: #fca5a5; }
+    html.dark .badge-status_changed { background: #78350f; color: #fbbf24; }
+    html.dark .badge-assigned { background: #4c1d95; color: #a78bfa; }
+    html.dark .badge-unassigned { background: #374151; color: #9ca3af; }
+    html.dark .badge-resolved { background: #064e3b; color: #34d399; }
+    html.dark .badge-reopened { background: #7f1d1d; color: #fca5a5; }
+    html.dark .badge-login { background: #064e3b; color: #34d399; }
+    html.dark .badge-logout { background: #374151; color: #9ca3af; }
+    
+    /* Entity type badge */
+    .badge-entity {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+    
+    html.dark .badge-entity {
+        background: #374151;
+        color: #d1d5db;
+    }
+    
+    /* Timestamp */
+    .timeline-time {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        white-space: nowrap;
+    }
+    
+    /* Expand Button */
+    .expand-btn {
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        color: #9ca3af;
+        transition: all 0.2s;
+    }
+    
+    .expand-btn:hover {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+    
+    html.dark .expand-btn:hover {
+        background: #374151;
+        color: #d1d5db;
+    }
+    
+    .expand-btn i {
+        transition: transform 0.2s;
+    }
+    
+    .timeline-entry.expanded .expand-btn i {
+        transform: rotate(180deg);
+    }
+    
+    /* Expandable Details */
+    .timeline-details {
+        padding: 0;
+        max-height: 0;
+        overflow: hidden;
+        transition: all 0.3s ease-out;
+        background: #f9fafb;
+    }
+    
+    html.dark .timeline-details {
+        background: #111827;
+    }
+    
+    .timeline-entry.expanded .timeline-details {
+        padding: 1rem 1.25rem;
+        max-height: 1000px;
+    }
+    
+    /* Details Grid */
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .detail-item {
+        font-size: 0.875rem;
+    }
+    
+    .detail-label {
+        color: #6b7280;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.25rem;
+    }
+    
+    html.dark .detail-label {
+        color: #9ca3af;
+    }
+    
+    .detail-value {
+        color: #111827;
+        font-weight: 500;
+        word-break: break-word;
+    }
+    
+    html.dark .detail-value {
+        color: #f3f4f6;
+    }
+    
+    /* Changes Viewer */
+    .changes-viewer {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+    }
+    
+    html.dark .changes-viewer {
+        background: #1f2937;
+        border-color: #374151;
+    }
+    
+    .changes-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+    
+    .changes-title {
+        font-weight: 600;
+        color: #111827;
+        font-size: 0.875rem;
+    }
+    
+    html.dark .changes-title {
+        color: #f3f4f6;
+    }
+    
+    .change-item {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    html.dark .change-item {
+        border-color: #374151;
+    }
+    
+    .change-item:last-child {
+        border-bottom: none;
+    }
+    
+    .change-field {
+        font-weight: 500;
+        color: #4b5563;
+        min-width: 120px;
+    }
+    
+    html.dark .change-field {
+        color: #d1d5db;
+    }
+    
+    .change-values {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1;
+    }
+    
+    .change-old {
+        color: #dc2626;
+        background: #fee2e2;
+        padding: 0.125rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.8rem;
+    }
+    
+    html.dark .change-old {
+        background: #7f1d1d;
+        color: #fca5a5;
+    }
+    
+    .change-arrow {
+        color: #9ca3af;
+    }
+    
+    .change-new {
+        color: #059669;
+        background: #d1fae5;
+        padding: 0.125rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.8rem;
+    }
+    
+    html.dark .change-new {
+        background: #064e3b;
+        color: #34d399;
+    }
+    
+    /* Filter Section */
+    .filter-section {
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    html.dark .filter-section {
+        background: #1f2937;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        align-items: end;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+    }
+    
+    .filter-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #4b5563;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    html.dark .filter-label {
+        color: #9ca3af;
+    }
+    
+    .filter-input, .filter-select {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+        background: white;
+    }
+    
+    html.dark .filter-input, 
+    html.dark .filter-select {
+        background: #374151;
+        border-color: #4b5563;
+        color: #f3f4f6;
+    }
+    
+    .filter-input:focus, .filter-select:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .filter-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+    }
+    
+    .btn-primary {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #2563eb;
+    }
+    
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+    
+    html.dark .btn-secondary {
+        background: #374151;
+        color: #d1d5db;
+    }
+    
+    .btn-secondary:hover {
+        background: #e5e7eb;
+    }
+    
+    html.dark .btn-secondary:hover {
+        background: #4b5563;
+    }
+    
+    /* Pagination */
+    .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 2rem;
+    }
+    
+    .pagination-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.5rem;
+        background: white;
+        color: #4b5563;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    html.dark .pagination-btn {
+        background: #1f2937;
+        border-color: #374151;
+        color: #d1d5db;
+    }
+    
+    .pagination-btn:hover:not(:disabled) {
+        border-color: #3b82f6;
+        color: #3b82f6;
+    }
+    
+    .pagination-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .pagination-info {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        color: #d1d5db;
+        margin-bottom: 1rem;
+    }
+    
+    html.dark .empty-icon {
+        color: #4b5563;
+    }
+    
+    .empty-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.5rem;
+    }
+    
+    html.dark .empty-title {
+        color: #f3f4f6;
+    }
+    
+    .empty-text {
+        color: #6b7280;
+    }
+    
+    /* Responsive */
+    @media (max-width: 640px) {
+        .timeline-container {
+            padding-left: 2rem;
+        }
+        
+        .timeline-dot {
+            left: -1.5rem;
+            width: 0.75rem;
+            height: 0.75rem;
+        }
+        
+        .timeline-header {
+            flex-direction: column;
+        }
+        
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .filter-actions {
+            flex-direction: column;
+        }
+    }
+    
+    /* Loading State */
+    .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+    }
+    
+    .spinner {
+        width: 2rem;
+        height: 2rem;
+        border: 3px solid #e5e7eb;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 sm:py-8">
+    <!-- Page Header -->
+    <div class="mb-6 sm:mb-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">
+                    <i class="fas fa-history mr-3 text-blue-600"></i>
+                    Activity Timeline
+                </h1>
+                <p class="text-gray-600 mt-2">Unified audit log for all platform activities</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="{% url 'frontend:logs' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Logs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section">
+        <form method="GET" id="filterForm">
+            <div class="filter-grid">
+                <!-- Entity Type Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Entity Type</label>
+                    <select name="entity_type" class="filter-select">
+                        <option value="">All Types</option>
+                        <option value="asset" {% if request.GET.entity_type == 'asset' %}selected{% endif %}>
+                            <i class="fas fa-desktop"></i> Assets
+                        </option>
+                        <option value="ticket" {% if request.GET.entity_type == 'ticket' %}selected{% endif %}>
+                            <i class="fas fa-ticket-alt"></i> Tickets
+                        </option>
+                        <option value="project" {% if request.GET.entity_type == 'project' %}selected{% endif %}>
+                            <i class="fas fa-project-diagram"></i> Projects
+                        </option>
+                        <option value="user" {% if request.GET.entity_type == 'user' %}selected{% endif %}>
+                            <i class="fas fa-user"></i> Users
+                        </option>
+                    </select>
+                </div>
+
+                <!-- User Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">User</label>
+                    <select name="username" class="filter-select">
+                        <option value="">All Users</option>
+                        {% for user in all_users %}
+                            <option value="{{ user.username }}" {% if request.GET.username == user.username %}selected{% endif %}>
+                                {{ user.username }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Action Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Action</label>
+                    <select name="action" class="filter-select">
+                        <option value="">All Actions</option>
+                        <option value="CREATED" {% if request.GET.action == 'CREATED' %}selected{% endif %}>Created</option>
+                        <option value="UPDATED" {% if request.GET.action == 'UPDATED' %}selected{% endif %}>Updated</option>
+                        <option value="DELETED" {% if request.GET.action == 'DELETED' %}selected{% endif %}>Deleted</option>
+                        <option value="STATUS_CHANGED" {% if request.GET.action == 'STATUS_CHANGED' %}selected{% endif %}>Status Changed</option>
+                        <option value="ASSIGNED" {% if request.GET.action == 'ASSIGNED' %}selected{% endif %}>Assigned</option>
+                        <option value="UNASSIGNED" {% if request.GET.action == 'UNASSIGNED' %}selected{% endif %}>Unassigned</option>
+                        <option value="RESOLVED" {% if request.GET.action == 'RESOLVED' %}selected{% endif %}>Resolved</option>
+                    </select>
+                </div>
+
+                <!-- Date Range -->
+                <div class="filter-group">
+                    <label class="filter-label">Date Range</label>
+                    <div class="flex gap-2">
+                        <input type="date" name="start_date" value="{{ request.GET.start_date }}"
+                               class="filter-input" placeholder="From">
+                        <input type="date" name="end_date" value="{{ request.GET.end_date }}"
+                               class="filter-input" placeholder="To">
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="filter-group filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search mr-2"></i>Filter
+                    </button>
+                    <a href="{% url 'frontend:activity_timeline' %}" class="btn btn-secondary">
+                        <i class="fas fa-times mr-2"></i>Clear
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Count -->
+    <div class="flex items-center justify-between mb-4">
+        <p class="text-sm text-gray-600">
+            Showing <span class="font-semibold">{{ page_obj.start_index }}</span> - 
+            <span class="font-semibold">{{ page_obj.end_index }}</span> of 
+            <span class="font-semibold">{{ paginator.count }}</span> entries
+        </p>
+    </div>
+
+    <!-- Timeline -->
+    {% if log_entries %}
+    <div class="timeline-container">
+        {% for entry in log_entries %}
+        <div class="timeline-entry" onclick="toggleTimelineEntry(this)">
+            <!-- Timeline Dot -->
+            <div class="timeline-dot {{ entry.entity_type|lower }}"></div>
+            
+            <!-- Header -->
+            <div class="timeline-header">
+                <!-- Entity Icon -->
+                <div class="entity-icon {{ entry.entity_type|lower }}">
+                    {% if entry.entity_type|lower == 'asset' %}
+                        <i class="fas fa-desktop"></i>
+                    {% elif entry.entity_type|lower == 'ticket' %}
+                        <i class="fas fa-ticket-alt"></i>
+                    {% elif entry.entity_type|lower == 'project' %}
+                        <i class="fas fa-project-diagram"></i>
+                    {% elif entry.entity_type|lower == 'user' %}
+                        <i class="fas fa-user"></i>
+                    {% else %}
+                        <i class="fas fa-circle"></i>
+                    {% endif %}
+                </div>
+                
+                <!-- Content -->
+                <div class="timeline-content">
+                    <div class="timeline-title-row">
+                        <span class="timeline-title">{{ entry.description }}</span>
+                    </div>
+                    
+                    <p class="timeline-description">
+                        {% if entry.object_repr %}{{ entry.object_repr }}{% endif %}
+                    </p>
+                    
+                    <div class="timeline-badges">
+                        <span class="badge badge-{{ entry.action_type|lower }}">
+                            {{ entry.action_type }}
+                        </span>
+                        <span class="badge badge-entity">
+                            {{ entry.entity_type }}
+                        </span>
+                        {% if entry.performed_by_username %}
+                        <span class="badge" style="background: #e5e7eb; color: #4b5563;">
+                            <i class="fas fa-user mr-1"></i>
+                            {{ entry.performed_by_username }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Time & Expand -->
+                <div class="flex items-start gap-3">
+                    <span class="timeline-time">
+                        {{ entry.formatted_timestamp }}
+                        <div class="text-xs text-gray-400">{{ entry.time_ago }}</div>
+                    </span>
+                    <button class="expand-btn">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Expandable Details -->
+            <div class="timeline-details">
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Performed By</div>
+                        <div class="detail-value">
+                            {% if entry.performed_by_username %}{{ entry.performed_by_username }}{% else %}System{% endif %}
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Role</div>
+                        <div class="detail-value">{{ entry.performed_by_role|default:"-" }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Event Type</div>
+                        <div class="detail-value">{{ entry.action_type }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Entity ID</div>
+                        <div class="detail-value">{{ entry.entity_id|default:"-" }}</div>
+                    </div>
+                    {% if entry.ip_address %}
+                    <div class="detail-item">
+                        <div class="detail-label">IP Address</div>
+                        <div class="detail-value">{{ entry.ip_address }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Changes Viewer -->
+                {% if entry.changes and entry.changes != '{}' %}
+                <div class="changes-viewer">
+                    <div class="changes-header">
+                        <span class="changes-title">
+                            <i class="fas fa-exchange-alt mr-2"></i>Changes
+                        </span>
+                    </div>
+                    {% for field, change in entry.changes.items %}
+                    <div class="change-item">
+                        <span class="change-field">{{ field|title }}</span>
+                        <div class="change-values">
+                            <span class="change-old">{{ change.from|default:"-" }}</span>
+                            <span class="change-arrow"><i class="fas fa-arrow-right"></i></span>
+                            <span class="change-new">{{ change.to|default:"-" }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+        <a href="?page=1{% if request.GET.entity_type %}&entity_type={{ request.GET.entity_type }}{% endif %}{% if request.GET.username %}&username={{ request.GET.username }}{% endif %}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="pagination-btn">
+            <i class="fas fa-angle-double-left"></i>
+        </a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.entity_type %}&entity_type={{ request.GET.entity_type }}{% endif %}{% if request.GET.username %}&username={{ request.GET.username }}{% endif %}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="pagination-btn">
+            <i class="fas fa-angle-left"></i>
+        </a>
+        {% else %}
+        <button class="pagination-btn" disabled>
+            <i class="fas fa-angle-double-left"></i>
+        </button>
+        <button class="pagination-btn" disabled>
+            <i class="fas fa-angle-left"></i>
+        </button>
+        {% endif %}
+        
+        <span class="pagination-info">
+            Page {{ page_obj.number }} of {{ paginator.num_pages }}
+        </span>
+        
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.entity_type %}&entity_type={{ request.GET.entity_type }}{% endif %}{% if request.GET.username %}&username={{ request.GET.username }}{% endif %}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="pagination-btn">
+            <i class="fas fa-angle-right"></i>
+        </a>
+        <a href="?page={{ paginator.num_pages }}{% if request.GET.entity_type %}&entity_type={{ request.GET.entity_type }}{% endif %}{% if request.GET.username %}&username={{ request.GET.username }}{% endif %}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="pagination-btn">
+            <i class="fas fa-angle-double-right"></i>
+        </a>
+        {% else %}
+        <button class="pagination-btn" disabled>
+            <i class="fas fa-angle-right"></i>
+        </button>
+        <button class="pagination-btn" disabled>
+            <i class="fas fa-angle-double-right"></i>
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-clipboard-list"></i>
+        </div>
+        <h3 class="empty-title">No Activity Logs Found</h3>
+        <p class="empty-text">Try adjusting your filters or check back later.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function toggleTimelineEntry(element) {
+    element.classList.toggle('expanded');
+}
+
+// Initialize flatpickr for date inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(input => {
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr(input, {
+                dateFormat: 'Y-m-d',
+                maxDate: new Date().fp_incr(365)
+            });
+        }
+    });
+});
+</script>
+{% endblock %}
+

@@ -159,6 +159,13 @@ class Ticket(models.Model):
     contact_phone = models.CharField(max_length=20, blank=True)
     contact_email = models.EmailField(blank=True)
     
+    # Contact type for tickets
+    CONTACT_TYPE_CHOICES = [
+        ('CLIENT', 'Client'),
+        ('TECHNICIAN', 'Technician'),
+    ]
+    contact_type = models.CharField(max_length=20, choices=CONTACT_TYPE_CHOICES, blank=True)
+    
     # Tags and custom fields
     tags = models.JSONField(default=list, blank=True)
     
