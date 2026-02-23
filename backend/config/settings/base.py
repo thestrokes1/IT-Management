@@ -127,6 +127,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Message Storage Configuration
+# Use session-based storage so messages are cleared when session ends (logout)
+# This prevents old messages from appearing after re-login
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
+
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

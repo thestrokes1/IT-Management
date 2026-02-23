@@ -130,11 +130,19 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
                 category_id=request.POST.get('category', ''),
                 serial_number=request.POST.get('serial_number', '').strip(),
                 asset_tag=request.POST.get('asset_tag', '').strip(),
-                status=request.POST.get('status', 'AVAILABLE'),
+                asset_type=request.POST.get('asset_type', 'HARDWARE'),
+                model=request.POST.get('model', '').strip(),
+                manufacturer=request.POST.get('manufacturer', '').strip(),
+                version=request.POST.get('version', '').strip(),
+                status=request.POST.get('status', 'ACTIVE'),
                 location=request.POST.get('location', '').strip(),
                 purchase_date=request.POST.get('purchase_date', ''),
-                purchase_price=request.POST.get('purchase_price', ''),
+                purchase_price=request.POST.get('purchase_cost', ''),
                 warranty_expiry=request.POST.get('warranty_expiry', ''),
+                end_of_life=request.POST.get('end_of_life', ''),
+                contact_type=request.POST.get('contact_type', '').strip(),
+                contact_email=request.POST.get('contact_email', '').strip(),
+                contact_phone=request.POST.get('contact_phone', '').strip(),
                 assigned_to_id=request.POST.get('assigned_to', '')
             )
             
@@ -336,11 +344,19 @@ class EditAssetView(LoginRequiredMixin, TemplateView):
                 category_id=request.POST.get('category', ''),
                 serial_number=request.POST.get('serial_number', '').strip(),
                 asset_tag=request.POST.get('asset_tag', '').strip(),
-                status=request.POST.get('status', 'AVAILABLE'),
+                asset_type=request.POST.get('asset_type', ''),
+                model=request.POST.get('model', '').strip(),
+                manufacturer=request.POST.get('manufacturer', '').strip(),
+                version=request.POST.get('version', '').strip(),
+                status=request.POST.get('status', 'ACTIVE'),
                 location=request.POST.get('location', '').strip(),
                 purchase_date=request.POST.get('purchase_date', ''),
-                purchase_price=request.POST.get('purchase_price', ''),
+                purchase_price=request.POST.get('purchase_cost', ''),
                 warranty_expiry=request.POST.get('warranty_expiry', ''),
+                end_of_life=request.POST.get('end_of_life', ''),
+                contact_type=request.POST.get('contact_type', '').strip(),
+                contact_email=request.POST.get('contact_email', '').strip(),
+                contact_phone=request.POST.get('contact_phone', '').strip(),
                 assigned_to_id=request.POST.get('assigned_to', '')
             )
             

@@ -336,11 +336,19 @@ class AssetService(EventPublisher):
         category_id: str,
         serial_number: str = '',
         asset_tag: str = '',  # Not in model, but used in views
+        asset_type: str = 'HARDWARE',
+        model: str = '',
+        manufacturer: str = '',
+        version: str = '',
         status: str = 'ACTIVE',
         location: str = '',
         purchase_date: str = '',
         purchase_price: str = '',
         warranty_expiry: str = '',
+        end_of_life: str = '',
+        contact_type: str = '',
+        contact_email: str = '',
+        contact_phone: str = '',
         assigned_to_id: str = ''
     ) -> 'Asset':
         """Create a new asset."""
@@ -377,9 +385,6 @@ class AssetService(EventPublisher):
         except (AssetCategory.DoesNotExist, ValueError):
             raise NotFoundError(resource_type="AssetCategory", resource_id=category_id)
         
-        # Determine asset type (default to HARDWARE)
-        asset_type = 'HARDWARE'  # Default, can be made configurable
-        
         # Parse dates
         purchase_date_obj = None
         if purchase_date:
@@ -392,6 +397,13 @@ class AssetService(EventPublisher):
         if warranty_expiry:
             try:
                 warranty_expiry_obj = datetime.strptime(warranty_expiry, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
+        end_of_life_obj = None
+        if end_of_life:
+            try:
+                end_of_life_obj = datetime.strptime(end_of_life, '%Y-%m-%d').date()
             except ValueError:
                 pass
         
@@ -419,11 +431,18 @@ class AssetService(EventPublisher):
             asset_type=asset_type,
             category=category,
             serial_number=serial_number.strip() if serial_number else '',
+            model=model.strip() if model else '',
+            manufacturer=manufacturer.strip() if manufacturer else '',
+            version=version.strip() if version else '',
             status=status,
             location=location.strip(),
             purchase_date=purchase_date_obj,
             purchase_cost=purchase_cost,
             warranty_expiry=warranty_expiry_obj,
+            end_of_life=end_of_life_obj,
+            contact_type=contact_type.strip() if contact_type else '',
+            contact_email=contact_email.strip() if contact_email else '',
+            contact_phone=contact_phone.strip() if contact_phone else '',
             assigned_to=assigned_to,
             created_by=request.user
         )
@@ -452,11 +471,19 @@ class AssetService(EventPublisher):
         category_id: str,
         serial_number: str = '',
         asset_tag: str = '',  # Not in model, but used in views
+        asset_type: str = '',
+        model: str = '',
+        manufacturer: str = '',
+        version: str = '',
         status: str = 'ACTIVE',
         location: str = '',
         purchase_date: str = '',
         purchase_price: str = '',
         warranty_expiry: str = '',
+        end_of_life: str = '',
+        contact_type: str = '',
+        contact_email: str = '',
+        contact_phone: str = '',
         assigned_to_id: str = ''
     ) -> 'Asset':
         """Update an existing asset."""
@@ -495,6 +522,13 @@ class AssetService(EventPublisher):
             except ValueError:
                 pass
         
+        end_of_life_obj = asset.end_of_life
+        if end_of_life:
+            try:
+                end_of_life_obj = datetime.strptime(end_of_life, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
         # Parse purchase price
         purchase_cost = asset.purchase_cost
         if purchase_price:
@@ -517,11 +551,27 @@ class AssetService(EventPublisher):
         asset.description = description.strip()
         asset.category = category
         asset.serial_number = serial_number.strip() if serial_number else asset.serial_number
+        # Only update asset_type if provided
+        if asset_type:
+            asset.asset_type = asset_type
+        if model is not None:
+            asset.model = model.strip() if model else ''
+        if manufacturer is not None:
+            asset.manufacturer = manufacturer.strip() if manufacturer else ''
+        if version is not None:
+            asset.version = version.strip() if version else ''
         asset.status = status
         asset.location = location.strip()
         asset.purchase_date = purchase_date_obj
         asset.purchase_cost = purchase_cost
         asset.warranty_expiry = warranty_expiry_obj
+        asset.end_of_life = end_of_life_obj
+        if contact_type is not None:
+            asset.contact_type = contact_type.strip() if contact_type else ''
+        if contact_email is not None:
+            asset.contact_email = contact_email.strip() if contact_email else ''
+        if contact_phone is not None:
+            asset.contact_phone = contact_phone.strip() if contact_phone else ''
         asset.assigned_to = assigned_to
         asset.updated_by = request.user
         asset.save()

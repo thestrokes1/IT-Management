@@ -105,8 +105,10 @@
                             class="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <option value="ACTIVE" {% if asset.status == 'ACTIVE' %}selected{% endif %}>Active</option>
                             <option value="INACTIVE" {% if asset.status == 'INACTIVE' %}selected{% endif %}>Inactive</option>
-                            <option value="MAINTENANCE" {% if asset.status == 'MAINTENANCE' %}selected{% endif %}>Maintenance</option>
+                            <option value="IN_REPAIR" {% if asset.status == 'IN_REPAIR' %}selected{% endif %}>In Repair</option>
                             <option value="RETIRED" {% if asset.status == 'RETIRED' %}selected{% endif %}>Retired</option>
+                            <option value="DISPOSED" {% if asset.status == 'DISPOSED' %}selected{% endif %}>Disposed</option>
+                            <option value="MISSING" {% if asset.status == 'MISSING' %}selected{% endif %}>Missing</option>
                         </select>
                     </div>
                     <div>

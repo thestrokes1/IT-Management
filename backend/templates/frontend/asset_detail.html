@@ -25,7 +25,7 @@
 
     <!-- Header Section -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6 border-b-4" 
-         style="border-bottom-color: {% if asset.status == 'ACTIVE' %}#10B981{% elif asset.status == 'MAINTENANCE' %}#F59E0B{% elif asset.status == 'RETIRED' %}#6B7280{% elif asset.status == 'INACTIVE' %}#EF4444{% else %}#6B7280{% endif %}">
+         style="border-bottom-color: {% if asset.status == 'ACTIVE' %}#10B981{% elif asset.status == 'IN_REPAIR' %}#F59E0B{% elif asset.status == 'RETIRED' %}#6B7280{% elif asset.status == 'INACTIVE' %}#EF4444{% else %}#6B7280{% endif %}">
         
         <div class="px-6 py-6">
             <div class="flex items-start justify-between">
@@ -37,17 +37,13 @@
                     <h1 class="text-3xl font-bold text-gray-900 mb-2">
                         {{ asset.name }}
                     </h1>
-                    
-                    <p class="text-sm text-gray-600">
-                        {% trans "Asset Tag" %}: <strong>{{ asset.asset_tag }}</strong>
-                    </p>
                 </div>
 
                 <!-- Status badge -->
                 <div class="flex flex-col gap-2 ml-4">
                     <span class="px-4 py-2 rounded-full text-sm font-semibold inline-block text-center
                         {% if asset.status == 'ACTIVE' %}bg-green-100 text-green-800
-                        {% elif asset.status == 'MAINTENANCE' %}bg-yellow-100 text-yellow-800
+                        {% elif asset.status == 'IN_REPAIR' %}bg-yellow-100 text-yellow-800
                         {% elif asset.status == 'RETIRED' %}bg-gray-100 text-gray-800
                         {% elif asset.status == 'INACTIVE' %}bg-red-100 text-red-800
                         {% else %}bg-gray-100 text-gray-800{% endif %}">

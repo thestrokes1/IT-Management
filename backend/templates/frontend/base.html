@@ -737,7 +737,7 @@
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden main-content {% if request.resolver_match.url_name == 'login' %}lg:ml-0{% else %}lg:ml-64{% endif %}">
             <!-- Top Header -->
-            <header class="bg-white shadow-sm border-b border-gray-200 {% if request.resolver_match.url_name == 'login' %}hidden{% endif %}">
+<header class="bg-white shadow-sm border-b border-gray-200 {% if request.resolver_match.url_name == 'login' %}hidden{% endif %}">
                 <div class="flex items-center justify-between h-16 px-4">
                     <div class="flex items-center">
                         <button id="mobile-sidebar-toggle" class="lg:hidden text-gray-500 hover:text-gray-700">
@@ -747,6 +747,42 @@
                             {% block page_title %}Dashboard{% endblock %}
                         </h2>
                     </div>
+                    
+                    <!-- Global Messages in Header -->
+                    {% if messages %}
+                    <div class="flex-1 mx-4 flex justify-center">
+                        <div class="flex flex-wrap items-center gap-2 max-w-2xl w-full">
+                            {% for message in messages %}
+                            <div class="px-3 py-1.5 rounded-md border flex items-center gap-2 text-sm alert-message
+                                {% if message.tags == 'success' %}
+                                    bg-green-50 border-green-200 text-green-700
+                                {% elif message.tags == 'error' %}
+                                    bg-red-50 border-red-200 text-red-700
+                                {% elif message.tags == 'warning' %}
+                                    bg-yellow-50 border-yellow-200 text-yellow-700
+                                {% else %}
+                                    bg-blue-50 border-blue-200 text-blue-700
+                                {% endif %}" role="alert">
+                                <div class="flex-shrink-0">
+                                    {% if message.tags == 'success' %}
+                                        <i class="fas fa-check-circle text-green-500 text-xs"></i>
+                                    {% elif message.tags == 'error' %}
+                                        <i class="fas fa-exclamation-circle text-red-500 text-xs"></i>
+                                    {% elif message.tags == 'warning' %}
+                                        <i class="fas fa-exclamation-triangle text-yellow-500 text-xs"></i>
+                                    {% else %}
+                                        <i class="fas fa-info-circle text-blue-500 text-xs"></i>
+                                    {% endif %}
+                                </div>
+                                <span class="text-xs font-medium truncate">{{ message }}</span>
+                                <button onclick="this.parentElement.remove()" class="ml-1 flex-shrink-0 text-gray-400 hover:text-gray-600">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                     
                     <div class="flex items-center space-x-4">
                         <!-- Dark Mode Toggle -->
