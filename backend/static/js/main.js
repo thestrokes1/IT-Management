@@ -223,6 +223,27 @@ window.showToast = function(message, type = 'info', duration = 5000) {
     if (duration > 0) setTimeout(() => { toast.style.animation = "fadeOut 0.3s forwards"; setTimeout(() => toast.remove(), 300); }, duration);
 };
 
+// Confirm Modal
+let _confirmCallback = null;
+
+window.showConfirmation = function(title, message, onConfirm) {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalMessage').textContent = message;
+    _confirmCallback = onConfirm;
+    document.getElementById('confirmModal').classList.remove('hidden');
+};
+
+window.closeConfirmModal = function() {
+    document.getElementById('confirmModal').classList.add('hidden');
+    _confirmCallback = null;
+};
+
+window.executeConfirm = function() {
+    document.getElementById('confirmModal').classList.add('hidden');
+    if (_confirmCallback) _confirmCallback();
+    _confirmCallback = null;
+};
+
 // Generic Modal Handling
 window.showModal = function(modalId) {
     document.getElementById('modal-overlay')?.classList.remove('hidden');

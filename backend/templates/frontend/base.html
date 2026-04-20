@@ -39,13 +39,13 @@
 </head>
 <body class="font-sans {% if request.resolver_match.url_name != 'login' %}bg-gray-50{% endif %}">
     <!-- Confirmation Modal -->
-    <div id="confirmModal">
-        <div class="modal-content">
-            <div class="modal-header" id="modalTitle">Confirm Action</div>
-            <div class="modal-body" id="modalMessage">Are you sure?</div>
-            <div class="modal-footer">
-                <button class="modal-btn modal-btn-cancel" onclick="closeConfirmModal()">Cancel</button>
-                <button class="modal-btn modal-btn-confirm" id="confirmBtn" onclick="executeConfirm()">Confirm</button>
+    <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+            <div id="modalTitle" class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Confirm Action</div>
+            <div id="modalMessage" class="text-gray-600 dark:text-gray-300 mb-6">Are you sure?</div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+                <button id="confirmBtn" onclick="executeConfirm()" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors">Confirm</button>
             </div>
         </div>
     </div>
@@ -215,7 +215,7 @@
                     
                     <div class="flex items-center space-x-4">
                         <!-- Dark Mode Toggle -->
-                        <button id="dark-mode-toggle" class="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Toggle Dark Mode">
+                        <button id="dark-mode-toggle" onclick="toggleDarkMode()" class="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Toggle Dark Mode">
                             <i class="fas fa-moon text-xl" id="dark-mode-icon"></i>
                         </button>
                         
