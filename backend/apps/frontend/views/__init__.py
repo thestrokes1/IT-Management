@@ -10,6 +10,7 @@ from .auth import (
     MaintenanceView,
     login_view,
     logout_view,
+    setup_admin,
 )
 
 # Dashboard views
