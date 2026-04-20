@@ -31,14 +31,15 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Development-specific middleware and apps
-INSTALLED_APPS += [
-    'debug_toolbar',
-]
-MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
-INTERNAL_IPS = [
-    "127.0.0.1",
-]
+# Development-specific middleware and apps — only if debug_toolbar is installed
+# It is not in requirements.txt so CI environments won't have it
+try:
+    import debug_toolbar  # noqa: F401
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+    INTERNAL_IPS = ["127.0.0.1"]
+except ImportError:
+    pass
 
 # Development logging - reduced output
 LOGGING = {
