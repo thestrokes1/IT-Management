@@ -200,8 +200,7 @@ LOGGING = {
 # SESSION CONFIGURATION
 # =============================================================================
 
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-SESSION_CACHE_ALIAS = 'default'
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 24 hours
 
 # =============================================================================
