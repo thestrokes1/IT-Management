@@ -134,7 +134,9 @@
                 <div class="mt-8 pt-8 border-t border-gray-200">
                     <div class="px-2 lg:px-4">
                         <div class="flex items-center px-2 lg:px-4 py-3 text-gray-700">
-                            <i class="fas fa-user-circle text-lg w-6 text-center text-primary-500"></i>
+                            <div class="w-6 h-6 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
+                                <span class="text-white text-xs font-bold">{{ user.username|first|upper }}</span>
+                            </div>
                             <div class="sidebar-text ml-3 overflow-hidden">
                                 <div class="text-sm font-medium whitespace-nowrap">{{ user.username }}</div>
                                 <div class="text-xs text-gray-500 whitespace-nowrap">{{ user.get_role_display }}</div>
@@ -166,13 +168,9 @@
                                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
                                 </div>
                                 <div class="max-h-64 overflow-y-auto">
-                                    <div class="p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">New ticket assigned</div>
-                                        <div class="text-xs text-gray-500 mt-0.5">2 minutes ago</div>
-                                    </div>
-                                    <div class="p-3 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">Project milestone reached</div>
-                                        <div class="text-xs text-gray-500 mt-0.5">1 hour ago</div>
+                                    <div class="p-6 text-center text-gray-400 dark:text-gray-500">
+                                        <i class="fas fa-bell-slash text-2xl mb-2 block"></i>
+                                        <p class="text-xs">No notifications</p>
                                     </div>
                                 </div>
                                 <div class="p-3 border-t border-gray-200 dark:border-gray-700">

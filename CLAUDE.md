@@ -94,10 +94,10 @@ Track progress here. Check items off as they are completed.
 - Deleted 0-byte ghost file `backend/apps/frontend/views/tickets` (existed since Feb 19)
 - `urls.py`: Fixed indentation + added `debug_toolbar` conditional guard
 
-**Steps to deploy (user action required):**
-- [ ] Commit all changes: `git add . && git commit -m "Complete refactor + deploy prep"`
-- [ ] Push: `git push origin main`
-- [ ] Go to render.com → New → **Blueprint** → connect GitHub repo
+**Steps to deploy:**
+- [x] Commit all changes (74 files, 3,838 insertions, 9,941 deletions)
+- [x] Push to `https://github.com/thestrokes1/IT-Management.git` (commit `45deb02`)
+- [ ] Go to render.com → New → **Blueprint** → connect `thestrokes1/IT-Management`
 - [ ] Render reads root-level `render.yaml` and auto-provisions PostgreSQL + Redis
 - [ ] `DJANGO_SECRET_KEY` auto-generated — no manual env vars needed
 - [ ] Build runs: `pip install` → `migrate` → `collectstatic` (all automatic)

@@ -3,6 +3,24 @@
 
 {% block title %}Assets Management - IT Management Platform{% endblock %}
 
+{% block breadcrumb %}
+<nav class="flex mb-6" aria-label="Breadcrumb">
+    <ol class="inline-flex items-center space-x-1 md:space-x-3">
+        <li class="inline-flex items-center">
+            <a href="{% url 'frontend:dashboard' %}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-primary-600 transition-colors">
+                <i class="fas fa-home mr-2"></i>Dashboard
+            </a>
+        </li>
+        <li>
+            <div class="flex items-center">
+                <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                <span class="text-sm font-medium text-gray-500">Assets</span>
+            </div>
+        </li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-6 sm:py-8">
     <div class="mb-6 sm:mb-8">
@@ -12,8 +30,8 @@
 
     {% if permissions.can_create %}
     <div class="mb-6">
-        <a href="{% url 'frontend:create-asset' %}" class="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition">
-            + Add New Asset
+        <a href="{% url 'frontend:create-asset' %}" class="inline-flex items-center bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-lg hover:bg-blue-700 transition">
+            <i class="fas fa-plus mr-2"></i> Add New Asset
         </a>
     </div>
     {% endif %}
@@ -119,12 +137,14 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="6" class="px-3 sm:px-6 py-8 text-center text-gray-500 text-xs sm:text-sm">
-                                No assets found.
+                            <td colspan="6" class="px-6 py-16 text-center">
+                                <i class="fas fa-desktop text-5xl text-gray-300 mb-4 block"></i>
+                                <h3 class="text-base font-semibold text-gray-900 mb-1">No assets yet</h3>
+                                <p class="text-sm text-gray-500 mb-5">Start tracking your IT hardware and software by adding your first asset.</p>
                                 {% if permissions.can_create %}
-                                    <a href="{% url 'frontend:create-asset' %}" class="text-blue-600 hover:text-blue-900">
-                                        Create one
-                                    </a>
+                                <a href="{% url 'frontend:create-asset' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 transition">
+                                    <i class="fas fa-plus mr-2"></i> Add New Asset
+                                </a>
                                 {% endif %}
                             </td>
                         </tr>

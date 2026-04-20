@@ -2,6 +2,24 @@
 
 {% block title %}Activity Logs - IT Management Platform{% endblock %}
 
+{% block breadcrumb %}
+<nav class="flex mb-6" aria-label="Breadcrumb">
+    <ol class="inline-flex items-center space-x-1 md:space-x-3">
+        <li class="inline-flex items-center">
+            <a href="{% url 'frontend:dashboard' %}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-primary-600 transition-colors">
+                <i class="fas fa-home mr-2"></i>Dashboard
+            </a>
+        </li>
+        <li>
+            <div class="flex items-center">
+                <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                <span class="text-sm font-medium text-gray-500">Logs</span>
+            </div>
+        </li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">

@@ -2535,6 +2535,23 @@ html.dark .modal-footer .modal-btn-cancel:hover {
   background-color: var(--border-light);
 }
 
+/* Fix: dark mode hover on table rows and list items (Tailwind hover variants aren't caught by bg-gray overrides) */
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover,
+html.dark .hover\:bg-white:hover {
+  background-color: var(--bg-tertiary) !important;
+}
+
+/* Ensure colored action buttons always show white text in dark mode */
+html.dark a.bg-blue-600,
+html.dark a.bg-blue-700,
+html.dark button.bg-blue-600,
+html.dark button.bg-blue-700,
+html.dark a.bg-primary-600,
+html.dark button.bg-primary-600 {
+  color: #ffffff;
+}
+
 @keyframes slideIn {
   from {
     transform: translateX(120%);
