@@ -24,11 +24,6 @@ from apps.core.domain.roles import (
 from apps.core.domain.authorization import AuthorizationError
 
 
-# Role constants
-_ROLE_IT_ADMIN = 'IT_ADMIN'
-_ROLE_TECHNICIAN = 'TECHNICIAN'
-_ROLE_VIEWER = 'VIEWER'
-
 
 # =============================================================================
 # VIEW PERMISSIONS
@@ -52,7 +47,7 @@ def can_view(user, asset) -> bool:
         bool: True if user can view the asset
     """
     # VIEWER has no asset access
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # All other roles can view assets
@@ -73,7 +68,7 @@ def can_view_list(user) -> bool:
     Returns:
         bool: True if user can view asset list
     """
-    return user.role != _ROLE_VIEWER
+    return user.role != 'VIEWER'
 
 
 def can_view_details(user, asset) -> bool:
@@ -109,7 +104,7 @@ def can_view_logs(user, asset) -> bool:
         bool: True if user can view asset logs
     """
     # IT_ADMIN and above can view logs
-    return has_higher_role(user.role, _ROLE_IT_ADMIN)
+    return has_higher_role(user.role, 'IT_ADMIN')
 
 
 # =============================================================================
@@ -130,7 +125,7 @@ def can_create(user) -> bool:
     Returns:
         bool: True if user can create assets
     """
-    return user.role != _ROLE_VIEWER
+    return user.role != 'VIEWER'
 
 
 # =============================================================================
@@ -158,7 +153,7 @@ def can_edit(user, asset) -> bool:
         bool: True if user can edit the asset
     """
     # VIEWER cannot edit
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -166,11 +161,11 @@ def can_edit(user, asset) -> bool:
         return True
     
     # IT_ADMIN has full asset access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only edit if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return asset.assigned_to_id == user.id
     
     return False
@@ -229,7 +224,7 @@ def can_delete(user, asset) -> bool:
         bool: True if user can delete the asset
     """
     # VIEWER cannot delete
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -237,11 +232,11 @@ def can_delete(user, asset) -> bool:
         return True
     
     # IT_ADMIN has full asset access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only delete if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return asset.assigned_to_id == user.id
     
     return False
@@ -270,7 +265,7 @@ def can_assign(user, asset, assignee) -> bool:
         bool: True if user can assign the asset
     """
     # VIEWER cannot assign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -278,7 +273,7 @@ def can_assign(user, asset, assignee) -> bool:
         return True
     
     # IT_ADMIN has full asset access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: NEVER can assign to others
@@ -303,7 +298,7 @@ def can_unassign(user, asset) -> bool:
         bool: True if user can unassign the asset
     """
     # VIEWER cannot unassign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -311,11 +306,11 @@ def can_unassign(user, asset) -> bool:
         return True
     
     # IT_ADMIN has full asset access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only unassign if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return asset.assigned_to_id == user.id
     
     return False
@@ -340,7 +335,7 @@ def can_self_assign(user, asset) -> bool:
         bool: True if user can self-assign the asset
     """
     # VIEWER cannot self-assign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER can always self-assign
@@ -348,11 +343,11 @@ def can_self_assign(user, asset) -> bool:
         return True
     
     # IT_ADMIN can always self-assign
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only self-assign if unassigned
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return asset.assigned_to_id is None
     
     return False
@@ -376,7 +371,7 @@ def can_unassign_self(user, asset) -> bool:
         bool: True if user can unassign themselves from the asset
     """
     # VIEWER cannot unassign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER can always unassign
@@ -384,11 +379,11 @@ def can_unassign_self(user, asset) -> bool:
         return True
     
     # IT_ADMIN can always unassign
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only unassign if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return asset.assigned_to_id == user.id
     
     return False
@@ -431,7 +426,7 @@ def can_reassign(user, asset) -> bool:
         bool: True if user can reassign the asset
     """
     # TECHNICIAN cannot reassign
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return False
     
     # Other roles can reassign (checked by can_assign)
@@ -459,11 +454,11 @@ def can_add_maintenance(user, asset) -> bool:
         bool: True if user can add maintenance records
     """
     # VIEWER cannot add maintenance
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # TECHNICIAN: can only add if assigned
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return asset.assigned_to_id == user.id
     
     # Other roles can add maintenance
@@ -487,11 +482,11 @@ def can_view_maintenance(user, asset) -> bool:
         bool: True if user can view maintenance records
     """
     # VIEWER cannot view maintenance
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # TECHNICIAN: can only view if assigned
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return asset.assigned_to_id == user.id
     
     # Other roles can view maintenance
@@ -693,6 +688,10 @@ def get_asset_permissions(user, asset) -> dict:
 
 
 # Legacy assertion aliases
+def assert_can_create_asset(user) -> None:
+    return assert_can_create(user)
+
+
 def assert_can_update_asset(user, asset) -> None:
     return assert_can_edit(user, asset)
 

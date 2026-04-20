@@ -16,6 +16,7 @@ from apps.tickets.domain.services.ticket_authority import (
     assert_can_edit,
     can_edit,
 )
+from apps.core.services.change_detection import get_changed_fields, format_field_value, get_display_field_name
 
 
 @dataclass
@@ -101,16 +102,28 @@ class UpdateTicket:
         except AuthorizationError as e:
             return UpdateTicketResult.fail(str(e))
         
+        # Detect changes before applying updates
+        changes = get_changed_fields(ticket, ticket_data)
+        
         # Update fields
         allowed_fields = {
             'title', 'description', 'priority', 'status',
             'impact', 'urgency', 'category_id', 'ticket_type_id',
-            'resolution_summary', 'assigned_team',
+            'resolution_summary', 'assigned_team', 'location',
+            'contact_phone', 'contact_email', 'assigned_to_id',
         }
         
         for field, value in ticket_data.items():
             if field in allowed_fields:
-                if field.endswith('_id'):
+                if field == 'assigned_to_id' and value:
+                    # Handle assigned_to foreign key
+                    from apps.users.models import User
+                    try:
+                        assigned_user = User.objects.get(id=value)
+                        ticket.assigned_to = assigned_user
+                    except User.DoesNotExist:
+                        pass
+                elif field.endswith('_id'):
                     # Handle foreign key fields
                     setattr(ticket, field, value)
                 else:
@@ -130,7 +143,8 @@ class UpdateTicket:
         ticket.save()
         
         # Activity logging - runs after transaction commits, never breaks command
-        transaction.on_commit(lambda: self._log_ticket_updated(ticket, user))
+        # Log each changed field individually
+        transaction.on_commit(lambda: self._log_ticket_changes(ticket, user, changes))
         
         return UpdateTicketResult.ok(
             data={
@@ -141,17 +155,62 @@ class UpdateTicket:
             }
         )
     
-    def _log_ticket_updated(self, ticket, user):
-        """Log ticket update activity."""
+    def _log_ticket_changes(self, ticket, user, changes):
+        """
+        Log ticket update activity with field-level changes.
+        
+        Creates one ActivityLog entry per changed field to show
+        exactly what was changed (old value → new value).
+        """
         try:
             from apps.logs.services.activity_service import ActivityService
-            ActivityService().log_ticket_action(
-                action='UPDATE',
-                ticket=ticket,
-                actor=user,
-                request=None,
-                description=f"Updated ticket #{ticket.id}: {ticket.title}"
-            )
+            from django.utils import timezone
+            
+            service = ActivityService()
+            
+            if not changes:
+                # No actual changes, log a generic update
+                service.log_ticket_action(
+                    action='UPDATE',
+                    ticket=ticket,
+                    actor=user,
+                    request=None,
+                    description=f"Updated ticket #{ticket.id}: {ticket.title}"
+                )
+                return
+            
+            # Log each changed field individually
+            for change in changes:
+                field_name = change['field']
+                old_value = change['old']
+                new_value = change['new']
+                
+                # Format values for display
+                old_display = format_field_value(old_value)
+                new_display = format_field_value(new_value)
+                
+                # Get human-readable field name
+                display_name = get_display_field_name(field_name)
+                
+                # Build description showing the change
+                description = f"Changed {display_name}: {old_display} → {new_display}"
+                
+                # Create activity log with change details in metadata
+                service.log_ticket_action(
+                    action='UPDATED',
+                    ticket=ticket,
+                    actor=user,
+                    metadata={
+                        'field_name': field_name,
+                        'field_display': display_name,
+                        'old_value': old_value,
+                        'new_value': new_value,
+                        'old_display': old_display,
+                        'new_display': new_display,
+                    },
+                    request=None,
+                    description=description
+                )
         except Exception:
             pass  # Logging must never break the command
 

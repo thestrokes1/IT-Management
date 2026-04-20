@@ -21,14 +21,6 @@ from apps.core.domain.roles import (
 from apps.core.domain.authorization import AuthorizationError
 
 
-# Role constants
-_ROLE_SUPERADMIN = 'SUPERADMIN'
-_ROLE_MANAGER = 'MANAGER'
-_ROLE_IT_ADMIN = 'IT_ADMIN'
-_ROLE_TECHNICIAN = 'TECHNICIAN'
-_ROLE_VIEWER = 'VIEWER'
-
-
 # =============================================================================
 # VIEW PERMISSIONS
 # =============================================================================
@@ -51,15 +43,15 @@ def can_view(user, project) -> bool:
         bool: True if user can view the project
     """
     # VIEWER has no project access
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER can view all projects
-    if user.role in [_ROLE_SUPERADMIN, _ROLE_MANAGER]:
+    if is_superadmin_or_manager(user.role):
         return True
     
     # IT_ADMIN can only view if self-assigned via ProjectMember
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         try:
             from apps.projects.models import ProjectMember
             return ProjectMember.objects.filter(
@@ -88,7 +80,7 @@ def can_view_list(user) -> bool:
     Returns:
         bool: True if user can view project list
     """
-    return user.role != _ROLE_VIEWER
+    return user.role != 'VIEWER'
 
 
 def can_view_details(user, project) -> bool:
@@ -124,7 +116,7 @@ def can_create(user) -> bool:
     Returns:
         bool: True if user can create projects
     """
-    return has_higher_role(user.role, _ROLE_MANAGER)
+    return has_higher_role(user.role, 'MANAGER')
 
 
 # =============================================================================
@@ -149,15 +141,15 @@ def can_edit(user, project) -> bool:
         bool: True if user can edit the project
     """
     # VIEWER cannot edit
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # TECHNICIAN cannot edit (read-only)
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return False
     
     # IT_ADMIN cannot edit (read-only access only)
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return False
     
     # SUPERADMIN, MANAGER can edit
@@ -201,7 +193,7 @@ def can_delete(user, project) -> bool:
         bool: True if user can delete the project
     """
     # Only SUPERADMIN can delete projects
-    return user.role == _ROLE_SUPERADMIN
+    return user.role == 'SUPERADMIN'
 
 
 # =============================================================================
@@ -227,19 +219,19 @@ def can_assign(user, project, assignee) -> bool:
         bool: True if user can assign project members
     """
     # VIEWER cannot assign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # TECHNICIAN cannot assign
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return False
     
     # IT_ADMIN cannot assign (read-only role for projects)
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return False
     
     # Only SUPERADMIN and MANAGER can assign
-    return user.role in [_ROLE_SUPERADMIN, _ROLE_MANAGER]
+    return is_superadmin_or_manager(user.role)
 
 
 def can_unassign(user, project) -> bool:
@@ -260,11 +252,11 @@ def can_unassign(user, project) -> bool:
         bool: True if user can unassign project members
     """
     # VIEWER cannot unassign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # TECHNICIAN cannot unassign
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return False
     
     # SUPERADMIN, MANAGER, IT_ADMIN can unassign
@@ -291,7 +283,7 @@ def can_assign_to_self(user, project) -> bool:
         bool: True if user can self-assign to the project
     """
     # VIEWER cannot self-assign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # All other roles can self-assign to projects
@@ -316,7 +308,7 @@ def can_unassign_self(user, project) -> bool:
         bool: True if user can unassign themselves from the project
     """
     # VIEWER cannot unassign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # All other roles can unassign themselves
@@ -365,7 +357,7 @@ def can_view_logs(user, project) -> bool:
         bool: True if user can view project logs
     """
     # VIEWER and TECHNICIAN cannot view logs
-    if user.role in (_ROLE_VIEWER, _ROLE_TECHNICIAN):
+    if user.role in ('VIEWER', 'TECHNICIAN'):
         return False
     
     # SUPERADMIN, MANAGER, IT_ADMIN can view logs

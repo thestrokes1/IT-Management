@@ -24,13 +24,6 @@ from apps.core.domain.roles import (
 from apps.core.domain.authorization import AuthorizationError
 
 
-# Role constants
-_ROLE_SUPERADMIN = 'SUPERADMIN'
-_ROLE_MANAGER = 'MANAGER'
-_ROLE_IT_ADMIN = 'IT_ADMIN'
-_ROLE_TECHNICIAN = 'TECHNICIAN'
-_ROLE_VIEWER = 'VIEWER'
-
 
 # =============================================================================
 # VIEW PERMISSIONS
@@ -58,7 +51,7 @@ def can_view(actor, target) -> bool:
         return True
     
     # VIEWER can only view their own profile
-    if actor.role == _ROLE_VIEWER:
+    if actor.role == 'VIEWER':
         return False
     
     # All other roles can view any user
@@ -79,7 +72,7 @@ def can_view_list(actor) -> bool:
     Returns:
         bool: True if actor can view user list
     """
-    return actor.role != _ROLE_VIEWER
+    return actor.role != 'VIEWER'
 
 
 def can_view_details(actor, target) -> bool:
@@ -146,19 +139,19 @@ def can_edit(actor, target) -> bool:
         return True
     
     # VIEWER cannot update any profile
-    if actor.role == _ROLE_VIEWER:
+    if actor.role == 'VIEWER':
         return False
     
     # SUPERADMIN can update any user
-    if actor.role == _ROLE_SUPERADMIN:
+    if actor.role == 'SUPERADMIN':
         return True
     
     # MANAGER can update any user except SUPERADMIN
-    if actor.role == _ROLE_MANAGER and target.role != _ROLE_SUPERADMIN:
+    if actor.role == 'MANAGER' and target.role != 'SUPERADMIN':
         return True
     
     # IT_ADMIN can ONLY update TECHNICIAN users
-    if actor.role == _ROLE_IT_ADMIN and target.role == _ROLE_TECHNICIAN:
+    if actor.role == 'IT_ADMIN' and target.role == 'TECHNICIAN':
         return True
     
     return False
@@ -208,7 +201,7 @@ def can_change_role(actor, target, new_role) -> bool:
         return False
     
     # TECHNICIAN and VIEWER cannot change roles
-    if actor.role in (_ROLE_TECHNICIAN, _ROLE_VIEWER):
+    if actor.role in ('TECHNICIAN', 'VIEWER'):
         return False
     
     # Cannot assign a role >= actor's role (prevents privilege escalation)
@@ -220,18 +213,18 @@ def can_change_role(actor, target, new_role) -> bool:
     
     # Handle equal rank case: only SUPERADMIN can assign MANAGER role
     if new_role_rank == actor_rank:
-        return actor.role == _ROLE_SUPERADMIN and new_role == _ROLE_MANAGER
+        return actor.role == 'SUPERADMIN' and new_role == 'MANAGER'
     
     # SUPERADMIN can assign any role (already covered by rank check above)
-    if actor.role == _ROLE_SUPERADMIN:
+    if actor.role == 'SUPERADMIN':
         return True
     
     # MANAGER can assign IT_ADMIN, TECHNICIAN, or VIEWER
-    if actor.role == _ROLE_MANAGER and new_role in (_ROLE_IT_ADMIN, _ROLE_TECHNICIAN, _ROLE_VIEWER):
+    if actor.role == 'MANAGER' and new_role in ('IT_ADMIN', 'TECHNICIAN', 'VIEWER'):
         return True
     
     # IT_ADMIN can assign TECHNICIAN or VIEWER only
-    if actor.role == _ROLE_IT_ADMIN and new_role in (_ROLE_TECHNICIAN, _ROLE_VIEWER):
+    if actor.role == 'IT_ADMIN' and new_role in ('TECHNICIAN', 'VIEWER'):
         return True
     
     return False
@@ -264,19 +257,19 @@ def can_deactivate(actor, target) -> bool:
         return False
     
     # TECHNICIAN and VIEWER cannot deactivate
-    if actor.role in (_ROLE_TECHNICIAN, _ROLE_VIEWER):
+    if actor.role in ('TECHNICIAN', 'VIEWER'):
         return False
     
     # SUPERADMIN can deactivate any user except self
-    if actor.role == _ROLE_SUPERADMIN:
+    if actor.role == 'SUPERADMIN':
         return True
     
     # MANAGER can deactivate IT_ADMIN and below (cannot deactivate SUPERADMIN)
-    if actor.role == _ROLE_MANAGER and target.role != _ROLE_SUPERADMIN:
+    if actor.role == 'MANAGER' and target.role != 'SUPERADMIN':
         return True
     
     # IT_ADMIN can deactivate TECHNICIAN or VIEWER only
-    if actor.role == _ROLE_IT_ADMIN and target.role in (_ROLE_TECHNICIAN, _ROLE_VIEWER):
+    if actor.role == 'IT_ADMIN' and target.role in ('TECHNICIAN', 'VIEWER'):
         return True
     
     return False
@@ -323,7 +316,7 @@ def can_delete(actor, target) -> bool:
         return False
     
     # Only SUPERADMIN can delete other users
-    return actor.role == _ROLE_SUPERADMIN
+    return actor.role == 'SUPERADMIN'
 
 
 # =============================================================================
@@ -510,8 +503,8 @@ def assert_can_update_user(actor, target) -> None:
     return assert_can_edit(actor, target)
 
 
-def assert_can_change_role(actor, target, new_role) -> None:
-    return assert_can_change_role(actor, target, new_role)
+# assert_can_change_role is already defined above with the correct implementation.
+# The duplicate alias was removed — it called itself recursively (infinite recursion).
 
 
 def assert_can_deactivate_user(actor, target) -> None:

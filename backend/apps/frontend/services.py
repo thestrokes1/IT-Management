@@ -648,3 +648,157 @@ class AssetService(EventPublisher):
             cursor.execute("DELETE FROM assets WHERE id = %s", [asset_db_id])
         
         return True
+
+
+class ReportsQueryService:
+    """Service layer for fetching aggregated report data."""
+    
+    def get_full_report_data(self, user, is_admin: bool = False) -> Dict:
+        total_assets = self._get_total_assets()
+        active_projects = self._get_active_projects()
+        open_tickets = self._get_open_tickets()
+        active_users = self._get_active_users()
+        recent_security_events = self._get_recent_security_events()
+        asset_status_distribution = self._get_asset_status_distribution()
+        tickets_by_status = self._get_tickets_by_status()
+        tickets_by_priority = self._get_tickets_by_priority()
+        total_tickets = self._get_total_tickets()
+        recent_tickets = self._get_recent_tickets(user, is_admin)
+        recent_activities = self._get_recent_activities(user)
+        
+        return {
+            'total_assets': total_assets,
+            'active_projects': active_projects,
+            'open_tickets': open_tickets,
+            'active_users': active_users,
+            'recent_security_events': recent_security_events,
+            'asset_status_distribution': asset_status_distribution,
+            'tickets_by_status': tickets_by_status,
+            'tickets_by_priority': tickets_by_priority,
+            'total_tickets': total_tickets,
+            'recent_tickets': recent_tickets,
+            'recent_activities': recent_activities,
+            'is_admin': is_admin,
+        }
+    
+    def _get_total_assets(self) -> int:
+        try:
+            from apps.assets.models import Asset
+            return Asset.objects.count()
+        except Exception:
+            return 0
+    
+    def _get_active_projects(self) -> int:
+        try:
+            from apps.projects.models import Project
+            return Project.objects.filter(status__in=['ACTIVE', 'IN_PROGRESS', 'ON_HOLD']).count()
+        except Exception:
+            return 0
+    
+    def _get_open_tickets(self) -> int:
+        try:
+            from apps.tickets.models import Ticket
+            return Ticket.objects.filter(status__in=['NEW', 'OPEN', 'IN_PROGRESS']).count()
+        except Exception:
+            return 0
+    
+    def _get_active_users(self) -> int:
+        try:
+            from apps.users.models import User
+            return User.objects.filter(is_active=True, is_superuser=False).count()
+        except Exception:
+            return 0
+    
+    def _get_recent_security_events(self) -> int:
+        try:
+            from apps.logs.models import SecurityEvent
+            from datetime import timedelta
+            recent_date = timezone.now() - timedelta(days=7)
+            return SecurityEvent.objects.filter(detected_at__gte=recent_date).count()
+        except Exception:
+            return 0
+    
+    def _get_asset_status_distribution(self) -> Dict:
+        try:
+            from apps.assets.models import Asset
+            distribution = {}
+            for status, label in Asset.STATUS_CHOICES:
+                count = Asset.objects.filter(status=status).count()
+                distribution[status] = {'label': label, 'count': count}
+            return distribution
+        except Exception:
+            return {}
+    
+    def _get_tickets_by_status(self) -> Dict:
+        try:
+            from apps.tickets.models import Ticket
+            distribution = {}
+            for status, label in Ticket.STATUS_CHOICES:
+                count = Ticket.objects.filter(status=status).count()
+                distribution[status] = {'label': label, 'count': count}
+            return distribution
+        except Exception:
+            return {}
+    
+    def _get_tickets_by_priority(self) -> Dict:
+        try:
+            from apps.tickets.models import Ticket
+            distribution = {}
+            for priority, label in Ticket.PRIORITY_CHOICES:
+                count = Ticket.objects.filter(priority=priority).count()
+                distribution[priority] = {'label': label, 'count': count}
+            return distribution
+        except Exception:
+            return {}
+    
+    def _get_total_tickets(self) -> int:
+        try:
+            from apps.tickets.models import Ticket
+            return Ticket.objects.count()
+        except Exception:
+            return 0
+    
+    def _get_recent_tickets(self, user, is_admin: bool, limit: int = 50) -> list:
+        try:
+            from apps.tickets.models import Ticket
+            from django.db.models import Q
+            
+            if is_admin:
+                tickets = Ticket.objects.select_related('created_by', 'assigned_to', 'category').order_by('-created_at')[:limit]
+            else:
+                tickets = Ticket.objects.filter(Q(created_by=user) | Q(assigned_to=user)).select_related('created_by', 'assigned_to', 'category').order_by('-created_at')[:limit]
+            
+            return [self._ticket_to_dict(ticket) for ticket in tickets]
+        except Exception:
+            return []
+    
+    def _get_recent_activities(self, user, limit: int = 50) -> list:
+        try:
+            from apps.logs.services.activity_service import ActivityService
+            service = ActivityService()
+            activities = service.get_activity_logs(user=user, limit=limit)
+            from apps.logs.services.log_adapter import LogAdapter
+            adapter = LogAdapter()
+            return adapter.to_template_dicts(activities)
+        except Exception:
+            return []
+    
+    def _ticket_to_dict(self, ticket) -> Dict:
+        return {
+            'id': ticket.id,
+            'title': ticket.title,
+            'status': ticket.status,
+            'priority': ticket.priority,
+            'category': ticket.category.name if ticket.category else None,
+            'created_at': ticket.created_at,
+            'created_by': {
+                'id': ticket.created_by.id if ticket.created_by else None,
+                'username': ticket.created_by.username if ticket.created_by else 'System',
+            },
+            'assigned_to': {
+                'id': ticket.assigned_to.id if ticket.assigned_to else None,
+                'username': ticket.assigned_to.username if ticket.assigned_to else None,
+            },
+            'status_display': ticket.get_status_display(),
+            'priority_display': ticket.get_priority_display(),
+        }

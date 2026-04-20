@@ -1,0 +1,137 @@
+{% load custom_filters %}
+<!-- Desktop Table View -->
+<div class="hidden md:block overflow-x-auto">
+    <table class="w-full">
+        <thead class="bg-gray-100 border-b-2 border-gray-300">
+            <tr>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">ID</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Title</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Category</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Type</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Status</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Priority</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Location</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Assigned</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Contact</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Created By</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-900">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% if tickets %}
+                {% for ticket in tickets %}
+                {% with ticket_perms=permissions_by_ticket|get_item:ticket.id %}
+                <tr class="hover:bg-gray-50 transition ticket-row" data-id="{{ ticket.id }}">
+                    <td class="px-3 py-3 text-xs font-medium text-gray-900">#{{ ticket.id }}</td>
+                    <td class="px-3 py-3 text-xs text-gray-600">{{ ticket.title|truncatechars:30 }}</td>
+                    <td class="px-3 py-3 text-xs text-gray-600">{% if ticket.category %}{{ ticket.category.name }}{% else %}-{% endif %}</td>
+                    <td class="px-3 py-3 text-xs text-gray-600">{% if ticket.ticket_type %}{{ ticket.ticket_type.name }}{% else %}-{% endif %}</td>
+                    <td class="px-3 py-3 text-xs">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.status == 'NEW' %}bg-blue-100 text-blue-800{% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800{% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800{% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ ticket.status|upper }}
+                        </span>
+                    </td>
+                    <td class="px-3 py-3 text-xs">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ ticket.priority|upper }}
+                        </span>
+                    </td>
+                    <td class="px-3 py-3 text-xs text-gray-600">{% if ticket.location %}{{ ticket.location }}{% else %}-{% endif %}</td>
+                    <td class="px-3 py-3 text-xs text-gray-600">{% if ticket.assigned_to %}{{ ticket.assigned_to.username }}{% else %}<span class="text-gray-400">Unassigned</span>{% endif %}</td>
+                    <td class="px-3 py-3 text-xs text-gray-600">
+                        {% if ticket.contact_type or ticket.contact_email or ticket.contact_phone %}
+                            {% if ticket.contact_type %}{{ ticket.contact_type }}{% endif %}
+                            {% if ticket.contact_email %}<br>{{ ticket.contact_email }}{% endif %}
+                            {% if ticket.contact_phone %}<br>{{ ticket.contact_phone }}{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="px-3 py-3 text-xs text-gray-600">{% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</td>
+                    <td class="px-3 py-3 text-xs">
+                        <div class="flex gap-2">
+                            <a href="/tickets/{{ ticket.id }}/" class="text-blue-600 hover:text-blue-900">Open</a>
+                            
+                            {% if ticket_perms.assigned_to_me and ticket_perms.can_unassign %}
+                                <button onclick="confirmUnassign({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-orange-600 hover:text-orange-900 bg-none border-none cursor-pointer">
+                                    Unassign
+                                </button>
+                            {% elif not ticket.assigned_to and ticket_perms.can_self_assign %}
+                                <button onclick="confirmSelfAssignFromList({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-green-600 hover:text-green-900 bg-none border-none cursor-pointer">
+                                    Assign
+                                </button>
+                            {% endif %}
+                            
+                            {% if ticket_perms.can_update %}
+                                <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900">Edit</a>
+                            {% endif %}
+                        
+                            {% if ticket_perms.can_delete %}
+                                <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="11" class="px-6 py-8 text-center text-gray-500">
+                        No tickets found matching your filters. <a href="{% url 'frontend:create-ticket' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Mobile Card View -->
+<div class="md:hidden">
+    {% if tickets %}
+        {% for ticket in tickets %}
+        {% with ticket_perms=permissions_by_ticket|get_item:ticket.id %}
+        <div class="border-b border-gray-200 p-4 ticket-row" data-id="{{ ticket.id }}">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex-1">
+                    <div class="font-medium text-gray-900">#{{ ticket.id }} - {{ ticket.title }}</div>
+                    <div class="text-sm text-gray-600 mt-1">By: {% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</div>
+                </div>
+                <div class="flex space-x-2 ml-2">
+                    {% if ticket_perms.assigned_to_me and ticket_perms.can_unassign %}
+                        <button onclick="confirmUnassign({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-orange-600 hover:text-orange-900 p-1" title="Unassign">
+                            <i class="fas fa-user-minus text-sm"></i>
+                        </button>
+                    {% elif not ticket.assigned_to and ticket_perms.can_self_assign %}
+                        <button onclick="confirmSelfAssignFromList({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-green-600 hover:text-green-900 p-1" title="Assign">
+                            <i class="fas fa-user-plus text-sm"></i>
+                        </button>
+                    {% endif %}
+                    {% if ticket_perms.can_update %}
+                        <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
+                            <i class="fas fa-edit text-sm"></i>
+                        </a>
+                    {% endif %}
+                    {% if ticket_perms.can_delete %}
+                        <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 p-1">
+                            <i class="fas fa-trash text-sm"></i>
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex justify-between items-center">
+                <div class="flex space-x-2">
+                    <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.status == 'NEW' %}bg-blue-100 text-blue-800{% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800{% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800{% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ ticket.status|upper }}
+                    </span>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ ticket.priority|upper }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+    {% else %}
+        <div class="p-8 text-center text-gray-500">
+            No tickets found matching your filters. <a href="{% url 'frontend:create-ticket' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
+        </div>
+    {% endif %}
+</div>

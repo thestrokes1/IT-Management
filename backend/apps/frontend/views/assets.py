@@ -17,10 +17,13 @@ from apps.frontend.mixins import CanManageAssetsMixin, FrontendAdminReadMixin
 from apps.frontend.services import AssetService
 from apps.assets.queries import AssetQuery
 from apps.assets.domain.services.asset_authority import (
-    get_asset_permissions, 
+    get_asset_permissions,
     can_create_asset,
+    can_delete,
+    can_edit,
     assert_can_delete_asset,
 )
+from apps.core.domain.roles import is_admin_role
 from apps.core.domain.authorization import AuthorizationError
 from apps.core.exceptions import ValidationError
 from apps.frontend.permissions_mapper import (
@@ -98,7 +101,7 @@ class CreateAssetView(LoginRequiredMixin, CanManageAssetsMixin, TemplateView):
         from apps.users.models import User
         user = self.request.user
         
-        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(user.role):
             # Show all technicians for assignment
             available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
         elif user.role == 'TECHNICIAN':
@@ -192,7 +195,7 @@ class AssetDetailView(LoginRequiredMixin, TemplateView):
         from apps.users.models import User
         user = self.request.user
         
-        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(user.role):
             # Show all technicians for assignment
             assignable_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
         elif user.role == 'TECHNICIAN':
@@ -201,10 +204,48 @@ class AssetDetailView(LoginRequiredMixin, TemplateView):
         else:
             assignable_users = User.objects.none()
         
+        # Get activity logs for this asset with field-level changes
+        from apps.logs.models import ActivityLog
+        from django.db.models import Q
+        
+        # Query activity logs for this asset
+        activities = ActivityLog.objects.filter(
+            Q(entity_type__iexact='asset', entity_id=asset.id) |
+            Q(model_name__iexact='asset', object_id=asset.id)
+        ).select_related('user').order_by('-timestamp')[:50]
+        
+        # Format activities to show field-level changes
+        formatted_activities = []
+        for activity in activities:
+            # Get field change info from extra_data if available
+            metadata = activity.extra_data or {}
+            field_name = metadata.get('field_name', '')
+            old_value = metadata.get('old_display', '-')
+            new_value = metadata.get('new_display', '-')
+            field_display = metadata.get('field_display', field_name)
+            
+            formatted_activities.append({
+                'id': activity.id,
+                'actor_username': activity.user.username if activity.user else 'System',
+                'actor_role': activity.user.role if activity.user else 'SYSTEM',
+                'action': activity.action,
+                'action_label': activity.action.replace('_', ' ').title(),
+                'description': activity.description,
+                'created_at': activity.timestamp,
+                # Field change details
+                'field_name': field_name,
+                'field_display': field_display,
+                'old_value': old_value,
+                'new_value': new_value,
+                'is_field_change': bool(field_name),
+            })
+        
         context.update({
             'asset': asset,
             'permissions': permissions,
             'assignable_users': assignable_users,
+            'activities': formatted_activities,
+            'activities_count': len(formatted_activities),
         })
         return context
     
@@ -309,7 +350,7 @@ class EditAssetView(LoginRequiredMixin, TemplateView):
         from apps.users.models import User
         user = self.request.user
         
-        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(user.role):
             # Show all technicians for assignment
             available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
         elif user.role == 'TECHNICIAN':
@@ -427,47 +468,34 @@ def asset_crud(request, asset_id):
         
         # DELETE - Delete asset
         elif request.method == 'DELETE':
-            # Check if user is authenticated
             if not request.user.is_authenticated:
                 return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
-            
-            # Check permissions (same as delete_asset)
-            if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']:
-                return JsonResponse({
-                    'error': 'You do not have permission to delete assets. Only ADMIN or SUPERADMIN roles can delete assets.'
-                }, status=403)
-            
-# Get asset for confirmation
+
             asset = AssetQuery.get_by_id(asset_id)
             if asset is None:
                 return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
-            
-            # Use Service for delete operation - pass request as first argument
+
+            if not can_delete(request.user, asset):
+                return JsonResponse({'error': 'You do not have permission to delete this asset.'}, status=403)
+
             AssetService.delete_asset(request, asset_id)
-            
             return JsonResponse({'success': True, 'message': 'Asset deleted successfully.'})
         
         # PATCH - Partial update asset
         elif request.method == 'PATCH':
             import json
-            
-            # Check if user is authenticated
+
             if not request.user.is_authenticated:
                 return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
-            
-            # Check permissions for update
-            if not hasattr(request.user, 'can_manage_assets') or not request.user.can_manage_assets:
-                if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']:
-                    return JsonResponse({
-                        'error': 'You do not have permission to update assets.'
-                    }, status=403)
-            
+
             data = json.loads(request.body)
-            
-            # Get asset for authorization check
+
             asset = AssetQuery.get_by_id(asset_id)
             if asset is None:
                 return JsonResponse({'error': f'Asset with id {asset_id} not found.'}, status=404)
+
+            if not can_edit(request.user, asset):
+                return JsonResponse({'error': 'You do not have permission to update this asset.'}, status=403)
             
             # Use Service for partial update
             updated_asset = AssetService.update_asset(
@@ -642,8 +670,9 @@ def asset_unassign_self(request, asset_id):
     
     asset = get_object_or_404(Asset, id=asset_id)
     
-    # Check if user has permission (only assigned user or admin)
-    if not (request.user == asset.assigned_to or request.user.role in ['ADMIN', 'SUPERADMIN', 'IT_ADMIN']):
+    # Check if user has permission to unassign
+    from apps.assets.domain.services.asset_authority import can_unassign
+    if not can_unassign(request.user, asset):
         messages.error(request, 'You do not have permission to unassign this asset.')
         return redirect('frontend:asset-detail', asset_id=asset_id)
     

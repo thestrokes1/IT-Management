@@ -22,6 +22,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator, Page
 
 from apps.tickets.models import Ticket
+from apps.core.domain.roles import is_admin_role
 
 
 class TicketQueryService:
@@ -276,7 +277,7 @@ class TicketQueryService:
         
         user_role = getattr(user, 'role', 'VIEWER') if user else None
         
-        return user.is_superuser or user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        return user.is_superuser or is_admin_role(user_role)
     
     def get_available_filters(
         self,

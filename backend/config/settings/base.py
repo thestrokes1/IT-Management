@@ -29,6 +29,8 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'drf_spectacular',
     'django_filters',
+    'crispy_forms',
+    'crispy_tailwind',
 ]
 
 LOCAL_APPS = [
@@ -345,3 +347,20 @@ DEBUG_EMAIL_MODE = config('DEBUG_EMAIL_MODE', default=True, cast=bool)
 
 # Password Reset Settings
 PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=3600, cast=int)  # 1 hour
+
+# Crispy Forms Configuration
+CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
+CRISPY_TEMPLATE_PACK = "tailwind"
+
+
+# CELERY CONFIGURATION
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+
+# Task serialization settings
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Timzone settings match Django
+CELERY_TIMEZONE = TIME_ZONE

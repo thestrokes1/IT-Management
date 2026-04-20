@@ -24,15 +24,15 @@ from django.utils import timezone
 from datetime import timedelta, datetime, date
 import json
 
+from apps.core.domain.roles import is_admin_role, is_superadmin_or_manager
+
 try:
     from apps.users.models import User
     from apps.assets.models import Asset
     from apps.projects.models import Project
     from apps.tickets.models import Ticket, TicketComment
     from apps.logs.models import ActivityLog, SecurityEvent, SystemLog
-    # Import new services for enhanced dashboard
     from apps.logs.services.activity_service import ActivityService
-    from apps.logs.services.security_service import SecurityEventService
 except ImportError:
     User = None
     Asset = None
@@ -42,7 +42,6 @@ except ImportError:
     SecurityEvent = None
     SystemLog = None
     ActivityService = None
-    SecurityEventService = None
 
 
 # =============================================================================
@@ -117,7 +116,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         user_role = getattr(user, 'role', 'VIEWER')
-        is_admin = user.is_superuser or user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        is_admin = user.is_superuser or is_admin_role(user_role)
         
         # Display login success message if it exists in session
         if 'login_success' in self.request.session:
@@ -275,7 +274,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         )
         
         # Non-admins only see their responsible tickets
-        is_admin = user.is_superuser or user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        is_admin = user.is_superuser or is_admin_role(user_role)
         if not is_admin and user:
             base_query = base_query.filter(
                 Q(assigned_to=user) | Q(created_by=user)
@@ -338,7 +337,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         stalled = []
         
         # Only admins can see unassigned tickets
-        is_admin = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        is_admin = is_admin_role(user_role)
         
         if is_admin and Ticket:
             # Unassigned tickets
@@ -471,12 +470,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 status='MAINTENANCE'
             ).count()
         
-        if user_role in ['SUPERADMIN', 'MANAGER'] and Project:
+        if is_superadmin_or_manager(user_role) and Project:
             stats['active_projects'] = Project.objects.filter(
                 status__in=['PLANNING', 'IN_PROGRESS']
             ).count()
         
-        if user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER'] and User:
+        if is_admin_role(user_role) and User:
             stats['active_users'] = User.objects.filter(is_active=True).count()
         
         return stats
@@ -551,9 +550,9 @@ def dashboard_api(request):
     
     if request.method == 'GET':
         # Determine what the user can access
-        can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER', 'TECHNICIAN']
-        can_access_projects = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
-        can_access_users = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        can_access_assets = user_role != 'VIEWER'
+        can_access_projects = is_admin_role(user_role)
+        can_access_users = is_admin_role(user_role)
         
         # Build stats based on role
         stats = {
@@ -574,16 +573,16 @@ def dashboard_api(request):
             'stats': stats,
             'recent_activity': self._get_filtered_activity(user, user_role) if hasattr(DashboardView, '_get_filtered_activity') else [],
             'alerts': {
-                'security_events': SecurityEvent.objects.filter(status__in=['OPEN', 'INVESTIGATING']).count() if SecurityEvent and user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER'] else 0,
-                'system_errors': SystemLog.objects.filter(level__in=['ERROR', 'CRITICAL']).count() if SystemLog and user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER'] else 0,
+                'security_events': SecurityEvent.objects.filter(status__in=['OPEN', 'INVESTIGATING']).count() if SecurityEvent and is_admin_role(user_role) else 0,
+                'system_errors': SystemLog.objects.filter(level__in=['ERROR', 'CRITICAL']).count() if SystemLog and is_admin_role(user_role) else 0,
             },
             'user_role': user_role,
             'permissions': {
                 'can_access_assets': can_access_assets,
                 'can_access_projects': can_access_projects,
                 'can_access_users': can_access_users,
-                'can_access_logs': user_role in ['SUPERADMIN', 'MANAGER'],
-                'can_access_reports': user_role in ['SUPERADMIN', 'MANAGER'],
+                'can_access_logs': is_superadmin_or_manager(user_role),
+                'can_access_reports': is_superadmin_or_manager(user_role),
             }
         }
         return JsonResponse(data)
@@ -594,9 +593,9 @@ def dashboard_api(request):
         
         if action == 'refresh_stats':
             # Return updated statistics with role filtering
-            can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
-            can_access_projects = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
-            can_access_users = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+            can_access_assets = is_admin_role(user_role)
+            can_access_projects = is_admin_role(user_role)
+            can_access_users = is_admin_role(user_role)
             
             stats = {
                 'tickets': Ticket.objects.filter(status__in=['NEW', 'OPEN', 'IN_PROGRESS']).count() if Ticket else 0,
@@ -633,9 +632,9 @@ def search_api(request):
     results = {}
     
     # Determine what the user can access
-    can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
-    can_access_projects = user_role in ['SUPERADMIN', 'MANAGER']
-    can_access_users = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+    can_access_assets = is_admin_role(user_role)
+    can_access_projects = is_superadmin_or_manager(user_role)
+    can_access_users = is_admin_role(user_role)
     can_access_tickets = True  # All roles can access tickets
     
     if ('all' in search_type or 'users' in search_type) and can_access_users:
@@ -695,7 +694,7 @@ def notifications_api(request):
     })
     
     # Add role-specific notifications
-    if user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']:
+    if is_admin_role(user_role):
         notifications.append({
             'id': 2,
             'title': 'System Overview',
@@ -801,10 +800,10 @@ def dashboard_stats_context(request):
     user_role = getattr(user, 'role', 'VIEWER')
     
     # Determine what the user can access
-    can_access_assets = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
-    can_access_projects = user_role in ['SUPERADMIN', 'MANAGER']
-    can_access_users = user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
-    can_access_logs = user_role in ['SUPERADMIN', 'MANAGER']
+    can_access_assets = is_admin_role(user_role)
+    can_access_projects = is_superadmin_or_manager(user_role)
+    can_access_users = is_admin_role(user_role)
+    can_access_logs = is_superadmin_or_manager(user_role)
     
     stats = {
         'active_users': User.objects.filter(is_active=True).count() if User and can_access_users else 0,

@@ -34,6 +34,7 @@ from apps.tickets.domain.services.ticket_authority import (
     can_resolve as can_resolve_ticket,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.core.domain.roles import is_admin_role
 from apps.tickets.application.update_ticket import UpdateTicket
 from apps.tickets.application.delete_ticket import DeleteTicket
 from apps.tickets.application.assign_ticket_to_self import AssignTicketToSelf
@@ -63,7 +64,26 @@ class TicketsView(LoginRequiredMixin, View):
     }
     """
     def get(self, request):
-        tickets = Ticket.objects.all().order_by('-created_at')
+        qs = Ticket.objects.prefetch_related('category', 'ticket_type', 'assigned_to', 'created_by').all().order_by('-created_at')
+        
+        # HTMX API Filtering
+        search = request.GET.get('search', '').strip()
+        status = request.GET.get('status', '').strip()
+        priority = request.GET.get('priority', '').strip()
+        category = request.GET.get('category', '').strip()
+        
+        if search:
+            from django.db.models import Q
+            clean_search = search.replace('#', '')
+            qs = qs.filter(Q(title__icontains=search) | Q(id__icontains=clean_search))
+        if status:
+            qs = qs.filter(status=status)
+        if priority:
+            qs = qs.filter(priority=priority)
+        if category:
+            qs = qs.filter(category__name__iexact=category)
+            
+        tickets = qs
         
         # Build permissions map using authority via permissions_mapper
         permissions_by_ticket = build_tickets_permissions_map(request.user, tickets)
@@ -86,13 +106,19 @@ class TicketsView(LoginRequiredMixin, View):
         
         allowed_actions = get_page_actions(page_key, request.user)
         
-        return render(request, "frontend/tickets.html", {
+        context = {
             "tickets": tickets,
             "permissions_by_ticket": permissions_by_ticket,
             "permissions": list_permissions,
             "allowed_actions": allowed_actions,
             "page_key": page_key,
-        })
+        }
+        
+        # HTMX partial rendering
+        if request.headers.get('HX-Request') == 'true':
+            return render(request, "frontend/partials/_ticket_table.html", context)
+            
+        return render(request, "frontend/tickets.html", context)
 
 
 class TicketDetailView(LoginRequiredMixin, View):
@@ -104,7 +130,7 @@ class TicketDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         ticket = get_object_or_404(Ticket, pk=pk)
         
-# Check view permission using authority
+        # Check view permission using authority
         if not can_view_ticket(request.user, ticket):
             raise PermissionDenied("You don't have permission to view this ticket.")
         
@@ -114,11 +140,24 @@ class TicketDetailView(LoginRequiredMixin, View):
         # Add additional context flags for template
         permissions['is_assigned'] = ticket.assigned_to_id is not None
         
+        # =====================================================================
+        # METADATA FOR DISPLAY - Added for ticket_detail.html template
+        # =====================================================================
+        # Status display
+        ticket_status_display = ticket.get_status_display()
+        ticket_priority_display = ticket.get_priority_display()
+        ticket_impact_display = ticket.get_impact_display()
+        ticket_urgency_display = ticket.get_urgency_display()
+        
+        # Category and Type display
+        ticket_category_display = ticket.category.name if ticket.category else "-"
+        ticket_type_display = ticket.ticket_type.name if ticket.ticket_type else "-"
+        
         # Get list of assignable users based on role
         from apps.users.models import User
         user = request.user
         
-        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(user.role):
             # Show all technicians for assignment
             assignable_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
         elif user.role == 'TECHNICIAN':
@@ -127,175 +166,128 @@ class TicketDetailView(LoginRequiredMixin, View):
         else:
             assignable_users = User.objects.none()
         
-        # Get activity timeline for this ticket
+        # Get activity logs for this ticket with field-level changes
         from apps.logs.models import ActivityLog
-        from apps.logs.services.activity_service import ActivityService
+        from django.db.models import Q
         
-        try:
-            # Fetch activities related to this ticket
-            # Use both entity_type/entity_id (new) and model_name/object_id (legacy) for compatibility
-            # Use iexact for case-insensitive matching
-            activities = ActivityLog.objects.filter(
-                Q(entity_type__iexact='ticket', entity_id=ticket.id) |
-                Q(model_name__iexact='ticket', object_id=ticket.id)
-            ).select_related('user').order_by('-timestamp')[:50]
+        # Query activity logs for this ticket
+        activities = ActivityLog.objects.filter(
+            Q(entity_type__iexact='ticket', entity_id=ticket.id) |
+            Q(model_name__iexact='ticket', object_id=ticket.id)
+        ).select_related('user').order_by('-timestamp')[:50]
+        
+        # Format activities to show field-level changes
+        formatted_activities = []
+        for activity in activities:
+            # Get field change info from extra_data if available
+            metadata = activity.extra_data or {}
+            field_name = metadata.get('field_name', '')
+            old_value = metadata.get('old_display', '-')
+            new_value = metadata.get('new_display', '-')
+            field_display = metadata.get('field_display', field_name)
             
-            # Format activities for template using ActivityService
-            service = ActivityService()
-            activities = [
-                {
-                    'actor_username': activity.user.username if activity.user else 'System',
-                    'actor_role': activity.user.role if activity.user else 'SYSTEM',
-                    'action': activity.action,
-                    'action_label': service._get_action_label(activity.action),
-                    'description': activity.description,
-                    'created_at': activity.timestamp,
-                    'metadata': activity.extra_data or {},
-                }
-                for activity in activities
-            ]
-        except Exception:
-            activities = []
+            formatted_activities.append({
+                'id': activity.id,
+                'actor_username': activity.user.username if activity.user else 'System',
+                'actor_role': activity.user.role if activity.user else 'SYSTEM',
+                'action': activity.action,
+                'action_label': activity.action.replace('_', ' ').title(),
+                'description': activity.description,
+                'created_at': activity.timestamp,
+                # Field change details
+                'field_name': field_name,
+                'field_display': field_display,
+                'old_value': old_value,
+                'new_value': new_value,
+                'is_field_change': bool(field_name),
+            })
         
         return render(request, "frontend/ticket_detail.html", {
             "ticket": ticket,
             "permissions": permissions,
             "assignable_users": assignable_users,
-            "activities": activities,
+            "activities": formatted_activities,
+            "activities_count": len(formatted_activities),
+            # Display context variables for template
+            "ticket_status_display": ticket_status_display,
+            "ticket_priority_display": ticket_priority_display,
+            "ticket_impact_display": ticket_impact_display,
+            "ticket_urgency_display": ticket_urgency_display,
+            "ticket_category_display": ticket_category_display,
+            "ticket_type_display": ticket_type_display,
         })
 
 
 class CreateTicketView(LoginRequiredMixin, View):
-    """Create a new ticket."""
+    """Create a new ticket using Crispy Forms and Tailwind."""
     def get(self, request):
-        # Get categories and ticket types for the form
-        from apps.tickets.models import TicketCategory, TicketType
         from apps.users.models import User
+        from apps.frontend.forms import TicketForm
         
-        categories = TicketCategory.objects.filter(is_active=True).order_by('name')
-        ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
-        
-        # Get list permissions for create check
         list_perms = get_list_permissions(request.user)
+        
+        user = request.user
+        if user.role == 'TECHNICIAN':
+            available_users = User.objects.filter(id=user.id)
+        else:
+            available_users = User.objects.filter(is_active=True).order_by('username')
+            
+        form = TicketForm(available_users=available_users)
         
         return render(request, "frontend/create-ticket.html", {
             "permissions": list_perms,
-            "categories": categories,
-            "ticket_types": ticket_types,
-            "available_users": User.objects.filter(is_active=True).order_by('username'),
-            "assign_config": {
-                "visible": True,
-                "readonly": False,
-                "default_user_id": None,
-            },
+            "form": form,
         })
 
     def post(self, request):
-        from apps.tickets.models import Ticket, TicketCategory, TicketType
         from apps.tickets.application.create_ticket import CreateTicket
-        from django.utils import timezone
-        from datetime import datetime
         from apps.users.models import User
+        from apps.frontend.forms import TicketForm
         
-        # Get form data
-        title = request.POST.get("title", "").strip()
-        description = request.POST.get("description", "").strip()
-        category_id = request.POST.get("category", "")
-        ticket_type_id = request.POST.get("ticket_type", "")
-        priority = request.POST.get("priority", "MEDIUM")
-        impact = request.POST.get("impact", "MEDIUM")
-        urgency = request.POST.get("urgency", "MEDIUM")
-        assigned_to_id = request.POST.get("assigned_to", "")
-        due_date_str = request.POST.get("due_date", "")
-        
-        # Validate required fields
-        errors = []
-        if not title:
-            errors.append("Title is required")
-        if not description:
-            errors.append("Description is required")
-        if not category_id:
-            errors.append("Category is required")
-        if not priority:
-            errors.append("Priority is required")
-        
-        if errors:
-            for error in errors:
-                messages.error(request, error)
-            # Re-render form with entered data
-            categories = TicketCategory.objects.filter(is_active=True).order_by('name')
-            ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
-            return render(request, "frontend/create-ticket.html", {
-                "permissions": {"can_create": True},
-                "categories": categories,
-                "ticket_types": ticket_types,
-                "available_users": User.objects.filter(is_active=True).order_by('username'),
-                "form": {
-                    "title": {"value": title},
-                    "description": {"value": description},
-                    "priority": {"value": priority},
-                    "impact": {"value": impact},
-                    "urgency": {"value": urgency},
-                    "category": {"value": category_id},
-                    "ticket_type": {"value": ticket_type_id},
-                    "assigned_to": {"value": assigned_to_id},
-                    "due_date": {"value": due_date_str},
-                },
-                "assign_config": {
-                    "visible": True,
-                    "readonly": False,
-                    "default_user_id": None,
-                },
-            })
-        
-        # Use CQRS command for ticket creation (includes activity logging)
-        create_use_case = CreateTicket()
-        try:
-            result = create_use_case.execute(
-                actor=request.user,
-                ticket_data={
-                    'title': title,
-                    'description': description,
-                    'category_id': category_id,
-                    'ticket_type_id': ticket_type_id if ticket_type_id else None,
-                    'priority': priority,
-                    'impact': impact,
-                    'urgency': urgency,
-                }
-            )
+        user = request.user
+        if user.role == 'TECHNICIAN':
+            available_users = User.objects.filter(id=user.id)
+        else:
+            available_users = User.objects.filter(is_active=True).order_by('username')
             
-            if result.success:
-                messages.success(request, f"Ticket '{title}' created successfully!")
-                return redirect("frontend:tickets")
-            else:
-                messages.error(request, result.error)
-        except Exception as e:
-            messages.error(request, f"Error creating ticket: {str(e)}")
+        form = TicketForm(request.POST, available_users=available_users)
         
-        # If we get here, re-render form with errors
-        categories = TicketCategory.objects.filter(is_active=True).order_by('name')
-        ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
+        if form.is_valid():
+            create_use_case = CreateTicket()
+            try:
+                # the form.cleaned_data fields match the CreateTicket parameters!
+                data = form.cleaned_data
+                result = create_use_case.execute(
+                    actor=request.user,
+                    ticket_data={
+                        'title': data.get('title'),
+                        'description': data.get('description'),
+                        'category_id': data.get('category').id if data.get('category') else None,
+                        'ticket_type_id': data.get('ticket_type').id if data.get('ticket_type') else None,
+                        'priority': data.get('priority'),
+                        'impact': data.get('impact'),
+                        'urgency': data.get('urgency'),
+                        'assigned_to_id': data.get('assigned_to').id if data.get('assigned_to') else None,
+                        'due_date': data.get('due_date'),
+                        'location': data.get('location'),
+                        'contact_type': data.get('contact_type'),
+                        'contact_email': data.get('contact_email'),
+                        'contact_phone': data.get('contact_phone'),
+                    }
+                )
+                
+                if result.success:
+                    messages.success(request, f"Ticket '{data.get('title')}' created successfully!")
+                    return redirect("frontend:tickets")
+                else:
+                    messages.error(request, result.error)
+            except Exception as e:
+                messages.error(request, f"Error creating ticket: {str(e)}")
+        
+        # Re-render with errors
         return render(request, "frontend/create-ticket.html", {
             "permissions": {"can_create": True},
-            "categories": categories,
-            "ticket_types": ticket_types,
-            "available_users": User.objects.filter(is_active=True).order_by('username'),
-            "form": {
-                "title": {"value": title},
-                "description": {"value": description},
-                "priority": {"value": priority},
-                "impact": {"value": impact},
-                "urgency": {"value": urgency},
-                "category": {"value": category_id},
-                "ticket_type": {"value": ticket_type_id},
-                "assigned_to": {"value": assigned_to_id},
-                "due_date": {"value": due_date_str},
-            },
-            "assign_config": {
-                "visible": True,
-                "readonly": False,
-                "default_user_id": None,
-            },
+            "form": form,
         })
 
 
@@ -321,7 +313,7 @@ class EditTicketView(LoginRequiredMixin, View):
         
         # Get list of assignable users based on role
         user = request.user
-        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(user.role):
             # Show all technicians for assignment
             available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
         elif user.role == 'TECHNICIAN':
@@ -392,7 +384,7 @@ class EditTicketView(LoginRequiredMixin, View):
             ticket_types = TicketType.objects.filter(is_active=True).order_by('name')
             
             user = request.user
-            if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+            if is_admin_role(user.role):
                 available_users = User.objects.filter(role='TECHNICIAN', is_active=True).order_by('username')
             elif user.role == 'TECHNICIAN':
                 available_users = User.objects.filter(id=user.id)

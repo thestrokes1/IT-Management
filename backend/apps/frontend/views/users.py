@@ -20,6 +20,7 @@ from apps.users.domain.services.user_authority import (
     assert_can_delete_user,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.core.domain.roles import is_admin_role
 from apps.frontend.permissions_mapper import (
     build_user_ui_permissions,
     build_users_permissions_map,
@@ -276,7 +277,7 @@ class ProfileView(LoginRequiredMixin, TemplateView):
         created_count = created.count()
         assigned_count = assigned.count()
         resolved_count = created.filter(status='RESOLVED').count()
-        can_reopen = user.role in ['TECHNICIAN', 'MANAGER', 'IT_ADMIN', 'SUPERADMIN']
+        can_reopen = user.role != 'VIEWER'
         can_reopen_count = created.filter(status='RESOLVED').count() if can_reopen else 0
         
         # Build permissions for own profile
@@ -321,7 +322,7 @@ def profile_reopen_ticket(request, ticket_id):
     
     # Permission check
     can_reopen = False
-    if user.role in ['MANAGER', 'IT_ADMIN', 'SUPERADMIN']:
+    if is_admin_role(user.role):
         can_reopen = True
     elif user.role == 'TECHNICIAN' and (ticket.created_by == user or ticket.assigned_to == user):
         can_reopen = True

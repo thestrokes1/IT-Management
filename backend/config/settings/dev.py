@@ -32,10 +32,12 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Development-specific middleware and apps
-# Removed debug_toolbar, silk, django_extensions as they are not installed
-
 INSTALLED_APPS += [
-    # Additional development apps can be added here
+    'debug_toolbar',
+]
+MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+INTERNAL_IPS = [
+    "127.0.0.1",
 ]
 
 # Development logging - reduced output

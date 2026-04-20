@@ -313,9 +313,15 @@ def emit_asset_updated(
     asset_id: int,
     asset_name: str,
     actor: Any,
-    changes: Dict[str, tuple]
+    changes,
 ) -> None:
-    """Emit an asset updated event."""
+    """Emit an asset updated event.
+
+    get_changed_fields() returns List[{'field','old','new'}]; convert to
+    the Dict[str, tuple] format AssetUpdated expects.
+    """
+    if isinstance(changes, list):
+        changes = {c['field']: (c.get('old', ''), c.get('new', '')) for c in changes}
     event = AssetUpdated(
         asset_id=asset_id,
         asset_name=asset_name,

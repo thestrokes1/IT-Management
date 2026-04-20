@@ -1,4 +1,4 @@
-name: Backend Permission Tests
+name: Backend Tests
 
 on:
   push:
@@ -7,8 +7,9 @@ on:
     branches: [main, develop]
 
 jobs:
-  permission-tests:
+  test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,11 +25,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Django checks
+      - name: Django system check
         working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.dev
+          SECRET_KEY: ci-test-secret-key-not-for-production
         run: python manage.py check
 
-      - name: Run permission tests
+      - name: Run tests
         working-directory: backend
-        run: pytest apps/frontend/tests/test_permissions/ -v --tb=short
-
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.dev
+          SECRET_KEY: ci-test-secret-key-not-for-production
+        run: |
+          pytest apps/tickets/tests/ \
+                 apps/assets/tests/ \
+                 apps/projects/tests/ \
+                 -v --tb=short -q

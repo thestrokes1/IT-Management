@@ -39,9 +39,7 @@ urlpatterns = [
     path('', include('apps.projects.web_urls')),  # Web URLs for projects
     path('', include('apps.logs.web_urls')),  # Web URLs for logs
 
-    
-    
-        # Auth password reset
+    # Auth password reset
     path(
         'password-reset/',
         auth_views.PasswordResetView.as_view(),
@@ -71,6 +69,8 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    if 'debug_toolbar' in settings.INSTALLED_APPS:
+        urlpatterns += [path('__debug__/', include('debug_toolbar.urls'))]
 
 # Custom admin site configuration
 admin.site.site_header = "IT Management Platform Administration"

@@ -19,16 +19,16 @@
     </div>
     {% endif %}
 
-    <!-- Filters -->
+    <!-- Filters (HTMX Powered) -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form hx-get="{% url 'frontend:tickets' %}" hx-target="#ticket-table-container" hx-trigger="input from:input delay:300ms, change from:select" class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Search Tickets</label>
-                <input type="text" id="searchTickets" placeholder="Search by title or ID..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <input type="text" name="search" placeholder="Search by title or ID..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select id="statusFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="">All Status</option>
                     <option value="NEW">New</option>
                     <option value="OPEN">Open</option>
@@ -39,7 +39,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                <select id="priorityFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select name="priority" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="">All Priority</option>
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
@@ -49,7 +49,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                <select id="categoryFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select name="category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="">All Categories</option>
                     <option value="HARDWARE">Hardware</option>
                     <option value="SOFTWARE">Software</option>
@@ -57,131 +57,12 @@
                     <option value="OTHER">Other</option>
                 </select>
             </div>
-        </div>
+        </form>
     </div>
 
     <!-- Tickets Table -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <!-- Desktop Table View -->
-        <div class="hidden md:block overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-100 border-b-2 border-gray-300">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ticket ID</th>
-                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Title</th>
-                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Priority</th>
-                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Created By</th>
-                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% if tickets %}
-                        {% for ticket in tickets %}
-                        {% with ticket_perms=permissions_by_ticket|get_item:ticket.id %}
-                        <tr class="hover:bg-gray-50 transition ticket-row" data-id="{{ ticket.id }}">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">#{{ ticket.id }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ ticket.title|truncatewords:5 }}</td>
-                            <td class="px-6 py-4 text-sm">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium {% if ticket.status == 'NEW' %}bg-blue-100 text-blue-800{% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800{% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800{% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {{ ticket.status|upper }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 text-sm">
-                                <span class py-1 rounded="px-3-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {{ ticket.priority|upper }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</td>
-                            <td class="px-6 py-4 text-sm">
-                                <a href="/tickets/{{ ticket.id }}/" class="text-blue-600 hover:text-blue-900 mr-4">Open</a>
-                                
-                                {% if ticket_perms.assigned_to_me and ticket_perms.can_unassign %}
-                                    <button onclick="confirmUnassign({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-orange-600 hover:text-orange-900 mr-4 bg-none border-none cursor-pointer">
-                                        Unassign
-                                    </button>
-                                {% elif not ticket.assigned_to and ticket_perms.can_self_assign %}
-                                    <button onclick="confirmSelfAssignFromList({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-green-600 hover:text-green-900 mr-4 bg-none border-none cursor-pointer">
-                                        Assign
-                                    </button>
-                                {% endif %}
-                                
-                                {% if ticket_perms.can_update %}
-                                    <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
-                                {% else %}
-                                    <span class="text-gray-400 cursor-not-allowed mr-4" title="No permission to edit">Edit</span>
-                                {% endif %}
-                            
-                                {% if ticket_perms.can_delete %}
-                                    <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 bg-none border-none cursor-pointer">Delete</button>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endwith %}
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                                No tickets found. <a href="{% url 'frontend:create-ticket' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Mobile Card View -->
-        <div class="md:hidden">
-            {% if tickets %}
-                {% for ticket in tickets %}
-{% with ticket_perms=permissions_by_ticket|get_item:ticket.id %}
-                <div class="border-b border-gray-200 p-4 ticket-row" data-id="{{ ticket.id }}">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="flex-1">
-                            <div class="font-medium text-gray-900">#{{ ticket.id }} - {{ ticket.title }}</div>
-                            <div class="text-sm text-gray-600 mt-1">By: {% if ticket.created_by %}{{ ticket.created_by.username }}{% else %}System{% endif %}</div>
-                        </div>
-                        <div class="flex space-x-2 ml-2">
-                            {% if ticket_perms.assigned_to_me and ticket_perms.can_unassign %}
-                                <button onclick="confirmUnassign({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-orange-600 hover:text-orange-900 p-1" title="Unassign">
-                                    <i class="fas fa-user-minus text-sm"></i>
-                                </button>
-                            {% elif not ticket.assigned_to and ticket_perms.can_self_assign %}
-                                <button onclick="confirmSelfAssignFromList({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-green-600 hover:text-green-900 p-1" title="Assign">
-                                    <i class="fas fa-user-plus text-sm"></i>
-                                </button>
-                            {% endif %}
-                            {% if ticket_perms.can_update %}
-                                <a href="{% url 'frontend:edit-ticket' ticket.id %}" class="text-blue-600 hover:text-blue-900 p-1">
-                                    <i class="fas fa-edit text-sm"></i>
-                                </a>
-                            {% endif %}
-                            {% if ticket_perms.can_delete %}
-                                <button onclick="deleteTicket({{ ticket.id }}, '{{ ticket.title|escapejs }}')" class="text-red-600 hover:text-red-900 p-1">
-                                    <i class="fas fa-trash text-sm"></i>
-                                </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <div class="flex space-x-2">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.status == 'NEW' %}bg-blue-100 text-blue-800{% elif ticket.status == 'OPEN' %}bg-blue-100 text-blue-800{% elif ticket.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800{% elif ticket.status == 'RESOLVED' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ ticket.status|upper }}
-                            </span>
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800{% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800{% elif ticket.priority == 'MEDIUM' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ ticket.priority|upper }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                {% endwith %}
-                {% endfor %}
-            {% else %}
-                <div class="p-8 text-center text-gray-500">
-                    No tickets found. <a href="{% url 'frontend:create-ticket' %}" class="text-blue-600 hover:text-blue-900">Create one</a>
-                </div>
-            {% endif %}
-        </div>
+    <div id="ticket-table-container" class="bg-white rounded-lg shadow-md overflow-hidden relative min-h-[200px]">
+        {% include 'frontend/partials/_ticket_table.html' %}
     </div>
 </div>
 
@@ -344,66 +225,6 @@ function deleteTicket(ticketId, ticketTitle) {
     );
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('searchTickets');
-    const statusFilter = document.getElementById('statusFilter');
-    const priorityFilter = document.getElementById('priorityFilter');
-    const categoryFilter = document.getElementById('categoryFilter');
-    const ticketRows = document.querySelectorAll('.ticket-row');
-
-    function filterTickets() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedStatus = statusFilter.value;
-        const selectedPriority = priorityFilter.value;
-        const selectedCategory = categoryFilter.value;
-
-        ticketRows.forEach(row => {
-            let id = '', title = '', status = '', priority = '';
-
-            // Handle both table rows and card elements
-            if (row.tagName === 'TR') {
-                // Desktop table row
-                id = row.cells[0].textContent.toLowerCase();
-                title = row.cells[1].textContent.toLowerCase();
-                status = row.cells[2].textContent.trim().toUpperCase();
-                priority = row.cells[3].textContent.trim().toUpperCase();
-            } else {
-                // Mobile card element
-                const titleElement = row.querySelector('.font-medium');
-                if (titleElement) {
-                    const titleText = titleElement.textContent;
-                    const idMatch = titleText.match(/^#(\d+)/);
-                    id = idMatch ? idMatch[1] : '';
-                    title = titleText.replace(/^#\d+\s*-\s*/, '').toLowerCase();
-                }
-
-                // Get status and priority from badges
-                const badges = row.querySelectorAll('span.rounded-full');
-                badges.forEach(badge => {
-                    const text = badge.textContent.trim().toUpperCase();
-                    if (['NEW', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(text)) {
-                        status = text;
-                    } else if (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(text)) {
-                        priority = text;
-                    }
-                });
-            }
-
-            const matchesSearch = id.includes(searchTerm) || title.includes(searchTerm);
-            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
-            const matchesPriority = !selectedPriority || priority.includes(selectedPriority);
-            // Note: Category filtering would require additional cell data or data attributes
-            const matchesCategory = !selectedCategory; // For now, we'll skip category filtering
-
-            row.style.display = matchesSearch && matchesStatus && matchesPriority && matchesCategory ? '' : 'none';
-        });
-    }
-
-    searchInput.addEventListener('keyup', filterTickets);
-    statusFilter.addEventListener('change', filterTickets);
-    priorityFilter.addEventListener('change', filterTickets);
-    categoryFilter.addEventListener('change', filterTickets);
-});
-</script>
+<!-- Note: Old JS filtering logic was removed and replaced entirely by HTMX Server-Side Filtering -->
 {% endblock %}
 

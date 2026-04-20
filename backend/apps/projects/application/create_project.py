@@ -15,6 +15,7 @@ from apps.projects.domain.services.project_authority import (
     assert_can_create,
 )
 from apps.core.domain.authorization import AuthorizationError
+from apps.core.domain.roles import is_superadmin_or_manager
 
 
 @dataclass
@@ -123,7 +124,7 @@ class CreateProject:
                 return CreateProjectResult.fail(f"Owner with ID {owner_id} not found")
         else:
             # Auto-assign current user if they are MANAGER or SUPERADMIN
-            if user.role in ['MANAGER', 'SUPERADMIN']:
+            if is_superadmin_or_manager(user.role):
                 owner = user
             else:
                 return CreateProjectResult.fail("A project manager must be selected")

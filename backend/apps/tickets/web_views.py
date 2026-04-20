@@ -15,13 +15,20 @@ from django.contrib.auth import get_user_model
 
 from apps.tickets.models import Ticket, TicketCategory, TicketType
 from apps.logs.models import ActivityLog
-from apps.tickets.domain.services.ticket_authority import TicketAuthority
+from apps.tickets.domain.services.ticket_authority import (
+    can_view,
+    can_assign,
+    can_self_assign,
+    can_edit,
+)
+from apps.tickets.web_mixins import TicketDetailLoggingMixin
+from apps.core.domain.roles import is_admin_role
 from apps.users.models import UserRole
 
 User = get_user_model()
 
 
-class TicketDetailView(LoginRequiredMixin, DetailView):
+class TicketDetailView(LoginRequiredMixin, TicketDetailLoggingMixin, DetailView):
     """
     READ-ONLY ticket detail page for internal staff.
     
@@ -94,8 +101,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         ticket = self.get_object()
         
         # Check permissions via domain service
-        authority = TicketAuthority()
-        if not authority.can_view(request.user, ticket):
+        if not can_view(request.user, ticket):
             # User doesn't have permission to view this ticket
             raise PermissionDenied(
                 "You do not have permission to view this ticket."
@@ -105,56 +111,6 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         self._log_ticket_view(request.user, ticket)
         
         return super().dispatch(request, *args, **kwargs)
-    
-    def _log_ticket_view(self, actor, ticket: Ticket) -> None:
-        """
-        Log ticket view event in ActivityLog.
-        
-        Args:
-            actor: User who viewed the ticket
-            ticket: Ticket that was viewed
-        """
-        # Check if this view was already logged recently (within last 5 minutes)
-        # to avoid spamming the activity log
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        recent_view = ActivityLog.objects.filter(
-            event_type='TICKET_VIEWED',
-            actor_id=str(actor.id),
-            entity_id=ticket.id,
-            timestamp__gte=timezone.now() - timedelta(minutes=5)
-        ).exists()
-        
-        if recent_view:
-            return  # Skip logging if already logged recently
-        
-        ActivityLog.objects.create(
-            event_type='TICKET_VIEWED',
-            action='VIEW',
-            level='INFO',
-            severity='INFO',
-            intent='access',
-            entity_type='ticket',
-            entity_id=ticket.id,
-            actor_type='user',
-            actor_id=str(actor.id),
-            actor_name=actor.username,
-            actor_role=actor.role,
-            title=f'Ticket viewed by {actor.username}',
-            description=f'User viewed ticket details',
-            model_name='ticket',
-            object_id=ticket.id,
-            object_repr=f'{ticket.title}',
-            ip_address=self._get_client_ip(self.request),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-            request_path=self.request.path,
-            request_method=self.request.method,
-            extra_data={
-                'ticket_id': str(ticket.ticket_id),
-                'ticket_title': ticket.title,
-            }
-        )
     
     def post(self, request, *args, **kwargs):
         """
@@ -204,7 +160,6 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         Returns:
             HttpResponse: Redirect back to GET view
         """
-        authority = TicketAuthority()
         assignee_id = request.POST.get('assigned_to', '').strip()
         
         # Validate assignee_id was provided
@@ -222,7 +177,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         
         # Check if user can assign to this person
         # For now, just check if user can assign (general permission)
-        if not authority.can_assign(request.user, ticket, assignee):
+        if not can_assign(request.user, ticket, assignee):
             return self._redirect_with_message(
                 request, ticket, 'error', 'You do not have permission to assign this ticket.'
             )
@@ -241,55 +196,6 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         
         return self._redirect_with_message(
             request, ticket, 'success', f'Ticket assigned to {assignee.get_full_name() or assignee.username}.'
-        )
-    
-    def _log_assignment(self, actor, ticket: Ticket, old_assignee, new_assignee) -> None:
-        """
-        Log assignment event in ActivityLog.
-        
-        Args:
-            actor: User who performed the assignment
-            ticket: Ticket being assigned
-            old_assignee: Previous assignee (User or None)
-            new_assignee: New assignee (User)
-        """
-        # Determine description based on old assignee
-        if old_assignee is None:
-            description = f"Assigned ticket to {new_assignee.get_full_name() or new_assignee.username}"
-        else:
-            description = (
-                f"Reassigned ticket from {old_assignee.get_full_name() or old_assignee.username} "
-                f"to {new_assignee.get_full_name() or new_assignee.username}"
-            )
-        
-        ActivityLog.objects.create(
-            event_type='TICKET_ASSIGNED',
-            action='UPDATE',
-            level='INFO',
-            severity='INFO',
-            intent='workflow',
-            entity_type='ticket',
-            entity_id=ticket.id,
-            actor_type='user',
-            actor_id=str(actor.id),
-            actor_name=actor.username,
-            actor_role=actor.role,
-            title=f'Ticket assigned to {new_assignee.username}',
-            description=description,
-            model_name='ticket',
-            object_id=ticket.id,
-            object_repr=f'{ticket.title} (assigned to {new_assignee.username})',
-            ip_address=self._get_client_ip(self.request),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-            request_path=self.request.path,
-            request_method=self.request.method,
-            extra_data={
-                'assigned_to': new_assignee.username,
-                'assigned_to_id': new_assignee.id,
-                'old_assignee': old_assignee.username if old_assignee else None,
-                'old_assignee_id': old_assignee.id if old_assignee else None,
-                'ticket_id': str(ticket.ticket_id),
-            }
         )
     
     def _handle_status_change(self, request, ticket: Ticket) -> HttpResponse:
@@ -330,7 +236,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             )
         
         # Check if user can edit this ticket
-        if not authority.can_edit(request.user, ticket):
+        if not can_edit(request.user, ticket):
             return self._redirect_with_message(
                 request, ticket, 'error', 'You do not have permission to change this ticket status.'
             )
@@ -414,57 +320,12 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             pass
         
         # Admins can also directly change to certain statuses
-        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(user.role):
             # Admins can transition to CLOSED from RESOLVED
             if current_status == 'RESOLVED' and 'CLOSED' not in allowed:
                 allowed.append('CLOSED')
         
         return allowed
-    
-    def _log_status_change(self, actor, ticket: Ticket, old_status: str, new_status: str) -> None:
-        """
-        Log status change event in ActivityLog.
-        
-        Args:
-            actor: User who performed the status change
-            ticket: Ticket being changed
-            old_status: Previous status code
-            new_status: New status code
-        """
-        old_status_display = dict(Ticket.STATUS_CHOICES)[old_status]
-        new_status_display = dict(Ticket.STATUS_CHOICES)[new_status]
-        
-        description = f"Changed ticket status from {old_status_display} to {new_status_display}"
-        
-        ActivityLog.objects.create(
-            event_type='TICKET_STATUS_CHANGED',
-            action='UPDATE',
-            level='INFO',
-            severity='INFO',
-            intent='workflow',
-            entity_type='ticket',
-            entity_id=ticket.id,
-            actor_type='user',
-            actor_id=str(actor.id),
-            actor_name=actor.username,
-            actor_role=actor.role,
-            title=f'Ticket status changed to {new_status_display}',
-            description=description,
-            model_name='Ticket',
-            object_id=ticket.id,
-            object_repr=f'{ticket.title} ({new_status_display})',
-            ip_address=self._get_client_ip(self.request),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-            request_path=self.request.path,
-            request_method=self.request.method,
-            extra_data={
-                'old_status': old_status,
-                'old_status_display': old_status_display,
-                'new_status': new_status,
-                'new_status_display': new_status_display,
-                'ticket_id': str(ticket.ticket_id),
-            }
-        )
     
     def _handle_priority_change(self, request, ticket: Ticket) -> HttpResponse:
         """
@@ -543,57 +404,12 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         Returns:
             bool: True if user can change priority
         """
-        return user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']
-    
-    def _log_priority_change(self, actor, ticket: Ticket, old_priority: str, new_priority: str) -> None:
-        """
-        Log priority change event in ActivityLog.
-        
-        Args:
-            actor: User who performed the priority change
-            ticket: Ticket being changed
-            old_priority: Previous priority code
-            new_priority: New priority code
-        """
-        old_priority_display = dict(Ticket.PRIORITY_CHOICES)[old_priority]
-        new_priority_display = dict(Ticket.PRIORITY_CHOICES)[new_priority]
-        
-        description = f"Changed ticket priority from {old_priority_display} to {new_priority_display}"
-        
-        ActivityLog.objects.create(
-            event_type='TICKET_PRIORITY_CHANGED',
-            action='UPDATE',
-            level='INFO',
-            severity='INFO',
-            intent='workflow',
-            entity_type='ticket',
-            entity_id=ticket.id,
-            actor_type='user',
-            actor_id=str(actor.id),
-            actor_name=actor.username,
-            actor_role=actor.role,
-            title=f'Ticket priority changed to {new_priority_display}',
-            description=description,
-            model_name='Ticket',
-            object_id=ticket.id,
-            object_repr=f'{ticket.title} (priority: {new_priority_display})',
-            ip_address=self._get_client_ip(self.request),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-            request_path=self.request.path,
-            request_method=self.request.method,
-            extra_data={
-                'old_priority': old_priority,
-                'old_priority_display': old_priority_display,
-                'new_priority': new_priority,
-                'new_priority_display': new_priority_display,
-                'ticket_id': str(ticket.ticket_id),
-            }
-        )
+        return is_admin_role(user.role)
     
     # =========================================================================
     # PHASE 3A: INTERNAL STAFF-ONLY TICKET NOTES
     # =========================================================================
-    
+
     def _handle_note_creation(self, request, ticket: Ticket) -> HttpResponse:
         """
         Handle internal note creation on a ticket (Phase 3A/3B).
@@ -652,7 +468,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         Returns boolean permission flag.
         """
         # Admin roles can always add notes
-        if user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(user.role):
             return True
         
         # Technician can add notes only if assigned
@@ -706,65 +522,10 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         
         return note_types
     
-    def _log_note_creation(self, actor, ticket: Ticket, note, note_type: str = 'INTERNAL') -> None:
-        """
-        Log internal note creation to ActivityLog.
-        
-        Event: TICKET_NOTE_ADDED
-        Records: ticket, author, summary of note (first 100 chars)
-        Does NOT store full note text (security/privacy)
-        Includes: immutable actor info, timestamp, extra metadata, note_type (Phase 3B)
-        
-        Args:
-            actor: User who created the note
-            ticket: The ticket being noted
-            note: The TicketNote object created
-            note_type: Classification of note (INTERNAL, OBSERVATION, DIAGNOSIS, WORK_DONE, ESCALATION)
-        """
-        from apps.logs.models import ActivityLog
-        
-        # Get note summary (first 100 chars + ellipsis if longer)
-        note_summary = note.text[:100]
-        if len(note.text) > 100:
-            note_summary += '...'
-        
-        description = f"Added internal note to ticket (summary: {note_summary})"
-        
-        ActivityLog.objects.create(
-            event_type='TICKET_NOTE_ADDED',
-            action='CREATE',
-            level='INFO',
-            severity='INFO',
-            intent='workflow',
-            entity_type='ticket',
-            entity_id=ticket.id,
-            actor_type='user',
-            actor_id=str(actor.id),
-            actor_name=actor.username,
-            actor_role=actor.role,
-            title=f'Internal note added to ticket',
-            description=description,
-            model_name='TicketNote',
-            object_id=note.id,
-            object_repr=f'Note by {actor.username} on {ticket.ticket_id}',
-            ip_address=self._get_client_ip(self.request),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-            request_path=self.request.path,
-            request_method=self.request.method,
-            extra_data={
-                'note_id': str(note.id),
-                'ticket_id': str(ticket.ticket_id),
-                'note_type': note_type,  # Phase 3B: Include note classification
-                'note_length': len(note.text),
-                'author_username': actor.username,
-                'author_role': actor.role,
-            }
-        )
-    
     # =========================================================================
     # PHASE 3C: CLIENT / REQUESTER TICKET REVIEWS
     # =========================================================================
-    
+
     def _handle_review_submission(self, request, ticket: Ticket) -> HttpResponse:
         """
         Handle client/requester review submission on a resolved ticket.
@@ -830,49 +591,6 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         # Success message
         return self._redirect_with_message(request, ticket, 'success', 'Thank you for your feedback.')
     
-    def _log_review_submission(self, actor, ticket: Ticket, review) -> None:
-        """
-        Log ticket review submission to ActivityLog.
-        
-        Event: TICKET_REVIEW_SUBMITTED
-        Records: ticket, author, rating (if provided)
-        Does NOT store full comment text (privacy)
-        Includes: immutable actor info, timestamp, extra metadata
-        """
-        from apps.logs.models import ActivityLog
-        
-        description = f"Client submitted review for ticket (rating: {review.rating if review.rating else 'N/A'})"
-        
-        ActivityLog.objects.create(
-            event_type='TICKET_REVIEW_SUBMITTED',
-            action='CREATE',
-            level='INFO',
-            severity='INFO',
-            intent='feedback',
-            entity_type='ticket',
-            entity_id=ticket.id,
-            actor_type='user',
-            actor_id=str(actor.id),
-            actor_name=actor.username,
-            actor_role='CLIENT',  # Always CLIENT for reviews
-            title=f'Client review submitted',
-            description=description,
-            model_name='TicketReview',
-            object_id=review.id,
-            object_repr=f'Review by {actor.username} on {ticket.ticket_id}',
-            ip_address=self._get_client_ip(self.request),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-            request_path=self.request.path,
-            request_method=self.request.method,
-            extra_data={
-                'review_id': str(review.id),
-                'ticket_id': str(ticket.ticket_id),
-                'rating': review.rating,
-                'comment_length': len(review.comment) if review.comment else 0,
-                'author_username': actor.username,
-            }
-        )
-    
     def _redirect_with_message(self, request, ticket: Ticket, message_type: str, message: str) -> HttpResponse:
         """
         Redirect back to ticket detail with a flash message.
@@ -899,23 +617,6 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
             messages.info(request, message)
         
         return redirect('frontend:ticket_detail', ticket_id=ticket.ticket_id)
-    
-    def _get_client_ip(self, request) -> str:
-        """
-        Get client IP address from request.
-        
-        Args:
-            request: The HTTP request
-            
-        Returns:
-            str: Client IP address
-        """
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
     
     def get_context_data(self, **kwargs):
         """
@@ -970,17 +671,30 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         # =====================================================================
         # METADATA FOR DISPLAY
         # =====================================================================
+        context['status_display'] = ticket.get_status_display()
+        context['priority_display'] = ticket.get_priority_display()
+        context['impact_display'] = ticket.get_impact_display()
+        context['urgency_display'] = ticket.get_urgency_display()
+        
+        # Also provide prefixed versions for compatibility
         context['ticket_status_display'] = ticket.get_status_display()
         context['ticket_priority_display'] = ticket.get_priority_display()
         context['ticket_impact_display'] = ticket.get_impact_display()
         context['ticket_urgency_display'] = ticket.get_urgency_display()
         
+        # Category and Type display
+        if ticket.category:
+            context['category_display'] = ticket.category.name
+            context['ticket_category_display'] = ticket.category.name
+        if ticket.ticket_type:
+            context['ticket_type_display'] = ticket.ticket_type.name
+            context['ticket_type'] = ticket.ticket_type
+        
         # =====================================================================
         # ASSIGNMENT CONTROLS - for Phase 2A mutation
         # =====================================================================
-        authority = TicketAuthority()
-        context['can_assign_other'] = authority.can_assign(user, ticket, None)
-        context['can_self_assign'] = authority.can_self_assign(user, ticket)
+        context['can_assign_other'] = can_assign(user, ticket, None)
+        context['can_self_assign'] = can_self_assign(user, ticket)
         context['can_assign'] = context['can_assign_other'] or context['can_self_assign']
         
         # Get available technicians for dropdown (only if user can assign)
@@ -992,7 +706,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         # =====================================================================
         # STATUS CHANGE CONTROLS - for Phase 2B mutation
         # =====================================================================
-        context['can_change_status'] = authority.can_edit(user, ticket)
+        context['can_change_status'] = can_edit(user, ticket)
         
         # Get available status transitions for dropdown (only if user can edit)
         if context['can_change_status']:
@@ -1058,12 +772,10 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         # PERMISSION FLAGS (for template rendering)
         # Only used to determine what sections to show
         # =====================================================================
-        context['can_view'] = authority.can_view(user, ticket)
+        context['can_view'] = can_view(user, ticket)
         
         # Can current user see internal notes? (staff only)
-        context['is_staff'] = user.role in [
-            'SUPERADMIN', 'MANAGER', 'IT_ADMIN', 'TECHNICIAN'
-        ]
+        context['is_staff'] = user.role != 'VIEWER'
         
         # =====================================================================
         # EMPTY STATE HANDLING
@@ -1092,7 +804,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         Returns:
             list: List of (user_id, user_name) tuples
         """
-        if current_user.role in ['SUPERADMIN', 'MANAGER', 'IT_ADMIN']:
+        if is_admin_role(current_user.role):
             # Admins can assign to any active technician
             technicians = User.objects.filter(
                 role='TECHNICIAN',

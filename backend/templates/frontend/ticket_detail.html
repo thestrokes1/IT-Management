@@ -220,6 +220,16 @@
                                 </dd>
                             </div>
 
+<!-- Resolution Summary -->
+                            {% if ticket.status == 'RESOLVED' and ticket.resolution_summary %}
+                            <div class="flex justify-between py-3 border-b border-gray-200">
+                                <dt class="text-sm font-medium text-gray-600">{% trans "Resolution Summary" %}</dt>
+                                <dd class="text-sm font-medium text-gray-900">
+                                    {{ ticket.resolution_summary }}
+                                </dd>
+                            </div>
+                            {% endif %}
+
                             <!-- Requester -->
                             <div class="flex justify-between py-3">
                                 <dt class="text-sm font-medium text-gray-600">{% trans "Created By" %}</dt>
@@ -779,14 +789,14 @@
         <div class="p-6">
             {% if activities %}
                 <!-- Activity entries list -->
-                <div class="space-y-6" id="activity-list">
+                <div class="space-y-4" id="activity-list">
                     {% for activity in activities %}
-                    <div class="flex gap-4 pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
+                    <div class="flex gap-4 pb-4 border-b border-gray-200 last:border-b-0 last:pb-0">
                         <!-- Avatar circle with first letter of actor name -->
                         <div class="flex-shrink-0">
                             <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                                 <span class="text-blue-600 text-sm font-semibold">
-                                    {{ activity.actor_name|first|upper }}
+                                    {{ activity.actor_username|first|upper }}
                                 </span>
                             </div>
                         </div>
@@ -796,71 +806,56 @@
                             <!-- Header: Event type and timestamp -->
                             <div class="flex items-start justify-between gap-2 mb-1">
                                 <h4 class="text-sm font-semibold text-gray-900">
-                                    {{ activity.event_type|default:activity.action|title }}
+                                    {{ activity.action_label }}
                                 </h4>
                                 <span class="text-xs text-gray-500 whitespace-nowrap">
-                                    <time datetime="{{ activity.timestamp|date:'c' }}">
-                                        {{ activity.timestamp|timesince }} {% trans "ago" %}
+                                    <time datetime="{{ activity.created_at|date:'c' }}">
+                                        {{ activity.created_at|timesince }} {% trans "ago" %}
                                     </time>
                                 </span>
                             </div>
 
                             <!-- Subheader: Actor info -->
                             <p class="text-xs text-gray-600 mb-2">
-                                <strong>{{ activity.actor_name }}</strong>
-                                <span class="text-gray-500">({{ activity.actor_role }})</span>
+                                <strong>{{ activity.actor_username }}</strong>
                                 •
-                                <time datetime="{{ activity.timestamp|date:'c' }}" class="text-gray-500">
-                                    {{ activity.timestamp|date:'M d, Y H:i' }}
+                                <time datetime="{{ activity.created_at|date:'c' }}" class="text-gray-500">
+                                    {{ activity.created_at|date:'M d, Y H:i' }}
                                 </time>
                             </p>
 
-                            <!-- Description/details -->
+                            <!-- Field-level changes display -->
+                            {% if activity.is_field_change and activity.field_name %}
+                            <div class="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-xs font-semibold text-gray-500 uppercase">
+                                        {{ activity.field_display }}:
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-3 text-sm">
+                                    <span class="px-2 py-1 bg-red-100 text-red-800 rounded font-mono">
+                                        {{ activity.old_value|default:"-" }}
+                                    </span>
+                                    <span class="text-gray-400">
+                                        <i class="fas fa-arrow-right"></i>
+                                    </span>
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded font-mono">
+                                        {{ activity.new_value|default:"-" }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <!-- Regular description for non-field changes -->
                             {% if activity.description %}
                             <div class="text-sm text-gray-700 bg-gray-50 rounded p-3 mt-2">
                                 {{ activity.description }}
                             </div>
                             {% endif %}
-
-                            <!-- Extra data (if any) -->
-                            {% if activity.extra_data %}
-                            <div class="text-xs text-gray-600 mt-2 space-y-1">
-                                {% for key, value in activity.extra_data.items %}
-                                    <p><strong>{{ key|title }}:</strong> {{ value }}</p>
-                                {% endfor %}
-                            </div>
                             {% endif %}
                         </div>
                     </div>
                     {% endfor %}
                 </div>
-
-                <!-- Pagination -->
-                {% if activities.has_other_pages %}
-                <div class="mt-6 pt-6 border-t border-gray-200 flex justify-center gap-2">
-                    {% if activities.has_previous %}
-                        <a href="?activity_page=1" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                            {% trans "First" %}
-                        </a>
-                        <a href="?activity_page={{ activities.previous_page_number }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                            ← {% trans "Previous" %}
-                        </a>
-                    {% endif %}
-
-                    <span class="px-3 py-2 text-sm text-gray-600">
-                        {% trans "Page" %} {{ activities.number }} {% trans "of" %} {{ activities.paginator.num_pages }}
-                    </span>
-
-                    {% if activities.has_next %}
-                        <a href="?activity_page={{ activities.next_page_number }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                            {% trans "Next" %} →
-                        </a>
-                        <a href="?activity_page={{ activities.paginator.num_pages }}" class="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                            {% trans "Last" %}
-                        </a>
-                    {% endif %}
-                </div>
-                {% endif %}
 
             {% else %}
                 <!-- Empty state with helpful message -->
@@ -869,7 +864,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <p class="text-gray-600 text-sm">
-                        {{ no_activities_reason|default:"No activity has been recorded yet." }}
+                        No activity has been recorded yet.
                     </p>
                 </div>
             {% endif %}

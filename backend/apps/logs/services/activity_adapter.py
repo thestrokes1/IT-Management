@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from django.utils import timezone
 from django.utils.timesince import timesince
+from apps.core.domain.roles import is_admin_role
 
 
 # =============================================================================
@@ -820,7 +821,7 @@ def get_recent_activities_for_dashboard(user, limit: int = 10) -> List[ActivityU
     user_role = getattr(user, 'role', 'VIEWER') if user else None
     is_admin = user and (
         user.is_superuser or 
-        user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        is_admin_role(user_role)
     )
     
     if not is_admin and user:

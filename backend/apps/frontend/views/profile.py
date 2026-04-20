@@ -13,6 +13,8 @@ from django.utils import timezone
 from django.http import HttpResponse
 from datetime import timedelta
 import csv
+
+from apps.core.domain.roles import is_admin_role
 import json
 
 try:
@@ -221,7 +223,7 @@ class ProfileView(LoginRequiredMixin, TemplateView):
         if not user:
             return False
         user_role = getattr(user, 'role', 'VIEWER') if user else None
-        return user.is_superuser or user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        return user.is_superuser or is_admin_role(user_role)
 
 
 class LogsView(LoginRequiredMixin, TemplateView):
@@ -344,7 +346,7 @@ class ReportsView(LoginRequiredMixin, TemplateView):
         user_role = getattr(request.user, 'role', 'VIEWER') if request.user else None
         is_admin = request.user and (
             request.user.is_superuser or 
-            user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+            is_admin_role(user_role)
         )
         
         try:
@@ -444,7 +446,7 @@ def profile_reopen_ticket(request, ticket_id):
     user_role = getattr(user, 'role', 'VIEWER') if user else None
     
     # RBAC Check: Only admins can reopen tickets
-    can_reopen = user.is_superuser or user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+    can_reopen = user.is_superuser or is_admin_role(user_role)
     
     if not can_reopen:
         messages.error(request, "You don't have permission to reopen tickets.")
@@ -510,9 +512,9 @@ def export_reports(request):
     user_role = getattr(request.user, 'role', 'VIEWER') if request.user else None
     is_admin = request.user and (
         request.user.is_superuser or 
-        user_role in ['SUPERADMIN', 'IT_ADMIN', 'MANAGER']
+        is_admin_role(user_role)
     )
-    
+
     # Collect report data based on permissions
     try:
         # Recent Tickets with full audit information

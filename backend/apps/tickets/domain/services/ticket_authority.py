@@ -25,13 +25,6 @@ from apps.core.domain.roles import (
 from apps.core.domain.authorization import AuthorizationError
 
 
-# Role constants
-_ROLE_SUPERADMIN = 'SUPERADMIN'
-_ROLE_MANAGER = 'MANAGER'
-_ROLE_IT_ADMIN = 'IT_ADMIN'
-_ROLE_TECHNICIAN = 'TECHNICIAN'
-_ROLE_VIEWER = 'VIEWER'
-
 
 # =============================================================================
 # VIEW PERMISSIONS
@@ -55,7 +48,7 @@ def can_view(user, ticket) -> bool:
         bool: True if user can view the ticket
     """
     # VIEWER has no ticket access
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # All other roles can view tickets
@@ -76,7 +69,7 @@ def can_view_list(user) -> bool:
     Returns:
         bool: True if user can view ticket list
     """
-    return user.role != _ROLE_VIEWER
+    return user.role != 'VIEWER'
 
 
 def can_view_details(user, ticket) -> bool:
@@ -113,7 +106,7 @@ def can_create(user) -> bool:
     Returns:
         bool: True if user can create tickets
     """
-    return user.role != _ROLE_VIEWER
+    return user.role != 'VIEWER'
 
 
 # =============================================================================
@@ -141,7 +134,7 @@ def can_edit(user, ticket) -> bool:
         bool: True if user can edit the ticket
     """
     # VIEWER cannot edit
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -149,11 +142,11 @@ def can_edit(user, ticket) -> bool:
         return True
     
     # IT_ADMIN has full ticket access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only edit if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return ticket.assigned_to_id == user.id
     
     return False
@@ -212,7 +205,7 @@ def can_delete(user, ticket) -> bool:
         bool: True if user can delete the ticket
     """
     # VIEWER cannot delete
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -220,11 +213,11 @@ def can_delete(user, ticket) -> bool:
         return True
     
     # IT_ADMIN has full ticket access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only delete if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return ticket.assigned_to_id == user.id
     
     return False
@@ -253,7 +246,7 @@ def can_assign(user, ticket, assignee) -> bool:
         bool: True if user can assign the ticket
     """
     # VIEWER cannot assign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -261,7 +254,7 @@ def can_assign(user, ticket, assignee) -> bool:
         return True
     
     # IT_ADMIN has full ticket access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: NEVER can assign to others
@@ -286,7 +279,7 @@ def can_unassign(user, ticket) -> bool:
         bool: True if user can unassign the ticket
     """
     # VIEWER cannot unassign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER have full access
@@ -294,11 +287,11 @@ def can_unassign(user, ticket) -> bool:
         return True
     
     # IT_ADMIN has full ticket access
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only unassign if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return ticket.assigned_to_id == user.id
     
     return False
@@ -323,7 +316,7 @@ def can_self_assign(user, ticket) -> bool:
         bool: True if user can self-assign the ticket
     """
     # VIEWER cannot self-assign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER can always self-assign
@@ -331,11 +324,11 @@ def can_self_assign(user, ticket) -> bool:
         return True
     
     # IT_ADMIN can always self-assign
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only self-assign if unassigned
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return ticket.assigned_to_id is None
     
     return False
@@ -359,7 +352,7 @@ def can_unassign_self(user, ticket) -> bool:
         bool: True if user can unassign themselves from the ticket
     """
     # VIEWER cannot unassign
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # SUPERADMIN and MANAGER can always unassign
@@ -367,11 +360,11 @@ def can_unassign_self(user, ticket) -> bool:
         return True
     
     # IT_ADMIN can always unassign
-    if user.role == _ROLE_IT_ADMIN:
+    if user.role == 'IT_ADMIN':
         return True
     
     # TECHNICIAN: can only unassign if assigned to them
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return ticket.assigned_to_id == user.id
     
     return False
@@ -414,7 +407,7 @@ def can_reassign(user, ticket) -> bool:
         bool: True if user can reassign the ticket
     """
     # TECHNICIAN cannot reassign
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return False
     
     # Other roles can reassign (checked by can_assign)
@@ -519,11 +512,11 @@ def can_add_comment(user, ticket) -> bool:
         bool: True if user can add comments
     """
     # VIEWER cannot comment
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # TECHNICIAN: can only comment if assigned
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return ticket.assigned_to_id == user.id
     
     # Other roles can comment
@@ -548,11 +541,11 @@ def can_view_comment(user, ticket, comment) -> bool:
         bool: True if user can view the comment
     """
     # VIEWER cannot view internal comments
-    if user.role == _ROLE_VIEWER:
+    if user.role == 'VIEWER':
         return False
     
     # TECHNICIAN: can only view if assigned
-    if user.role == _ROLE_TECHNICIAN:
+    if user.role == 'TECHNICIAN':
         return ticket.assigned_to_id == user.id
     
     return True
@@ -832,28 +825,14 @@ def get_ticket_permissions(user, ticket) -> dict:
 
 
 # Legacy assertion aliases
+# assert_can_update → assert_can_edit (different name, safe alias)
 def assert_can_update(user, ticket):
     return assert_can_edit(user, ticket)
 
-
-def assert_can_delete(user, ticket):
-    return assert_can_delete(user, ticket)
-
-
-def assert_can_assign(user, ticket):
-    return assert_can_assign(user, ticket, None)
-
-
-def assert_can_close(user, ticket):
-    return assert_can_close(user, ticket)
-
-
-def assert_can_resolve(user, ticket):
-    return assert_can_resolve(user, ticket)
-
-
-def assert_can_reopen(user, ticket):
-    return assert_can_reopen(user, ticket)
+# Note: assert_can_delete, assert_can_assign, assert_can_close,
+# assert_can_resolve, assert_can_reopen are already defined above
+# with the correct names — the duplicate aliases were removed because
+# they called themselves recursively, causing infinite recursion.
 
 
 def assert_can_cancel(user, ticket):
@@ -869,103 +848,3 @@ assert_can_close_ticket = assert_can_close
 assert_can_resolve_ticket = assert_can_resolve
 assert_can_reopen_ticket = assert_can_reopen
 assert_can_cancel_ticket = assert_can_cancel
-
-
-# =============================================================================
-# TICKET AUTHORITY CLASS - Wrapper for domain service functions
-# =============================================================================
-
-class TicketAuthority:
-    """
-    Wrapper class for ticket authorization functions.
-    Allows using OOP-style access to authorization rules.
-    
-    Example:
-        authority = TicketAuthority()
-        if authority.can_view(user, ticket):
-            # proceed
-    """
-    
-    def can_view(self, user, ticket) -> bool:
-        """Check if user can view this ticket."""
-        return can_view(user, ticket)
-    
-    def can_view_list(self, user) -> bool:
-        """Check if user can view ticket list."""
-        return can_view_list(user)
-    
-    def can_view_details(self, user, ticket) -> bool:
-        """Check if user can view ticket details."""
-        return can_view_details(user, ticket)
-    
-    def can_create(self, user) -> bool:
-        """Check if user can create tickets."""
-        return can_create(user)
-    
-    def can_edit(self, user, ticket) -> bool:
-        """Check if user can edit this ticket."""
-        return can_edit(user, ticket)
-    
-    def can_update(self, user, ticket) -> bool:
-        """Check if user can update this ticket."""
-        return can_update(user, ticket)
-    
-    def can_modify(self, user, ticket) -> bool:
-        """Check if user can modify this ticket."""
-        return can_modify(user, ticket)
-    
-    def can_delete(self, user, ticket) -> bool:
-        """Check if user can delete this ticket."""
-        return can_delete(user, ticket)
-    
-    def can_assign(self, user, ticket, assignee) -> bool:
-        """Check if user can assign this ticket."""
-        return can_assign(user, ticket, assignee)
-    
-    def can_unassign(self, user, ticket) -> bool:
-        """Check if user can unassign this ticket."""
-        return can_unassign(user, ticket)
-    
-    def can_self_assign(self, user, ticket) -> bool:
-        """Check if user can self-assign this ticket."""
-        return can_self_assign(user, ticket)
-    
-    def can_unassign_self(self, user, ticket) -> bool:
-        """Check if user can unassign themselves from this ticket."""
-        return can_unassign_self(user, ticket)
-    
-    def can_assign_to_self(self, user, ticket) -> bool:
-        """Check if user can assign ticket to themselves."""
-        return can_assign_to_self(user, ticket)
-    
-    def can_reassign(self, user, ticket) -> bool:
-        """Check if user can reassign this ticket."""
-        return can_reassign(user, ticket)
-    
-    def can_close(self, user, ticket) -> bool:
-        """Check if user can close this ticket."""
-        return can_close(user, ticket)
-    
-    def can_resolve(self, user, ticket) -> bool:
-        """Check if user can mark ticket as resolved."""
-        return can_resolve(user, ticket)
-    
-    def can_reopen(self, user, ticket) -> bool:
-        """Check if user can reopen this ticket."""
-        return can_reopen(user, ticket)
-    
-    def can_cancel(self, user, ticket) -> bool:
-        """Check if user can cancel this ticket."""
-        return can_cancel(user, ticket)
-    
-    def can_add_comment(self, user, ticket) -> bool:
-        """Check if user can add comments to this ticket."""
-        return can_add_comment(user, ticket)
-    
-    def can_view_comment(self, user, ticket, comment) -> bool:
-        """Check if user can view a comment on this ticket."""
-        return can_view_comment(user, ticket, comment)
-    
-    def can_add_attachment(self, user, ticket) -> bool:
-        """Check if user can add attachments to this ticket."""
-        return can_add_attachment(user, ticket)

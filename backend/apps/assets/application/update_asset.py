@@ -16,6 +16,7 @@ from apps.assets.domain.services.asset_authority import (
     assert_can_edit,
     can_edit,
 )
+from apps.core.services.change_detection import get_changed_fields, format_field_value, get_display_field_name
 
 
 @dataclass
@@ -101,30 +102,46 @@ class UpdateAsset:
         except AuthorizationError as e:
             return UpdateAssetResult.fail(str(e))
         
-        # Track changes for event
-        changes = {}
+        # Store original values for change detection BEFORE any modifications
+        original_values = {}
         allowed_fields = {
             'name', 'description', 'status', 'category_id',
-            'location_id', 'serial_number', 'asset_tag',
-            'purchase_date', 'purchase_price', 'warranty_expiry',
-            'notes',
+            'location', 'serial_number', 'model', 'manufacturer',
+            'purchase_date', 'purchase_cost', 'warranty_expiry',
+            'end_of_life', 'contact_type', 'contact_email', 
+            'contact_phone', 'assigned_to_id', 'assigned_to',
         }
         
+        for field in allowed_fields:
+            if hasattr(asset, field):
+                original_values[field] = getattr(asset, field)
+        
+        # Detect changes before applying updates
+        changes = get_changed_fields(asset, asset_data)
+        
+        # Apply updates to asset
         for field, value in asset_data.items():
             if field in allowed_fields:
-                old_value = getattr(asset, field, None)
-                if field.endswith('_id'):
-                    # Handle foreign key fields
+                if field == 'assigned_to_id' and value:
+                    # Handle assigned_to foreign key
+                    from apps.users.models import User
+                    try:
+                        assigned_user = User.objects.get(id=value)
+                        asset.assigned_to = assigned_user
+                    except User.DoesNotExist:
+                        pass
+                elif field.endswith('_id') and field != 'assigned_to_id':
+                    # Handle other foreign key fields
                     setattr(asset, field, value)
                 else:
                     setattr(asset, field, value)
-                changes[field] = (old_value, value)
         
         asset.updated_by = user
         asset.save()
         
         # Activity logging - runs after transaction commits, never breaks command
-        transaction.on_commit(lambda: self._log_asset_updated(asset, user))
+        # Log each changed field individually
+        transaction.on_commit(lambda: self._log_asset_changes(asset, user, changes))
         
         # Emit domain event
         from apps.assets.domain.events import emit_asset_updated
@@ -144,17 +161,62 @@ class UpdateAsset:
             }
         )
     
-    def _log_asset_updated(self, asset, user):
-        """Log asset update activity."""
+    def _log_asset_changes(self, asset, user, changes):
+        """
+        Log asset update activity with field-level changes.
+        
+        Creates one ActivityLog entry per changed field to show
+        exactly what was changed (old value → new value).
+        """
         try:
             from apps.logs.services.activity_service import ActivityService
-            ActivityService().log_asset_action(
-                action='UPDATE',
-                asset=asset,
-                actor=user,
-                request=None,
-                description=f"Updated asset: {asset.name}"
-            )
+            from django.utils import timezone
+            
+            service = ActivityService()
+            
+            if not changes:
+                # No actual changes, log a generic update
+                service.log_asset_action(
+                    action='UPDATE',
+                    asset=asset,
+                    actor=user,
+                    request=None,
+                    description=f"Updated asset: {asset.name}"
+                )
+                return
+            
+            # Log each changed field individually
+            for change in changes:
+                field_name = change['field']
+                old_value = change['old']
+                new_value = change['new']
+                
+                # Format values for display
+                old_display = format_field_value(old_value)
+                new_display = format_field_value(new_value)
+                
+                # Get human-readable field name
+                display_name = get_display_field_name(field_name)
+                
+                # Build description showing the change
+                description = f"Changed {display_name}: {old_display} → {new_display}"
+                
+                # Create activity log with change details in extra_data
+                service.log_asset_action(
+                    action='UPDATED',
+                    asset=asset,
+                    actor=user,
+                    metadata={
+                        'field_name': field_name,
+                        'field_display': display_name,
+                        'old_value': old_value,
+                        'new_value': new_value,
+                        'old_display': old_display,
+                        'new_display': new_display,
+                    },
+                    request=None,
+                    description=description
+                )
         except Exception:
             pass  # Logging must never break the command
 
