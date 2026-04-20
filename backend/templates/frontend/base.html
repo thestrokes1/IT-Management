@@ -146,6 +146,47 @@
                             <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden {% if request.resolver_match.url_name == 'profile' %}text-pink-700 font-medium{% endif %}">Profile</span>
                         </a>
                         
+                        <!-- Search -->
+                        <button onclick="openSearchModal()" class="nav-link w-full flex items-center px-2 lg:px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 rounded-lg mt-1">
+                            <i class="fas fa-search text-lg w-6 text-center text-gray-500"></i>
+                            <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden">Search</span>
+                        </button>
+
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <button id="notifications-toggle" class="nav-link w-full flex items-center px-2 lg:px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-orange-50 rounded-lg mt-1">
+                                <div class="relative w-6 flex justify-center">
+                                    <i class="fas fa-bell text-lg text-orange-500"></i>
+                                    <span id="notification-count" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">3</span>
+                                </div>
+                                <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden">Notifications</span>
+                            </button>
+                            <div id="notifications-dropdown" class="hidden absolute left-full top-0 ml-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50">
+                                <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                                </div>
+                                <div class="max-h-64 overflow-y-auto">
+                                    <div class="p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">New ticket assigned</div>
+                                        <div class="text-xs text-gray-500 mt-0.5">2 minutes ago</div>
+                                    </div>
+                                    <div class="p-3 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">Project milestone reached</div>
+                                        <div class="text-xs text-gray-500 mt-0.5">1 hour ago</div>
+                                    </div>
+                                </div>
+                                <div class="p-3 border-t border-gray-200 dark:border-gray-700">
+                                    <a href="#" class="text-xs text-primary-600 hover:text-primary-700">View all notifications</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dark Mode -->
+                        <button onclick="toggleDarkMode()" class="nav-link w-full flex items-center px-2 lg:px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 rounded-lg mt-1">
+                            <i id="dark-mode-icon" class="fas fa-moon text-lg w-6 text-center text-gray-500"></i>
+                            <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden">Dark Mode</span>
+                        </button>
+
                         <a href="{% url 'frontend:logout' %}" class="nav-link flex items-center px-2 lg:px-4 py-3 text-gray-700 hover:bg-red-50 rounded-lg mt-1">
                             <i class="fas fa-sign-out-alt text-lg w-6 text-center text-red-500"></i>
                             <span class="sidebar-text ml-3 whitespace-nowrap overflow-hidden text-red-600">Logout</span>
@@ -165,104 +206,13 @@
         
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden main-content {% if request.resolver_match.url_name == 'login' %}lg:ml-0{% else %}lg:ml-64{% endif %}">
-            <!-- Top Header -->
-<header class="bg-white shadow-sm border-b border-gray-200 {% if request.resolver_match.url_name == 'login' %}hidden{% endif %}">
-                <div class="flex items-center justify-between h-16 px-4">
-                    <div class="flex items-center">
-                        <button id="mobile-sidebar-toggle" class="lg:hidden text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-bars text-xl"></i>
-                        </button>
-                        <h2 class="ml-4 lg:ml-0 text-xl font-semibold text-gray-800">
-                            {% block page_title %}Dashboard{% endblock %}
-                        </h2>
-                    </div>
-                    
-                    <!-- Global Messages in Header -->
-                    {% if messages %}
-                    <div class="flex-1 mx-4 flex justify-center">
-                        <div class="flex flex-wrap items-center gap-2 max-w-2xl w-full">
-                            {% for message in messages %}
-                            <div class="px-3 py-1.5 rounded-md border flex items-center gap-2 text-sm alert-message
-                                {% if message.tags == 'success' %}
-                                    bg-green-50 border-green-200 text-green-700
-                                {% elif message.tags == 'error' %}
-                                    bg-red-50 border-red-200 text-red-700
-                                {% elif message.tags == 'warning' %}
-                                    bg-yellow-50 border-yellow-200 text-yellow-700
-                                {% else %}
-                                    bg-blue-50 border-blue-200 text-blue-700
-                                {% endif %}" role="alert">
-                                <div class="flex-shrink-0">
-                                    {% if message.tags == 'success' %}
-                                        <i class="fas fa-check-circle text-green-500 text-xs"></i>
-                                    {% elif message.tags == 'error' %}
-                                        <i class="fas fa-exclamation-circle text-red-500 text-xs"></i>
-                                    {% elif message.tags == 'warning' %}
-                                        <i class="fas fa-exclamation-triangle text-yellow-500 text-xs"></i>
-                                    {% else %}
-                                        <i class="fas fa-info-circle text-blue-500 text-xs"></i>
-                                    {% endif %}
-                                </div>
-                                <span class="text-xs font-medium truncate">{{ message }}</span>
-                                <button onclick="this.parentElement.remove()" class="ml-1 flex-shrink-0 text-gray-400 hover:text-gray-600">
-                                    <i class="fas fa-times text-xs"></i>
-                                </button>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="flex items-center space-x-4">
-                        <!-- Dark Mode Toggle -->
-                        <button id="dark-mode-toggle" onclick="toggleDarkMode()" class="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Toggle Dark Mode">
-                            <i class="fas fa-moon text-xl" id="dark-mode-icon"></i>
-                        </button>
-                        
-                        <!-- Mobile Search Button -->
-                        <button id="mobile-search-toggle" class="md:hidden text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-search text-xl"></i>
-                        </button>
-
-                        <!-- Search -->
-                        <div class="hidden md:block relative">
-                            <input type="text" id="global-search" placeholder="Search..."
-                                   class="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                            <div id="search-results" class="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 hidden z-50"></div>
-                        </div>
-                        
-                        <!-- Notifications -->
-                        <div class="relative">
-                            <button id="notifications-toggle" class="text-gray-500 hover:text-gray-700">
-                                <i class="fas fa-bell text-xl"></i>
-                                <span id="notification-count" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
-                            </button>
-                            <div id="notifications-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                <div class="p-4 border-b border-gray-200">
-                                    <h3 class="text-lg font-semibold">Notifications</h3>
-                                </div>
-                                <div class="max-h-64 overflow-y-auto">
-                                    <div class="p-4 border-b border-gray-100 hover:bg-gray-50">
-                                        <div class="text-sm font-medium">New ticket assigned</div>
-                                        <div class="text-xs text-gray-500 mt-1">2 minutes ago</div>
-                                    </div>
-                                    <div class="p-4 border-b border-gray-100 hover:bg-gray-50">
-                                        <div class="text-sm font-medium">Project milestone reached</div>
-                                        <div class="text-xs text-gray-500 mt-1">1 hour ago</div>
-                                    </div>
-                                </div>
-                                <div class="p-4 border-t border-gray-200">
-                                    <a href="#" class="text-sm text-primary-600 hover:text-primary-700">View all notifications</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-            
             <!-- Main Content Area -->
             <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
                 <div class="container mx-auto px-4 py-6">
+                    <!-- Mobile sidebar toggle -->
+                    <button id="mobile-sidebar-toggle" class="lg:hidden flex items-center text-gray-600 hover:text-gray-900 mb-4">
+                        <i class="fas fa-bars text-lg"></i>
+                    </button>
 <!-- Breadcrumb -->
                     {% block breadcrumb %}
                     <nav class="flex mb-6" aria-label="Breadcrumb">
@@ -423,20 +373,36 @@
     <!-- Overlay for mobile sidebar -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-40 hidden lg:hidden"></div>
 
-    <!-- Mobile Search Overlay -->
-    <div id="mobile-search-overlay" class="mobile-search-overlay">
-        <div id="mobile-search-modal" class="mobile-search-modal">
-            <input type="text" id="mobile-global-search" placeholder="Search..."
-                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-base">
-            <div id="mobile-search-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+    <!-- Search Modal -->
+    <div id="search-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black bg-opacity-50" onclick="if(event.target===this)closeSearchModal()">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg mx-4">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+                <i class="fas fa-search text-gray-400"></i>
+                <input id="search-modal-input" type="text" placeholder="Search tickets, assets, projects, users..."
+                       class="flex-1 bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 text-sm">
+                <button onclick="closeSearchModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="search-modal-results" class="max-h-80 overflow-y-auto p-2">
+                <p class="p-4 text-center text-sm text-gray-400">Type at least 3 characters to search...</p>
+            </div>
         </div>
     </div>
-    
 
     <!-- JavaScript -->
     <script src="{% static 'js/main.js' %}"></script>
     
     {% block extra_js %}{% endblock %}
+    {% if messages %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            {% for message in messages %}
+            showToast("{{ message|escapejs }}", "{% if message.tags == 'success' or message.tags == 'error' or message.tags == 'warning' %}{{ message.tags }}{% else %}info{% endif %}");
+            {% endfor %}
+        });
+    </script>
+    {% endif %}
 </body>
 </html>
 

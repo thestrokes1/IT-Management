@@ -104,13 +104,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =====================================================
-    // SEARCH API & UI
+    // SEARCH MODAL
     // =====================================================
-    const globalSearch = document.getElementById('global-search');
-    const searchResults = document.getElementById('search-results');
-    
-    if (globalSearch && searchResults) {
-        globalSearch.addEventListener('input', function() {
+    const searchInput = document.getElementById('search-modal-input');
+    const searchModalResults = document.getElementById('search-modal-results');
+
+    if (searchInput && searchModalResults) {
+        searchInput.addEventListener('input', function() {
             const query = this.value;
             if (query.length > 2) {
                 fetch(`/api/search/?q=${encodeURIComponent(query)}`)
@@ -118,53 +118,52 @@ document.addEventListener('DOMContentLoaded', () => {
                     .then(data => {
                         if (data.count > 0) {
                             let html = '<div class="p-2">';
-                            
                             ['users', 'tickets', 'assets', 'projects'].forEach(type => {
                                 if (data.results[type] && data.results[type].length > 0) {
-                                    html += `<div class="text-xs font-semibold text-gray-500 mb-1 mt-2 capitalize">${type}</div>`;
+                                    html += `<div class="text-xs font-semibold text-gray-400 uppercase tracking-wide px-2 mt-3 mb-1">${type}</div>`;
                                     data.results[type].forEach(item => {
                                         let link = '#';
-                                        let display = item.name || item.title || item.username;
+                                        const display = item.name || item.title || item.username;
                                         if (type === 'users') link = `/edit-user/${item.id}/`;
                                         if (type === 'tickets') link = `/tickets/${item.id}/`;
                                         if (type === 'assets') link = `/assets/${item.id}/`;
                                         if (type === 'projects') link = `/project/${item.id}/`;
-                                        
-                                        html += `<a href="${link}" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer block rounded transition-colors">${display}</a>`;
+                                        html += `<a href="${link}" onclick="closeSearchModal()" class="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm transition-colors">${display}</a>`;
                                     });
                                 }
                             });
-                            
                             html += '</div>';
-                            searchResults.innerHTML = html;
-                            searchResults.classList.remove('hidden');
+                            searchModalResults.innerHTML = html;
                         } else {
-                            searchResults.innerHTML = '<div class="p-4 text-center text-gray-500">No results found</div>';
-                            searchResults.classList.remove('hidden');
+                            searchModalResults.innerHTML = '<p class="p-4 text-center text-sm text-gray-400">No results found</p>';
                         }
-                    }).catch(err => {
-                        searchResults.innerHTML = '<div class="p-4 text-center text-red-500">Search failed.</div>';
-                        searchResults.classList.remove('hidden');
+                    }).catch(() => {
+                        searchModalResults.innerHTML = '<p class="p-4 text-center text-sm text-red-500">Search failed.</p>';
                     });
             } else {
-                searchResults.classList.add('hidden');
+                searchModalResults.innerHTML = '<p class="p-4 text-center text-sm text-gray-400">Type at least 3 characters to search...</p>';
             }
         });
     }
 
     // =====================================================
-    // MODALS & DROPDOWNS
+    // NOTIFICATIONS & KEYBOARD
     // =====================================================
-    document.getElementById('notifications-toggle')?.addEventListener('click', () => {
+    document.getElementById('notifications-toggle')?.addEventListener('click', (e) => {
+        e.stopPropagation();
         document.getElementById('notifications-dropdown')?.classList.toggle('hidden');
     });
 
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('#notifications-toggle')) {
+        if (!e.target.closest('#notifications-toggle') && !e.target.closest('#notifications-dropdown')) {
             document.getElementById('notifications-dropdown')?.classList.add('hidden');
         }
-        if (!e.target.closest('#global-search') && !e.target.closest('#search-results')) {
-            document.getElementById('search-results')?.classList.add('hidden');
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.getElementById('notifications-dropdown')?.classList.add('hidden');
+            window.closeSearchModal?.();
         }
     });
 
@@ -242,6 +241,20 @@ window.executeConfirm = function() {
     document.getElementById('confirmModal').classList.add('hidden');
     if (_confirmCallback) _confirmCallback();
     _confirmCallback = null;
+};
+
+// Search Modal
+window.openSearchModal = function() {
+    document.getElementById('search-modal')?.classList.remove('hidden');
+    setTimeout(() => document.getElementById('search-modal-input')?.focus(), 50);
+};
+
+window.closeSearchModal = function() {
+    document.getElementById('search-modal')?.classList.add('hidden');
+    const input = document.getElementById('search-modal-input');
+    const results = document.getElementById('search-modal-results');
+    if (input) input.value = '';
+    if (results) results.innerHTML = '<p class="p-4 text-center text-sm text-gray-400">Type at least 3 characters to search...</p>';
 };
 
 // Generic Modal Handling
