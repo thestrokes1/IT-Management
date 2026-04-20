@@ -29,7 +29,11 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
 
+        user.refresh_from_db()
+        verified = user.check_password(password)
+
         action = 'Created' if created else 'Updated'
-        self.stdout.write(f'===> {action} superuser: "{username}" password_length={len(password)} (role=SUPERADMIN) <===')
-        self.stdout.write(f'===> LOGIN NOW AT: /login/ with username="{username}" <===')
+        self.stdout.write(f'===> {action} superuser: "{username}" password_length={len(password)} verified={verified} <===')
+        if not verified:
+            self.stdout.write('ERROR: password was NOT saved correctly to DB!')
 
