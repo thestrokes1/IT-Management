@@ -17,6 +17,8 @@ class Command(BaseCommand):
             self.stdout.write('DJANGO_SUPERUSER_USERNAME and DJANGO_SUPERUSER_PASSWORD required — skipping.')
             return
 
+        self.stdout.write(f'init_superuser: username="{username}" password_length={len(password)} first_char="{password[0]}"')
+
         user, created = User.objects.get_or_create(username=username)
         user.email = email
         user.is_staff = True
@@ -26,4 +28,4 @@ class Command(BaseCommand):
         user.save()
 
         action = 'Created' if created else 'Updated'
-        self.stdout.write(f'{action} superuser: {username} (role=SUPERADMIN)')
+        self.stdout.write(f'{action} superuser: {username} (role=SUPERADMIN, is_superuser=True)')
