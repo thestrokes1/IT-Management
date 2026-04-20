@@ -1,0 +1,264 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== MODERNIZED DARK & LIGHT MODE CSS ===== */
+
+/* Font Family Base */
+body {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
+}
+
+/* Base Light Mode Variables */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-tertiary: #f1f5f9;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border-color: #e2e8f0;
+    --border-light: #f1f5f9;
+    --shadow-color: rgba(15, 23, 42, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    color-scheme: light dark;
+}
+
+/* CSS Custom Properties for Dark Mode */
+html.dark {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --border-light: #475569;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --glass-bg: rgba(30, 41, 59, 0.75);
+    color-scheme: dark;
+}
+
+/* Glassmorphism Utilities */
+@layer components {
+  .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+html.dark .glass-panel {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Smooth Transitions Foundation */
+body, 
+.bg-gray-50, 
+.bg-gray-100, 
+.bg-white,
+header.bg-white,
+.sidebar,
+.modal-content,
+.toast,
+input, textarea, select, button, a {
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Backgrounds overriding Tailwind */
+html.dark body,
+html.dark .bg-gray-50,
+html.dark .bg-gray-100 {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+html.dark .bg-white {
+    background-color: var(--bg-secondary);
+}
+
+/* Text Colors dynamically adapting */
+html.dark .text-gray-400,
+html.dark .text-gray-500 {
+    color: var(--text-secondary);
+}
+
+html.dark .text-gray-600,
+html.dark .text-gray-700,
+html.dark .text-gray-800,
+html.dark .text-gray-900 {
+    color: var(--text-primary);
+}
+
+/* Borders */
+html.dark .border-gray-200,
+html.dark .border-gray-300,
+html.dark .border-b.border-gray-200 {
+    border-color: var(--border-color);
+}
+
+html.dark header.shadow-sm {
+    box-shadow: 0 1px 15px var(--shadow-color);
+}
+
+/* Sidebar Specifics */
+html.dark .nav-link {
+    color: var(--text-secondary);
+}
+html.dark .nav-link:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    transform: translateX(4px);
+}
+.nav-link:hover {
+    transform: translateX(4px);
+}
+
+/* Forms Input Enhancements */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea, select {
+    border-radius: 0.5rem;
+}
+
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark input[type="search"],
+html.dark textarea,
+html.dark select {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+    border-color: #6366f1; /* Indigo 500 */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+/* UI Elements */
+html.dark a { color: #6366f1; }
+html.dark a:hover { color: #818cf8; text-shadow: 0 0 8px rgba(99,102,241,0.4); }
+
+/* Dropdowns & Modals */
+html.dark #notifications-dropdown,
+html.dark #user-menu-dropdown,
+html.dark #search-results {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+    box-shadow: 0 10px 25px -5px var(--shadow-color);
+}
+
+html.dark .modal-content {
+    background: var(--bg-secondary);
+}
+
+/* Dashboard Cards (Premium Elevation) */
+.bg-white.rounded-lg.shadow {
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 2px 4px -1px var(--shadow-color);
+}
+.bg-white.rounded-lg.shadow:hover {
+    box-shadow: 0 10px 15px -3px var(--shadow-color), 0 4px 6px -2px var(--shadow-color);
+    transform: translateY(-2px);
+}
+
+/* Sidebar Collapse/Expand Transitions */
+.sidebar {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar-icon-only { width: 5rem !important; }
+.sidebar-full { width: 16rem !important; }
+
+.sidebar-text {
+    transition: opacity 0.2s ease-in-out, visibility 0.2s;
+    opacity: 1;
+    visibility: visible;
+}
+.sidebar-text.hidden-text {
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+    overflow: hidden;
+}
+
+.main-content {
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile Rules */
+@media (max-width: 1023px) {
+    .sidebar {
+        position: fixed;
+        z-index: 50;
+        transform: translateX(-100%);
+    }
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    .main-content {
+        margin-left: 0 !important;
+    }
+}
+
+/* Pulse / Skeleton Indicator */
+.skeleton {
+    animation: skeleton-loading 1s linear infinite alternate;
+}
+@keyframes skeleton-loading {
+    0% { background-color: hsl(200, 20%, 90%); }
+    100% { background-color: hsl(200, 20%, 95%); }
+}
+html.dark .skeleton {
+    animation: skeleton-loading-dark 1s linear infinite alternate;
+}
+@keyframes skeleton-loading-dark {
+    0% { background-color: hsl(215, 20%, 20%); }
+    100% { background-color: hsl(215, 20%, 15%); }
+}
+
+/* Toasts */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+.toast {
+    margin-bottom: 10px;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px var(--shadow-color);
+    animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Modal Backdrops & Appearance */
+#confirmModal, .mobile-search-overlay {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+.modal-content {
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+}
+html.dark .modal-footer .modal-btn-cancel {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+html.dark .modal-footer .modal-btn-cancel:hover { background-color: var(--border-light); }
+
+@keyframes slideIn {
+    from { transform: translateX(120%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
