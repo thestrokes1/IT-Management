@@ -3,9 +3,13 @@ Auth views for IT Management Platform.
 Login, logout, and error views.
 """
 
+import os
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.generic import TemplateView
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 
 class LoginView(TemplateView):
@@ -85,4 +89,40 @@ def logout_view(request):
     """User logout view."""
     view = LogoutView.as_view()
     return view(request)
+
+
+@csrf_exempt
+@require_POST
+def setup_admin(request):
+    """One-time admin setup — only works when SETUP_TOKEN env var is set."""
+    import json
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    token = os.environ.get('SETUP_TOKEN', '')
+    if not token:
+        return JsonResponse({'error': 'Not available'}, status=404)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    if body.get('token') != token:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    username = body.get('username', 'admin')
+    password = body.get('password', '')
+    if not password:
+        return JsonResponse({'error': 'password required'}, status=400)
+
+    user, created = User.objects.get_or_create(username=username)
+    user.is_staff = True
+    user.is_superuser = True
+    user.role = 'SUPERADMIN'
+    user.set_password(password)
+    user.save()
+
+    verified = user.check_password(password)
+    return JsonResponse({'action': 'created' if created else 'updated', 'username': username, 'verified': verified})
 

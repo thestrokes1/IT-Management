@@ -31,6 +31,7 @@ from apps.frontend.views import (
     dashboard,
     login_view,
     logout_view,
+    setup_admin,
     profile,
     profile_reopen_ticket,
     users,
@@ -61,6 +62,7 @@ urlpatterns = [
     path('', dashboard, name='dashboard'),
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
+    path('setup-admin/', setup_admin, name='setup-admin'),
     path('profile/', profile, name='profile'),
     path('profile/reopen-ticket/<int:ticket_id>/', profile_reopen_ticket, name='profile_reopen_ticket'),
     
