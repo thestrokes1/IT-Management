@@ -13,11 +13,13 @@ class Command(BaseCommand):
         email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '')
         password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
 
-        if not username or not password:
-            self.stdout.write('DJANGO_SUPERUSER_USERNAME and DJANGO_SUPERUSER_PASSWORD required — skipping.')
-            return
+        FALLBACK_PASSWORD = 'Deploy2026!IT'
 
-        self.stdout.write(f'init_superuser: username="{username}" password_length={len(password)} first_char="{password[0]}"')
+        if not username:
+            username = 'admin'
+        if not password:
+            password = FALLBACK_PASSWORD
+            self.stdout.write(f'WARNING: DJANGO_SUPERUSER_PASSWORD not set — using fallback password')
 
         user, created = User.objects.get_or_create(username=username)
         user.email = email
@@ -28,4 +30,6 @@ class Command(BaseCommand):
         user.save()
 
         action = 'Created' if created else 'Updated'
-        self.stdout.write(f'{action} superuser: {username} (role=SUPERADMIN, is_superuser=True)')
+        self.stdout.write(f'===> {action} superuser: "{username}" password_length={len(password)} (role=SUPERADMIN) <===')
+        self.stdout.write(f'===> LOGIN NOW AT: /login/ with username="{username}" <===')
+
