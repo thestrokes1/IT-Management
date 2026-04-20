@@ -25,6 +25,9 @@ whitenoise==6.6.0
 django-redis==5.4.0
 redis==5.0.1
 
+# Task Queue
+celery==5.3.6
+
 # Utilities & Tools
 django-filter==23.5
 
