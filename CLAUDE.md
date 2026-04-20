@@ -84,6 +84,29 @@ Track progress here. Check items off as they are completed.
 - [x] Left `projects/permissions.py` unchanged — all 16 classes are used and use Django model properties (different abstraction layer), no dead code to remove
 - **Total LOC removed: ~1,154 lines across 3 permission files**
 
+### Phase 8 — UI/UX Polish & Deployment Fixes (Next up)
+
+#### 🔴 Functional — app is not fully demoable without these
+
+- [ ] **Seed demo users** — `itadmin`, `manager`, `tech`, `viewer` shown on login page but don't exist on Render DB. Write a management command `seed_demo_users` that creates them with `admin123` password, idempotent (safe to re-run). Add to build command in `render.yaml` after `init_superuser`.
+- [ ] **Seed categories** — Creating a ticket/asset/project requires categories to exist. Fresh deployment has zero so create forms fail silently. Write `seed_categories` management command (or combine with above into `seed_data`) that creates: TicketCategory (Hardware Issue, Software, Network/Connectivity, General Inquiry, Email/Communication), AssetCategory (Laptop, Desktop, Monitor, Printer, Phone, Server), ProjectCategory (Infrastructure, Security, Development, Maintenance).
+- [ ] **Console errors on every page** — 4–7 JS errors logged per page load (visible in dev toolbar). Identify and fix — likely missing API endpoints or undefined JS references.
+
+#### 🟡 Code hygiene
+
+- [ ] **Add `.playwright-mcp/` to `.gitignore`** — Playwright screenshots/snapshots are untracked and will get accidentally staged. Add `/.playwright-mcp/` to `.gitignore`.
+- [ ] **Add `favicon.ico`** — Every page request logs `GET /favicon.ico 404`. Add a simple favicon to `static/` and reference it in `base.html`.
+- [ ] **Delete old Render service** — `IT-Management` (srv-d65ps575r7bs73bk8ho0, deployed Feb 2026) is still running at `it-management-e72k.onrender.com` and consuming free-tier resources alongside the new service. Delete it from Render dashboard.
+- [ ] **Update `PROJECT SUMMARY` status** — CLAUDE.md still says `Status: Not deployed` — now deployed at `https://it-management-backend-afpb.onrender.com`.
+
+#### 🟢 UI — verify and polish
+
+- [ ] **Light mode spot-check** — All recent fixes were tested in dark mode only. Open the app in light mode and verify: button text, breadcrumbs, hover states, empty states all look correct.
+- [ ] **Mobile layout** — Test sidebar collapse/hamburger on a narrow viewport after the navbar removal. The `lg:hidden` hamburger button at the top of main content needs to actually open the sidebar smoothly.
+- [ ] **Projects "Create" button missing for SUPERADMIN on local DB** — Verify this works on Render where the admin user has SUPERADMIN role. If it fails there too, debug `permissions.can_create` for projects.
+- [ ] **Ticket detail page** — Not checked in UI review. Verify dark mode styling, breadcrumb (should be `Dashboard > Tickets > #ID`), and action buttons (assign, close, resolve) are visible and functional.
+- [ ] **Create/Edit forms** — Check all create forms (ticket, asset, project, user) in dark mode. Form fields, labels, and submit buttons may have the same white-on-white issue we fixed for list pages.
+
 ### Phase 7 — Deploy (Code ready — user action needed)
 **Pre-deploy fixes applied:**
 - `render.py`: `conn_max_links=500` → `conn_max_age=60` (invalid param → TypeError on startup)
@@ -121,7 +144,7 @@ Track progress here. Check items off as they are completed.
 | Logs | Full audit trail: ActivityLog (differential changes) + SecurityEvent |
 | Security | Rate limiting, auth event tracking, SecurityAudit model |
 
-**Status:** Not deployed. Deployment config exists for both Render and PythonAnywhere.
+**Status:** Deployed at `https://it-management-backend-afpb.onrender.com` (Render free tier, spins down after 15 min inactivity). Login: `admin` / `Deploy2026!IT`.
 
 ---
 
