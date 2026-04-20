@@ -27,8 +27,8 @@ media/
 
 # LOGS
 backend/runtime_logs/
+backend/logs/
 *.log
-logs/
 
 # IDE & EDITORS
 .vscode/
